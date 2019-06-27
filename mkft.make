@@ -1,10 +1,19 @@
 # mkft.make
 #CC := clang  # Code gen errors ?
 #OPT := -Wall -Oz
-CC := gcc
-OPT := -Wall -Os
+#
+CC := pgcc
+OPT := -O2
+ACC := -Mautoinline -acc=verystrict -ta=tesla
+#
+#CC := gcc
+#OPT := -Wall -Os
+# full debug...
 #OPT := -Wall -g -O0
+# problematic...
 # -std=c11 -D__USE_MISC -pedantic
+# defaults
+ACC ?= 
 
 TARGET := mkft
 MAKEFILE := $(TARGET).make
@@ -24,7 +33,7 @@ CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
 LIBS := -lm
 PATHS := -I$(CMN_DIR) -I$(INC_DIR)
 DEFS :=
-#-DLX_I2C_MAIN
+#-DMK_
 
 # Move any object files to the expected location
 $(OBJ_DIR)/%.o : %.o
@@ -33,7 +42,7 @@ $(OBJ_DIR)/%.o : %.o
 ifeq ($(BUILD),FLLSRC)
 # Full build from source every time
 $(TARGET) : $(SRC) $(CMN_SRC) $(HDR) $(MAKEFILE)
-	$(CC) $(OPT) $(PATHS) $(DEFS) $(LIBS) $(SRC) $(CMN_SRC) -o $@
+	$(CC) $(OPT) $(ACC) $(PATHS) $(DEFS) $(LIBS) $(SRC) $(CMN_SRC) -o $@
 
 else
 # Build incrementally if efficiency becomes a concern...
@@ -44,7 +53,7 @@ else
 	$(CC) $(OPT) $(PATHS) $(DEFS) $(PATHS) $< -c
 
 $(TARGET) : $(OBJ) $(CMN_OBJ) $(MAKEFILE)
-	$(CC) $(OPT) $(LIBS) $(OBJ) $(CMN_OBJ) -o $@
+	$(CC) $(OPT) $(ACC) $(LIBS) $(OBJ) $(CMN_OBJ) -o $@
 
 endif
 
