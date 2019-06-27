@@ -1,3 +1,6 @@
+// mkfTest.h - Minkowski Functional test code.
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors June 2019
 
 #ifndef MKFT_H
 #define MKFT_H

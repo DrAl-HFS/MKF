@@ -1,3 +1,7 @@
+// mkfTools.h - tools for calculating Minkowski Functionals on a scalar field (via packed binary map and pattern distribution).
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors June 2019
+
 #ifndef MKFTOOLS_H
 #define MKFTOOLS_H
 
@@ -19,6 +23,7 @@ typedef double MKMeasureVal;
 
 //extern int addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int rowStride, const int n);
 
+// Simple version for basic testing
 extern void procSimple (U32 hBPD[256], U8 *pBM, const F32 *pF, const int def[3], const BinMapCtxF32 *pC);
 
 
