@@ -65,13 +65,14 @@ ACC_INLINE void addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int
    }
 } // addRowBPD
 
-void procSimple (U32 hBPD[256], U8 *pBM, const F32 *pF, const int def[3], const BinMapCtxF32 *pC)
+void procSimple (U32 hBPD[256], U8 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapCtxF32 * const pC)
 {
-      const int rowStride= BITS_TO_BYTES(def[0]);
-      const int planeStride= rowStride * def[1];
-      const int nF= def[0]*def[1]*def[2];
+   const int rowStride= BITS_TO_BYTES(def[0]);
+   const int planeStride= rowStride * def[1];
+   const int volStride= planeStride * def[2];
+   const int nF= def[0]*def[1]*def[2];
 
-   #pragma acc data present_or_create( pBM[:planeStride*def[2]] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( hBPD[:256] )
+   #pragma acc data present_or_create( pBM[:volStride] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( hBPD[:256] )
    {  // #pragma acc parallel vector ???
       if ((rowStride<<3) == def[0])
       {  // Multiple of 8
@@ -84,12 +85,18 @@ void procSimple (U32 hBPD[256], U8 *pBM, const F32 *pF, const int def[3], const 
 
       for (int j= 0; j < (def[2]-1); j++)
       {
-         //#pragma acc parallel vector
+         const U8 * restrict pPlane[2];
+         pPlane[0]= pBM + j * planeStride;
+         pPlane[1]= pBM + (j+1) * planeStride;
+         #pragma acc loop seq
          for (int i= 0; i < (def[1]-1); i++)
          {
-            const U8 * pRow[2];
-            pRow[0]= pBM + i * rowStride + j * planeStride;
-            pRow[1]= pRow[0] + planeStride;
+            const U8 * restrict pRow[2];
+            //pRow[0]= pBM + i * rowStride + j * planeStride;
+            //pRow[1]= pBM + i * rowStride + (j+1) * planeStride;
+            //pRow[1]= pRow[0] + planeStride;
+            pRow[0]= pPlane[0] + i * rowStride;
+            pRow[1]= pPlane[1] + i * rowStride;
             addRowBPD(hBPD, pRow, rowStride, def[0]);
          }
       }

@@ -17,7 +17,7 @@
 // '<' '=' '>' -> 0, 1, 2
 ACC_INLINE U8 sgnIdxDiffF32 (const F32 f, const F32 t) { return(1 + (f > t) - (f < t)); } // 1+sgnF32(f-t)
 
-ACC_INLINE U8 bm1F32 (const F32 f, const BinMapCtxF32 *pC)
+ACC_INLINE U8 bm1F32 (const F32 f, const BinMapCtxF32 * const pC)
 {  // pragma acc data present( pC[:1] )
    return( pC->m[ sgnIdxDiffF32(f, pC->t[0]) ] );
 } // bm1F32
@@ -50,13 +50,17 @@ void setBMCF32 (BinMapCtxF32 *pC, const char relopChars[], const F32 t)
       }
       ++i;
    } while (valid);
-   if (pC->m[3] & 0x80) { for (i= 0; i < 3; i++) { pC->m[i]^= 0x01; } }
+   if (pC->m[3] & 0x80)
+   {  // Invert all
+      i= 0;
+      do { pC->m[i]^= 0x01; } while (++i < 3);
+   }
    LOG_CALL("(%p, %s, %G) - m={0x%X:0x%X:0x%X:0x%X}\n", pC, relopChars, t, pC->m[0], pC->m[1], pC->m[2], pC->m[3]);
    //acc_set_device_num( 0, acc_device_host );
 } // setBMCF32
 
 #pragma acc routine vector
-void binMapNF32G (U8 * restrict pBM, const F32 * restrict pF, const size_t n, const BinMapCtxF32 *pC)
+void binMapNF32G (U8 * restrict pBM, const F32 * restrict pF, const size_t n, const BinMapCtxF32 * const pC)
 {
    #pragma acc data present( pBM[:n], pF[:n], pC[:1] )
    {

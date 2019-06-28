@@ -18,7 +18,8 @@ ACC ?=
 
 TARGET := mkft
 MAKEFILE := $(TARGET).make
-BUILD := FLLSRC
+BUILD := NCRMNTL
+#FLLSRC
 
 SRC_DIR := src
 HDR_DIR := $(SRC_DIR)
@@ -48,10 +49,10 @@ $(TARGET) : $(SRC) $(CMN_SRC) $(HDR) $(MAKEFILE)
 else
 # Build incrementally if efficiency becomes a concern...
 %.o : $(SRC_DIR)/%.c $(HDR_DIR)/%.h
-	$(CC) $(OPT) $(PATHS) $(DEFS) $(PATHS) $< -c
+	$(CC) $(OPT) $(ACC) $(PATHS) $(DEFS) $< -c
 
 %.o : $(CMN_DIR)/%.c $(CMN_DIR)/%.h
-	$(CC) $(OPT) $(PATHS) $(DEFS) $(PATHS) $< -c
+	$(CC) $(OPT) $(PATHS) $(DEFS) $< -c
 
 $(TARGET) : $(OBJ) $(CMN_OBJ) $(MAKEFILE)
 	$(CC) $(OPT) $(ACC) $(LIBS) $(OBJ) $(CMN_OBJ) -o $@
