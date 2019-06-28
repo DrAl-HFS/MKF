@@ -3,6 +3,7 @@
 // (c) Project Contributors June 2019
 
 #include "binMap.h"
+#include "openacc.h"
 
 #ifndef ACC_INLINE
 #define ACC_INLINE
@@ -30,38 +31,56 @@ ACC_INLINE U8 bm2F32 (const F32 f, const BinMapCtxF32 *pC)
 
 /***/
 
+//pragma acc routine seq
 void setBMCF32 (BinMapCtxF32 *pC, const char relopChars[], const F32 t)
 {
    int i= 0, valid= 1;
    pC->t[0]= t;
    pC->w= 0;
 
-   while (valid)
+   do
    {
       switch(relopChars[i])
       {
          case '<' : pC->m[0]|= 0x01; break;
          case '=' : pC->m[1]|= 0x01; break;
          case '>' : pC->m[2]|= 0x01; break;
-         case '!' : if (0 ==i) { pC->m[3]|= 0x80; break; } // else...
+         case '!' : if (0 == i) { pC->m[3]|= 0x80; break; } // else...
          default : valid= 0;
       }
       ++i;
-   }
+   } while (valid);
    if (pC->m[3] & 0x80) { for (i= 0; i < 3; i++) { pC->m[i]^= 0x01; } }
    LOG_CALL("(%p, %s, %G) - m={0x%X:0x%X:0x%X:0x%X}\n", pC, relopChars, t, pC->m[0], pC->m[1], pC->m[2], pC->m[3]);
+   //acc_set_device_num( 0, acc_device_host );
 } // setBMCF32
 
-#pragma acc routine
+#pragma acc routine vector
+void binMapNF32G (U8 * restrict pBM, const F32 * restrict pF, const size_t n, const BinMapCtxF32 *pC)
+{
+   #pragma acc data present( pBM[:n], pF[:n], pC[:1] )
+   {
+      #pragma acc loop vector
+      for (size_t i= 0; i < n; i++)
+      { //
+         pBM[i]= bm1F32(pF[i], pC); // << (i & 0x7);
+      }
+   }
+} // binMapNF32G
+
+#pragma acc routine vector
 void binMapNF32 (U8 * restrict pBM, const F32 * restrict pF, const size_t nF, const BinMapCtxF32 *pC)
 {
-   #pragma acc data present( pBM[:BITS_TO_BYTES(nF)], pF[:nF], pC[:1] )
-   {  // #pragma acc parallel vector ???
-      for (size_t i= 0; i < nF; i+= 8)
-      { //#pragma acc seq ???
+   const size_t nB= nF>>3; // NB: truncates non multiple of 8!
+   #pragma acc data present( pBM[:nB], pF[:nF], pC[:1] )
+   {
+      #pragma acc loop vector
+      for (size_t i= 0; i < nB; i++)
+      { //
          U8 b= 0;
-         for (int j= 0; j < 8; j++) { b|= bm1F32(pF[i+j], pC) << j; }
-         pBM[i >> 3]= b;
+         #pragma acc loop seq
+         for (int j= 0; j < 8; j++) { b|= bm1F32(pF[(i*8)+j], pC) << j; }
+         pBM[i]= b;
       }
    }
 } // binMapNF32
@@ -76,7 +95,7 @@ void binMapRowsF32
    #pragma acc data present( pBM[:rowStrideBM*nRows], pF[:rowLenF*nRows], pC[:1] )
    {
       const int rowLenBits= (rowLenF + 0x7) & ~0x7;
-      #pragma acc parallel
+      #pragma acc loop vector
       for (int i= 0; i < nRows; i++)
       {
          binMapNF32(pBM + i * rowStrideBM, pF + i * rowLenF, rowLenBits, pC);

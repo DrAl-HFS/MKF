@@ -93,6 +93,15 @@ int main (int argc, char *argv[])
 #endif
          setBMCF32(&ctx,">=",0.5);
          procSimple(hBPD, pBM, pF, def, &ctx);
+         { // debug...
+            size_t t= 0;
+            for (int i= 0; i < 256; i++)
+            {
+               //LOG("%d: %u\n", i, hBPD[i]);
+               t+= hBPD[i] * bitCountZ(i);
+            }
+            LOG("bitcount=%zu /8= %zu\n", t, t>>3);
+         }
 
          vf= volFrac(hBPD);
          kf= chiEP3(hBPD);

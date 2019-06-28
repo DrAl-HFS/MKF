@@ -67,11 +67,11 @@ ACC_INLINE void addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int
 
 void procSimple (U32 hBPD[256], U8 *pBM, const F32 *pF, const int def[3], const BinMapCtxF32 *pC)
 {
-   const int rowStride= BITS_TO_BYTES(def[0]);
-   const int planeStride= rowStride * def[1];
-   const int nF= def[0]*def[1]*def[2];
+      const int rowStride= BITS_TO_BYTES(def[0]);
+      const int planeStride= rowStride * def[1];
+      const int nF= def[0]*def[1]*def[2];
 
-   #pragma acc data present_or_create( pBM[:planeStride*def[2]] ) present_or_copyin( pF[:nF], pC[:1] )
+   #pragma acc data present_or_create( pBM[:planeStride*def[2]] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( hBPD[:256] )
    {  // #pragma acc parallel vector ???
       if ((rowStride<<3) == def[0])
       {  // Multiple of 8
@@ -82,29 +82,17 @@ void procSimple (U32 hBPD[256], U8 *pBM, const F32 *pF, const int def[3], const 
          binMapRowsF32(pBM, pF, def[0], rowStride, def[1]*def[2], pC);
       }
 
-      #pragma acc data copy( hBPD[:256] )
+      for (int j= 0; j < (def[2]-1); j++)
       {
-         for (int j= 0; j < (def[2]-1); j++)
+         //#pragma acc parallel vector
+         for (int i= 0; i < (def[1]-1); i++)
          {
-            //#pragma acc parallel vector
-            for (int i= 0; i < (def[1]-1); i++)
-            {
-               const U8 * pRow[2];
-               pRow[0]= pBM + i * rowStride + j * planeStride;
-               pRow[1]= pRow[0] + planeStride;
-               addRowBPD(hBPD, pRow, rowStride, def[0]);
-            }
+            const U8 * pRow[2];
+            pRow[0]= pBM + i * rowStride + j * planeStride;
+            pRow[1]= pRow[0] + planeStride;
+            addRowBPD(hBPD, pRow, rowStride, def[0]);
          }
       }
-   }
-   { // debug...
-      size_t t= 0;
-      for (int i= 0; i < 256; i++)
-      {
-         //LOG("%d: %u\n", i, hBPD[i]);
-         t+= hBPD[i] * bitCountZ(i);
-      }
-      LOG("bitcount=%zu /8= %zu\n", t, t>>3);
    }
 } // procSimple
 

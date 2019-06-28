@@ -4,7 +4,8 @@
 #
 CC := pgcc
 OPT := -O2
-ACC := -Mautoinline -acc=verystrict -ta=tesla
+ACC := -Mautoinline -acc=verystrict -ta=tesla -Minfo=all
+# multicore,tesla
 #
 #CC := gcc
 #OPT := -Wall -Os
