@@ -2,7 +2,8 @@
 UNAME := $(shell uname -a)
 PGCCOUT := $(shell pgcc 2>&1)
 
-ifeq ($(PGCCOUT),pgcc)
+#ifeq ($(PGCCOUT),pgcc)
+ifneq (,$(findstring pgcc,$(PGCCOUT)))
 BUILD := NCRMNTL
 CC := pgcc
 OPT := -O2
