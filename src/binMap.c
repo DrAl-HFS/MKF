@@ -16,19 +16,25 @@
 //int sgnF32 (const F32 f) { return((f > 0) - (f < 0)); }
 
 // '<' '=' '>' -> 0, 1, 2
-ACC_INLINE U32 sgnIdxDiffF32 (const F32 f, const F32 t) { return(1 + (f > t) - (f < t)); } // 1+sgnF32(f-t)
+ACC_INLINE U32 sgnIdxDiff1F32 (const F32 f, const F32 t) { return(1 + (f > t) - (f < t)); } // 1+sgnF32(f-t)
 
 ACC_INLINE U32 bm1F32 (const F32 f, const BinMapF32 * const pC)
 {  // pragma acc data present( pC[:1] )
-   return( (pC->m >> sgnIdxDiffF32(f, pC->t[0]) ) & 0x1 );
+   return( (pC->m >> sgnIdxDiff1F32(f, pC->t[0]) ) & 0x1 );
 } // bm1F32
 
-/* interval threshold (hysteresis)
+#if 0
+// interval threshold (hysteresis)
+ACC_INLINE U32 sgnIdxDiff2F32 (const F32 f, const F32 t[2])
+{
+   return( sgnIdxDiff1F32(f,t[0]) + 3 * sgnIdxDiff1F32(f,t[1]) );
+} // sgnIdxDiff2F32
+
 ACC_INLINE U8 bm2F32 (const F32 f, const BinMapCtxF32 *pC)
 {  // pragma acc data present( pC[:1] )
-   return( pC->m[ sgnIdxDiffF32(f, pC->t[0]) + 3 * sgnIdxDiffF32(f, pC->t[1]) ] );
+   return( ( pC->m >> (sgnIdxDiff2F32(f, pC->t[0]) + 3 * sgnIdxDiffF32(f, pC->t[1])) ) & 0x1 );
 } // bm2F32
-*/
+#endif
 
 /***/
 
