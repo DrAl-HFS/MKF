@@ -1,25 +1,30 @@
 # mkft.make
-#CC := clang  # Code gen errors ?
-#OPT := -Wall -Oz
-#
+UNAME := $(shell uname -a)
+PGCCOUT := $(shell pgcc 2>&1)
+
+ifeq ($(PGCCOUT),pgcc)
+BUILD := NCRMNTL
 CC := pgcc
 OPT := -O2
 ACC := -Mautoinline -acc=verystrict -ta=tesla -Minfo=all
 # multicore,tesla
-#
-#CC := gcc
-#OPT := -Wall -Os
+else
+BUILD := FLLSRC
+CC := gcc
+OPT := -Wall -Os
 # full debug...
 #OPT := -Wall -g -O0
 # problematic...
 # -std=c11 -D__USE_MISC -pedantic
 # defaults
+#CC := clang  # Code gen errors ?
+#OPT := -Wall -Oz
+endif
 ACC ?= 
 
 TARGET := mkft
 MAKEFILE := $(TARGET).make
-BUILD := NCRMNTL
-#FLLSRC
+BUILD ?= FLLSRC
 
 SRC_DIR := src
 HDR_DIR := $(SRC_DIR)
@@ -46,8 +51,7 @@ ifeq ($(BUILD),FLLSRC)
 $(TARGET) : $(SRC) $(CMN_SRC) $(HDR) $(MAKEFILE)
 	$(CC) $(OPT) $(ACC) $(PATHS) $(DEFS) $(LIBS) $(SRC) $(CMN_SRC) -o $@
 
-else
-# Build incrementally if efficiency becomes a concern...
+else # Build incrementally if efficiency becomes a concern...
 %.o : $(SRC_DIR)/%.c $(HDR_DIR)/%.h
 	$(CC) $(OPT) $(ACC) $(PATHS) $(DEFS) $< -c
 
@@ -57,7 +61,7 @@ else
 $(TARGET) : $(OBJ) $(CMN_OBJ) $(MAKEFILE)
 	$(CC) $(OPT) $(ACC) $(LIBS) $(OBJ) $(CMN_OBJ) -o $@
 
-endif
+endif # ifeq($(BUILD) ...
 
 .PHONY : all clean run
 
