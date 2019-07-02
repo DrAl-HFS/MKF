@@ -8,74 +8,105 @@
 #define ACC_INLINE
 #endif
 
+// Processing chunks of 32 elements (i.e. bits packed into word)
+// allows GPU hardware to be more easily/efficiently exploited.
+#define CHUNK_SHIFT (5)
+#define CHUNK_SIZE (1<<CHUNK_SHIFT)
+#define CHUNK_MASK (CHUNK_SIZE-1)
+
+
 /***/
 
 #include "weighting.inc"
 
 /***/
 
-ACC_INLINE void ldbs (U16 bs[4], const U8 * restrict pR0, const U8 * restrict pR1, const U32 rowStride, const U32 lsh)
+// Load chunk from 4 adjacent rows within 2 neighbouring planes of binary map,
+// appending to remaining bits of last chunk if required
+ACC_INLINE void loadChunk
+(
+   U64 bufChunk[4],     // chunk buffer
+   const U32 * restrict pR0, // Location within row of first -
+   const U32 * restrict pR1, //  - and second planes
+   const U32 rowStride,       // stride between successive rows within each plane
+   const U32 lsh              // shift at which to append chunks (0/1)
+)
 {  // vect
-   bs[0] |= (pR0[0] << lsh);
-   bs[1] |= (pR0[rowStride] << lsh);
-   bs[2] |= (pR1[0] << lsh);
-   bs[3] |= (pR1[rowStride] << lsh);
-} // ldbs
+   bufChunk[0] |= (pR0[0] << lsh);
+   bufChunk[1] |= (pR0[rowStride] << lsh);
+   bufChunk[2] |= (pR1[0] << lsh);
+   bufChunk[3] |= (pR1[rowStride] << lsh);
+} // loadChunk
 
-ACC_INLINE int mkbp (U8 bp[], U16 bs[4], const int n)
+ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
 {
    for (int i= 0; i < n; i++) // seq
    {
-      U8 r[4];
+      U8 r[4]; // temporary to permit/encourage vectorisation
 
       for (int k= 0; k < 4; k++) // vect
       {
-         r[k]= (bs[k] & 0x3) << (2*k);
-         bs[k] >>= 1;
+         r[k]= (bufChunk[k] & 0x3) << (2*k);
+         bufChunk[k] >>= 1;
       }
-      bp[i]= r[0] | r[1] | r[2] | r[3];
+      bufPatt[i]= r[0] | r[1] | r[2] | r[3];
    }
    return(n);
-} // mkbp
+} // buildPattern
 
-ACC_INLINE void addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int rowStride, const int n)
+// Add a single row of 8bit/3D patterns (defined by four adjacent rows of
+// elements) to the result distribution array. Efficient parallel execution
+// seems unlikely due to memory access patterns:-
+//  i) requires *atomic_add()* to distribution array
+// ii) successive chunks need merge of leading/trailing bits
+ACC_INLINE void addRowBPD
+(
+   U32 rBPD[256], // result pattern distribution
+   const U32 * restrict pRow[2],
+   const int rowStride,
+   const int n    // Number of single bit elements packed in row
+)
 {  // seq
    int m, k, j, i;
-   U16 bs[4]= { 0,0,0,0 };
-   U8 bp[8];
+   U64 bufChunk[4]= { 0,0,0,0 };
+   U8 bufPatt[CHUNK_SIZE];
 
-   ldbs(bs, pRow[0]+0, pRow[1]+0, rowStride, 0);
-   k= MIN(7, n-1);
-   k= mkbp(bp, bs, k);
-   for (j=0; j<k; j++) { hBPD[ bp[j] ]++; }
+   // First chunk of n bits yields n-1 patterns
+   loadChunk(bufChunk, pRow[0]+0, pRow[1]+0, rowStride, 0);
+   k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
+   for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+   // Subsequent whole chunks yield n patterns
    i= 0;
-   m= n>>3;
+   m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
-      ldbs(bs, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      k= mkbp(bp, bs, 8);
-      for (int j=0; j<k; j++) { hBPD[ bp[j] ]++; }
+      loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
+      k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
+      for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
-   k= n & 0x7;
+   // Check for residual bits < CHUNK_SIZE
+   k= n & CHUNK_MASK;
    if (k > 0)
    {
-      ldbs(bs, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      k= mkbp(bp, bs, k);
-      for (int j=0; j<k; j++) { hBPD[ bp[j] ]++; }
+      loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
+      k= buildPattern(bufPatt, bufChunk, k);
+      for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
 } // addRowBPD
 
-void procSimple (U32 hBPD[256], U8 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapCtxF32 * const pC)
+/***/
+
+void procSimple (U32 rBPD[256], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 * const pC)
 {
-   const int rowStride= BITS_TO_BYTES(def[0]);
+   const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
    const int planeStride= rowStride * def[1];
    const int volStride= planeStride * def[2];
    const int nF= def[0]*def[1]*def[2];
 
-   #pragma acc data present_or_create( pBM[:volStride] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( hBPD[:256] )
+   #pragma acc data present_or_create( pBM[:volStride] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( rBPD[:256] )
    {  // #pragma acc parallel vector ???
-      if ((rowStride<<3) == def[0])
-      {  // Multiple of 8
+      if ((rowStride<<5) == def[0])
+      {  // Multiple of 32
          binMapNF32(pBM, pF, nF, pC);
       }
       else
@@ -85,19 +116,16 @@ void procSimple (U32 hBPD[256], U8 * restrict pBM, const F32 * restrict pF, cons
 
       for (int j= 0; j < (def[2]-1); j++)
       {
-         const U8 * restrict pPlane[2];
+         const U32 * restrict pPlane[2];
          pPlane[0]= pBM + j * planeStride;
          pPlane[1]= pBM + (j+1) * planeStride;
          #pragma acc loop seq
          for (int i= 0; i < (def[1]-1); i++)
          {
-            const U8 * restrict pRow[2];
-            //pRow[0]= pBM + i * rowStride + j * planeStride;
-            //pRow[1]= pBM + i * rowStride + (j+1) * planeStride;
-            //pRow[1]= pRow[0] + planeStride;
+            const U32 * restrict pRow[2];
             pRow[0]= pPlane[0] + i * rowStride;
             pRow[1]= pPlane[1] + i * rowStride;
-            addRowBPD(hBPD, pRow, rowStride, def[0]);
+            addRowBPD(rBPD, pRow, rowStride, def[0]);
          }
       }
    }

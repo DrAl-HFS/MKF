@@ -3,11 +3,12 @@
 // (c) Project Contributors June 2019
 
 #include "binMap.h"
-#include "openacc.h"
+//#include "openacc.h"
 
 #ifndef ACC_INLINE
 #define ACC_INLINE
 #endif
+
 
 /***/
 
@@ -15,11 +16,11 @@
 //int sgnF32 (const F32 f) { return((f > 0) - (f < 0)); }
 
 // '<' '=' '>' -> 0, 1, 2
-ACC_INLINE U8 sgnIdxDiffF32 (const F32 f, const F32 t) { return(1 + (f > t) - (f < t)); } // 1+sgnF32(f-t)
+ACC_INLINE U32 sgnIdxDiffF32 (const F32 f, const F32 t) { return(1 + (f > t) - (f < t)); } // 1+sgnF32(f-t)
 
-ACC_INLINE U8 bm1F32 (const F32 f, const BinMapCtxF32 * const pC)
+ACC_INLINE U32 bm1F32 (const F32 f, const BinMapF32 * const pC)
 {  // pragma acc data present( pC[:1] )
-   return( pC->m[ sgnIdxDiffF32(f, pC->t[0]) ] );
+   return( (pC->m >> sgnIdxDiffF32(f, pC->t[0]) ) & 0x1 );
 } // bm1F32
 
 /* interval threshold (hysteresis)
@@ -32,35 +33,31 @@ ACC_INLINE U8 bm2F32 (const F32 f, const BinMapCtxF32 *pC)
 /***/
 
 //pragma acc routine seq
-void setBMCF32 (BinMapCtxF32 *pC, const char relopChars[], const F32 t)
+void setBMCF32 (BinMapF32 *pC, const char relopChars[], const F32 t)
 {
-   int i= 0, valid= 1;
+   int i= 0, inv= 0, valid= 1;
    pC->t[0]= t;
-   pC->w= 0;
+   pC->m= BMC_NV;
 
    do
    {
       switch(relopChars[i])
       {
-         case '<' : pC->m[0]|= 0x01; break;
-         case '=' : pC->m[1]|= 0x01; break;
-         case '>' : pC->m[2]|= 0x01; break;
-         case '!' : if (0 == i) { pC->m[3]|= 0x80; break; } // else...
+         case '<' : pC->m|= BMC_LT; break;
+         case '=' : pC->m|= BMC_EQ; break;
+         case '>' : pC->m|= BMC_GT; break;
+         case '!' : if (0 == i) { inv= 1; break; } // else...
          default : valid= 0;
       }
       ++i;
    } while (valid);
-   if (pC->m[3] & 0x80)
-   {  // Invert all
-      i= 0;
-      do { pC->m[i]^= 0x01; } while (++i < 3);
-   }
-   LOG_CALL("(%p, %s, %G) - m={0x%X:0x%X:0x%X:0x%X}\n", pC, relopChars, t, pC->m[0], pC->m[1], pC->m[2], pC->m[3]);
+   if (inv) { pC->m^= BMC_AL; }
+   LOG_CALL("(%p, %s, %G) - m=0x%X\n", pC, relopChars, t, pC->m);
    //acc_set_device_num( 0, acc_device_host );
 } // setBMCF32
 
 #pragma acc routine vector
-void binMapNF32G (U8 * restrict pBM, const F32 * restrict pF, const size_t n, const BinMapCtxF32 * const pC)
+void binMapNF32G (U32 * restrict pBM, const F32 * restrict pF, const size_t n, const BinMapF32 * const pC)
 {
    #pragma acc data present( pBM[:n], pF[:n], pC[:1] )
    {
@@ -73,17 +70,17 @@ void binMapNF32G (U8 * restrict pBM, const F32 * restrict pF, const size_t n, co
 } // binMapNF32G
 
 #pragma acc routine vector
-void binMapNF32 (U8 * restrict pBM, const F32 * restrict pF, const size_t nF, const BinMapCtxF32 *pC)
+void binMapNF32 (U32 * restrict pBM, const F32 * restrict pF, const size_t nF, const BinMapF32 *pC)
 {
-   const size_t nB= nF>>3; // NB: truncates non multiple of 8!
+   const size_t nB= nF>>5; // NB: truncates non multiple of 8!
    #pragma acc data present( pBM[:nB], pF[:nF], pC[:1] )
    {
       #pragma acc loop vector
       for (size_t i= 0; i < nB; i++)
       { //
-         U8 b= 0;
+         U32 b= 0;
          #pragma acc loop seq
-         for (int j= 0; j < 8; j++) { b|= bm1F32(pF[(i*8)+j], pC) << j; }
+         for (int j= 0; j < 32; j++) { b|= bm1F32(pF[(i*32)+j], pC) << j; }
          pBM[i]= b;
       }
    }
@@ -91,14 +88,14 @@ void binMapNF32 (U8 * restrict pBM, const F32 * restrict pF, const size_t nF, co
 
 void binMapRowsF32
 (
-   U8 * restrict pBM, const F32 * restrict pF,
+   U32 * restrict pBM, const F32 * restrict pF,
    const int rowLenF, const int rowStrideBM,
-   const int nRows, const BinMapCtxF32 *pC
+   const int nRows, const BinMapF32 *pC
 )
 {
    #pragma acc data present( pBM[:rowStrideBM*nRows], pF[:rowLenF*nRows], pC[:1] )
    {
-      const int rowLenBits= (rowLenF + 0x7) & ~0x7;
+      const int rowLenBits= (rowLenF + 0x1F) & ~0x1F;
       #pragma acc loop vector
       for (int i= 0; i < nRows; i++)
       {
@@ -111,7 +108,7 @@ void binMapRowsF32
 
 
 #if 0
-testBMC (const F32 f0, const F32 fs, const int n, const BinMapCtxF32 *pC)
+testBMC (const F32 f0, const F32 fs, const int n, const BinMapF32 *pC)
 {
    for (int i= 0; i<n; i++)
    {

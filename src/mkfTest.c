@@ -59,11 +59,11 @@ int main (int argc, char *argv[])
 {
    size_t n, vol;
    F32 *pF;
-   U8  *pBM;
+   U32 *pBM;
    const int def[3]= {64,64,64};
    const F32 radius= 0.5*def[0] - 1.5;
    F32 fracR;
-   BinMapCtxF32 ctx;
+   BinMapF32 ctx;
    U32 hBPD[256]={0,};
    MKMeasureVal vf, vr, kf;
 
