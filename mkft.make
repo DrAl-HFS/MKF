@@ -47,24 +47,34 @@ CU_OBJ := $(CU_SRC:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.o)
 
 CMN_SRC := $(shell ls $(CMN_DIR)/*.c)
 CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
-LIBDEF := -lm -lcudart -L$(LCUPATH)
+LIBDEF := -lm
+#-lcudart -L$(LCUPATH)
 INCDEF := -I$(CMN_DIR) -I$(INC_DIR)
 #-DMK_
 
-OBJ := $(C_OBJ) $(CMN_OBJ) $(CU_OBJ)
+OBJ := $(C_OBJ) $(CMN_OBJ)
 
 # Move any object files to the expected location
 $(OBJ_DIR)/%.o : %.o
 	mv $< $@
 
+ifdef CUCC
+
+OBJ += $(CU_OBJ)
+
+LIBDEF += -L$(LCUPATH) -lcudart
+
+INCDEF += -DMK_CUDA
+
 %.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
 	$(CUCC) $(OPT) $(INCDEF) $< -c
 
+endif
 
 ifeq ($(BUILD),FLLSRC)
 # Full build from source every time : not reliable with pgcc+nvcc multi-compiler...
-$(TARGET) : $(C_SRC) $(CMN_SRC) $(HDR) $(MAKEFILE) $(CU_OBJ) 
-	$(CC) $(OPT) $(ACC) $(INCDEF) $(C_SRC) $(CMN_SRC) $(LIBDEF) $(CU_OBJ) -o $@
+$(TARGET) : $(C_SRC) $(CMN_SRC) $(HDR) $(MAKEFILE)
+	$(CC) $(OPT) $(ACC) $(INCDEF) $(C_SRC) $(CMN_SRC) $(LIBDEF) -o $@
 	#$(CUCC) $(OPT) $(INCDEF) $(CU_SRC) -c
 
 else # Build incrementally if necessary

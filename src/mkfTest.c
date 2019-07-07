@@ -110,7 +110,7 @@ int main (int argc, char *argv[])
          kf= chiEP3(hBPD);
          LOG("volFrac=%G (ref=%G)\n", vf, vr);
          LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
-
+#ifdef MK_CUDA
          {
             Context ctx={0};
             ctx.pHF= pF; ctx.nF= vol; ctx.bytesF= ctx.nF * sizeof(*pF);
@@ -122,7 +122,7 @@ int main (int argc, char *argv[])
                LOG("mkfProcess() - volFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
             }
          }
-
+#endif
          free(pBM);
       }
       free(pF);
