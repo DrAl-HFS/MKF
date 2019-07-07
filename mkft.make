@@ -1,13 +1,19 @@
 # mkft.make
 UNAME := $(shell uname -a)
-PGCCOUT := $(shell pgcc 2>&1)
+PGCCPATH := $(shell command -v pgcc 2>/dev/null)
+LCUPATH := /opt/pgi/linux86-64/2019/cuda/10.1/lib64
+# $(shell echo $(PGI_PATH))/cuda/10.1/lib64 ???
+# $PGI_CUDA_LIB_PATH
 
-#ifeq ($(PGCCOUT),pgcc)
-ifneq (,$(findstring pgcc,$(PGCCOUT)))
+###ifneq (,$(findstring /bin/pgcc,$(PGCCPATH)))
+ifdef PGCCPATH
 BUILD := NCRMNTL
 CC := pgcc
-OPT := -O2
-ACC := -Mautoinline -acc=verystrict -ta=tesla -Minfo=all
+CUCC := nvcc
+OPT := -g
+#-O2
+ACC := -Mautoinline -acc=verystrict -ta=multicore
+# -Minfo=all
 # multicore,tesla
 else
 BUILD := FLLSRC
@@ -33,34 +39,44 @@ OBJ_DIR := obj
 CMN_DIR := ../Common/src
 INC_DIR := inc
 
-SRC := $(shell ls $(SRC_DIR)/*.c)
+C_SRC := $(shell ls $(SRC_DIR)/*.c)
+CU_SRC := $(shell ls $(SRC_DIR)/*.cu)
 HDR := $(shell ls $(SRC_DIR)/*.h)
-OBJ := $(SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+C_OBJ := $(C_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+CU_OBJ := $(CU_SRC:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.o)
+
 CMN_SRC := $(shell ls $(CMN_DIR)/*.c)
 CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
-LIBS := -lm
-PATHS := -I$(CMN_DIR) -I$(INC_DIR)
-DEFS :=
+LIBDEF := -lm -lcudart -L$(LCUPATH)
+INCDEF := -I$(CMN_DIR) -I$(INC_DIR)
 #-DMK_
+
+OBJ := $(C_OBJ) $(CMN_OBJ) $(CU_OBJ)
 
 # Move any object files to the expected location
 $(OBJ_DIR)/%.o : %.o
 	mv $< $@
 
-ifeq ($(BUILD),FLLSRC)
-# Full build from source every time
-$(TARGET) : $(SRC) $(CMN_SRC) $(HDR) $(MAKEFILE)
-	$(CC) $(OPT) $(ACC) $(PATHS) $(DEFS) $(LIBS) $(SRC) $(CMN_SRC) -o $@
+%.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
+	$(CUCC) $(OPT) $(INCDEF) $< -c
 
-else # Build incrementally if efficiency becomes a concern...
+
+ifeq ($(BUILD),FLLSRC)
+# Full build from source every time : not reliable with pgcc+nvcc multi-compiler...
+$(TARGET) : $(C_SRC) $(CMN_SRC) $(HDR) $(MAKEFILE) $(CU_OBJ) 
+	$(CC) $(OPT) $(ACC) $(INCDEF) $(C_SRC) $(CMN_SRC) $(LIBDEF) $(CU_OBJ) -o $@
+	#$(CUCC) $(OPT) $(INCDEF) $(CU_SRC) -c
+
+else # Build incrementally if necessary
+
 %.o : $(SRC_DIR)/%.c $(HDR_DIR)/%.h
-	$(CC) $(OPT) $(ACC) $(PATHS) $(DEFS) $< -c
+	$(CC) $(OPT) $(ACC) $(INCDEF) $(DEFS) $< -c
 
 %.o : $(CMN_DIR)/%.c $(CMN_DIR)/%.h
-	$(CC) $(OPT) $(PATHS) $(DEFS) $< -c
+	$(CC) $(OPT) $(INCDEF) $< -c
 
-$(TARGET) : $(OBJ) $(CMN_OBJ) $(MAKEFILE)
-	$(CC) $(OPT) $(ACC) $(LIBS) $(OBJ) $(CMN_OBJ) -o $@
+$(TARGET) : $(OBJ) $(MAKEFILE)
+	$(CC) $(OPT) $(ACC) $(LIBDEF) $(OBJ) -o $@
 
 endif # ifeq($(BUILD) ...
 
