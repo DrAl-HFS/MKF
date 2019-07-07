@@ -1,6 +1,7 @@
 
 #include "mkfTools.h"
 #include "binMap.h"
+#include "mkf.h"
 
 /*  */
 
@@ -55,6 +56,8 @@ int genBox (F32 *pF, const int def[3], const F32 r)
    return(n);
 } // genBox
 
+extern Bool32 mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC);
+
 int main (int argc, char *argv[])
 {
    size_t n, vol;
@@ -63,7 +66,7 @@ int main (int argc, char *argv[])
    const int def[3]= {64,64,64};
    const F32 radius= 0.5*def[0] - 1.5;
    F32 fracR;
-   BinMapF32 ctx;
+   BinMapF32 bmc;
    U32 hBPD[256]={0,};
    MKMeasureVal vf, vr, kf;
 
@@ -91,8 +94,8 @@ int main (int argc, char *argv[])
          n= genBox(pF, def, radius);
          LOG("box=%zu (/%d=%G)\n", n, vol, (F64)n / vol);
 #endif
-         setBMCF32(&ctx,">=",0.5);
-         procSimple(hBPD, pBM, pF, def, &ctx);
+         setBMCF32(&bmc,">=",0.5);
+         procSimple(hBPD, pBM, pF, def, &bmc);
          { // debug...
             size_t t= 0;
             for (int i= 0; i < 256; i++)
@@ -107,6 +110,18 @@ int main (int argc, char *argv[])
          kf= chiEP3(hBPD);
          LOG("volFrac=%G (ref=%G)\n", vf, vr);
          LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
+
+         {
+            Context ctx={0};
+            ctx.pHF= pF; ctx.nF= vol; ctx.bytesF= ctx.nF * sizeof(*pF);
+            ctx.pHU= pBM; ctx.nU= ctx.nF / 32; ctx.bytesU= ctx.nU * sizeof(*pBM);
+            ctx.nZ= 256; ctx.bytesZ= ctx.nZ * sizeof(uint); // ctx.pHZ= (void*)cudaMallocHost(ctx.bytesZ);
+            if (mkfProcess(&ctx, def, &bmc))
+            {
+               const uint *pBPD= ctx.pHZ;
+               LOG("mkfProcess() - volFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
+            }
+         }
 
          free(pBM);
       }

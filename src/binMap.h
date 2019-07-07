@@ -16,6 +16,10 @@
 extern "C" {
 #endif
 
+// Number of threshold values per mapping: 1 (simple threshold) or 2 (interval / hysteresis)
+#define BM_NUMT   (1)
+#define BM_FLAG_T2IVL  (1<<15)
+
 // Comparison operation descriptor (single threshold).
 // The possible 0 or 1 result of a comparison
 // is obtained from m[] via a comparison-to-index
@@ -25,8 +29,9 @@ extern "C" {
 // threshold value plus the lookup.
 typedef struct
 {
-   float t[1];
-   U32 m;
+   float t[BM_NUMT];
+   int   m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
+   // NB: 32bit alignment (pre-NVIDIA-Pascal).
 } BinMapF32;
 
 #define BMC_GT (0x4)

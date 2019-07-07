@@ -23,7 +23,7 @@ ACC_INLINE U32 bm1F32 (const F32 f, const BinMapF32 * const pC)
    return( (pC->m >> sgnIdxDiff1F32(f, pC->t[0]) ) & 0x1 );
 } // bm1F32
 
-#if 0
+#if BM_NUMT > 1
 // interval threshold (hysteresis)
 ACC_INLINE U32 sgnIdxDiff2F32 (const F32 f, const F32 t[2])
 {
