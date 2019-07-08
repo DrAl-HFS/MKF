@@ -1,21 +1,25 @@
 # mkft.make
 UNAME := $(shell uname -a)
 PGCCPATH := $(shell command -v pgcc 2>/dev/null)
+NVCCPATH := $(shell command -v nvcc 2>/dev/null)
 LCUPATH := /opt/pgi/linux86-64/2019/cuda/10.1/lib64
 # $(shell echo $(PGI_PATH))/cuda/10.1/lib64 ???
 # $PGI_CUDA_LIB_PATH
 
-###ifneq (,$(findstring /bin/pgcc,$(PGCCPATH)))
+ifdef NVCCPATH
+CUCC := nvcc
+endif
+
 ifdef PGCCPATH
 BUILD := NCRMNTL
 CC := pgcc
-CUCC := nvcc
 OPT := -g
 #-O2
 ACC := -Mautoinline -acc=verystrict -ta=multicore
 # -Minfo=all
 # multicore,tesla
-else
+
+else # Default compiler gcc / clang, assume no ACC
 BUILD := FLLSRC
 CC := gcc
 OPT := -Wall -Os
