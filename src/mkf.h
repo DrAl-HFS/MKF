@@ -1,4 +1,6 @@
-// mkf.h - NB: .cu assumes c++ style compilation
+// mkf.cu - Minkowski Functional pattern processing using CUDA
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors Jan-June 2019
 
 #ifndef MKF_H
 #define MKF_H
@@ -20,10 +22,11 @@ typedef struct
    int   m;
 } MKBMapF32;
 
-typedef size_t MKCount;
+//typedef size_t MKCount;
 
-//MKCount rBPD[256]
-//extern "C" int mkfProcess (const Context *pC, const int def[3], const MKBMapF32 *pMC);
+#ifndef MKF_CU // nvcc doesn't like this prototype...
+extern int mkfProcess (const Context *pC, const int def[3], const MKBMapF32 *pMC);
+#endif
 
 #ifdef __cplusplus
 } // extern "C"

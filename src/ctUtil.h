@@ -1,4 +1,6 @@
-// ctUtil.h - NB: .cu assumes c++ style compilation
+// ctUtil.h - cuda test utils
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors Jan-June 2019
 
 #ifndef CT_UTIL_H
 #define CT_UTIL_H
@@ -11,7 +13,7 @@ extern "C" {
 
 typedef struct
 {
-   uint nF, bytesF;
+   long nF, bytesF;
    long nU, bytesU;
    long nZ, bytesZ;
    float *pDF, *pHF;  // Device / Host ptrs

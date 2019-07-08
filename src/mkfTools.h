@@ -2,8 +2,8 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#ifndef MKFTOOLS_H
-#define MKFTOOLS_H
+#ifndef MKF_TOOLS_H
+#define MKF_TOOLS_H
 
 #include "binMap.h"
 
@@ -40,4 +40,4 @@ extern MKMeasureVal chiEP3 (const U32 hBPD[256]);
 } // extern "C"
 #endif
 
-#endif // MKFTOOLS_H
+#endif // MKF_TOOLS_H

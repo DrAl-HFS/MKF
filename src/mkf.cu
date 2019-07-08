@@ -1,4 +1,10 @@
-// mkf.cu - NB: .cu assumes c++ style compilation
+// mkf.cu - Minkowski Functional pattern processing using CUDA NB: .cu assumes c++ style compilation
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors Jan-June 2019
+
+#ifndef MKF_CU
+#define MKF_CU
+#endif
 
 #include "mkf.h"
 
@@ -7,7 +13,7 @@
 #define BLKS 5
 #define BLKD (1<<BLKS)
 #define BLKM BLKD-1
-#define BLKN 1024/BLKD
+//define BLKN 1024/BLKD
 
 __global__ void vThresh8 (uint r[], const float f[], const size_t n, const MKBMapF32 mc)
 {
@@ -211,7 +217,7 @@ __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1
    }
 } // addPlane
 
-void ctuErr (cudaError_t *pE, const char *s)
+cudaError_t ctuErr (cudaError_t *pE, const char *s)
 {
    cudaError_t e;
    if (NULL == pE) { e= cudaGetLastError(); } else { e= *pE; }
@@ -219,11 +225,8 @@ void ctuErr (cudaError_t *pE, const char *s)
    {
       ERROR("%s - r=%d -> %s\n", s, e, cudaGetErrorName(e));
    }
+   return(e);
 } // ctuErr
-
-// Host wrapper
-// MKCount rBPD[256],
-//extern "C" {
 
 extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
 {
@@ -262,12 +265,13 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
 
       if (pC->pDF && pC->pDU)
       {
-
-         vThresh32<<<BLKN,BLKD>>>(pC->pDU, pC->pDF, pC->nF, *pMC);
+         // CAVEAT! Treated as 1D
+         vThresh32<<<pC->nF,BLKD>>>(pC->pDU, pC->pDF, pC->nF, *pMC);
          ctuErr(NULL, "vThresh32()");
 
          if (pC->pHU)
          {
+            LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHU, pC->pDU, pC->bytesU);
             r= cudaMemcpy(pC->pHU, pC->pDU, pC->bytesU, cudaMemcpyDeviceToHost);
             ctuErr(NULL, "{vThresh32+} cudaMemcpy()");
          }
@@ -278,7 +282,6 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
             //if ((pC->pDZ) && (pC->bytesZ >= bpdBytes))
             uint *pBPD= (uint*)(pC->pDZ);
             const int rowStride= def[0] / 32;
-            //const int def[2]= {64, pC->nF / (2 * 64) };
             const int nRowPairs= def[1]-1;
             const int nPlanePairs= def[2]-1;
             const int planeStride= def[1] * rowStride;
@@ -287,7 +290,8 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
                const uint *pP0= pC->pDU + i * planeStride;
                const uint *pP1= pC->pDU + (i+1) * planeStride;
                addPlane<<<nRowPairs,BLKD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
-               ctuErr(NULL, "addPlane()");
+               if (0 != ctuErr(NULL, "addPlane"))
+               { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPD, pP0, pP1); }
             }
             if (pC->pHZ)
             {
@@ -298,5 +302,9 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
       }
    }
 
-   return(0 == r);
+   return(1); //0 == r);
 } // mkfProcess
+
+#ifdef MKF_CU
+#undef MKF_CU
+#endif

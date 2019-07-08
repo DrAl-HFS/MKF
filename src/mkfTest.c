@@ -69,7 +69,7 @@ Bool32 buffAlloc (Context *pC, const int def[3])
    pC->nZ= 256;
    pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
 
-   LOG("vol= %zu sites\nF: %zu Bytes\n", vol, pC->bytesF);
+   LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
 
 #ifdef MK_CUDA
    if (cuBuffAlloc(pC,vol)) { r= 2; }
@@ -142,11 +142,17 @@ int main (int argc, char *argv[])
          const uint *pBPD= cux.pHZ;
          LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
          checkBPD(pBPD, 1);
+         if (cux.pHU)
+         {
+            LOG("HU (%d) :\n", cux.nU);
+            for (int i= 0; i<cux.nU; i++)
+            {
+               if (0 != cux.pHU[i]) { LOG("[%d]: 0x%04X\n", i, cux.pHU[i]); }
+            }
+         }
       }
 #endif
    }
    buffRelease(&cux);
-   //utilTest();
-	//LOG_CALL("() %s\n", "MKF");
 	return(0);
 } // main

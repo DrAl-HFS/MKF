@@ -1,4 +1,6 @@
-// ctUtil.cu
+// ctUtil.cu - cuda test utils NB: .cu assumes c++ style compilation
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors Jan-June 2019
 
 #include "ctUtil.h"
 
@@ -81,12 +83,12 @@ extern "C" int cuBuffRelease (Context *pC)
    cudaError_t r;
    int sE=0;
 
-   r= cudaFree(pC->pDF); sE+= (0!=r);
-   r= cudaFree(pC->pDU); sE+= (0!=r);
-   r= cudaFree(pC->pDZ); sE+= (0!=r);
+   if (pC->pDF) { r= cudaFree(pC->pDF); sE+= (0!=r); }
+   if (pC->pDU) { r= cudaFree(pC->pDU); sE+= (0!=r); }
+   if (pC->pDZ) { r= cudaFree(pC->pDZ); sE+= (0!=r); }
 
-   r= cudaFreeHost(pC->pHF); sE+= (0!=r);
-   r= cudaFreeHost(pC->pHU); sE+= (0!=r);
-   r= cudaFreeHost(pC->pHZ); sE+= (0!=r);
+   if (pC->pHF) { r= cudaFreeHost(pC->pHF); sE+= (0!=r); }
+   if (pC->pHU) { r= cudaFreeHost(pC->pHU); sE+= (0!=r); }
+   if (pC->pHZ) { r= cudaFreeHost(pC->pHZ); sE+= (0!=r); }
    return(0 == sE);
 } // ctuReleaseCtx
