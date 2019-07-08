@@ -19,6 +19,9 @@ typedef struct
    void *pDZ, *pHZ;
 } Context;
 
+extern int cuBuffAlloc (Context *pC, uint n);
+extern int cuBuffRelease (Context *pC);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

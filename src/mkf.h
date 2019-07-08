@@ -23,7 +23,7 @@ typedef struct
 typedef size_t MKCount;
 
 //MKCount rBPD[256]
-//extern "C" Bool32 mkfProcess (const Context *pC, const int def[3], const MKBMapF32 *pMC);
+//extern "C" int mkfProcess (const Context *pC, const int def[3], const MKBMapF32 *pMC);
 
 #ifdef __cplusplus
 } // extern "C"

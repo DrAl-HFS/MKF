@@ -56,77 +56,96 @@ int genBox (F32 *pF, const int def[3], const F32 r)
    return(n);
 } // genBox
 
-extern Bool32 mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC);
+extern int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC);
+
+Bool32 buffAlloc (Context *pC, const int def[3])
+{
+   int r=0, vol= def[0] * def[1] * def[2];
+
+   pC->nF= vol;
+   pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
+   pC->nU= BITS_TO_WRDSH(vol,5);
+   pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
+   pC->nZ= 256;
+   pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
+
+   LOG("vol= %zu sites\nF: %zu Bytes\n", vol, pC->bytesF);
+
+#ifdef MK_CUDA
+   if (cuBuffAlloc(pC,vol)) { r= 2; }
+#else
+   cux.pHF= malloc(n);
+   cux.pHU= malloc(n);
+#endif
+   if (pC->pHF) { memset(pC->pHF, 0, pC->bytesF); ++r; }
+   if (pC->pHU) { memset(pC->pHU, 0xFF, pC->bytesU); ++r; }
+   return(r >= 2);
+} // buffAlloc
+
+void buffRelease (Context *pC)
+{
+#ifdef MK_CUDA
+   cuBuffRelease(pC);
+#else
+   if (NULL != pC->pHF) { free(pC->pHF); pC->pHF= NULL; }
+   if (NULL != pC->pHU) { free(pC->pHU); pC->pHU= NULL; }
+#endif
+} // buffRelease
+
+void checkBPD (const U32 aBPD[256], int verbose)
+{ // debug...
+   size_t t= 0;
+   for (int i= 0; i < 256; i++)
+   {
+      if (verbose && (0 != aBPD[i])) { LOG("%d: %u\n", i, aBPD[i]); }
+      t+= aBPD[i] * bitCountZ(i);
+   }
+   LOG("checkBPD() - bitcount=%zu /8= %zu\n", t, t>>3);
+} // checkBPD
 
 int main (int argc, char *argv[])
 {
-   size_t n, vol;
-   F32 *pF;
-   U32 *pBM;
    const int def[3]= {64,64,64};
    const F32 radius= 0.5*def[0] - 1.5;
    F32 fracR;
    BinMapF32 bmc;
-   U32 hBPD[256]={0,};
+   U32 aBPD[256]={0,};
    MKMeasureVal vf, vr, kf;
+   Context cux={0};
+   int n;
 
-   vol= def[0] * def[1] * def[2];
-   n= sizeof(*pF)*vol;
-   LOG("vol= %zu sites\nF: %zu Bytes\n", vol, n);
-   pF= malloc(n);
-   if (pF)
+   if (buffAlloc(&cux,def))
    {
-      memset(pF, 0, n);
-      n= BITS_TO_BYTES(def[0]) * def[1] * def[2];
-      LOG("BM: %zu Bytes\n", n);
-      pBM= malloc(n);
-      if (pBM)
-      {
-         memset(pBM, 0xFF, n);
-
-         fracR= radius / def[0];
+      fracR= radius / def[0];
 #if 1
-         vr= sphereVol(fracR);
-         n= genBall(pF, def, radius);
-         LOG("ball=%zu (/%d=%G)\n", n, vol, (F64)n / vol);
+      vr= sphereVol(fracR);
+      n= genBall(cux.pHF, def, radius);
+      LOG("ball=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
 #else
-         vr= boxVol(fracR);
-         n= genBox(pF, def, radius);
-         LOG("box=%zu (/%d=%G)\n", n, vol, (F64)n / vol);
+      vr= boxVol(fracR);
+      n= genBox(cux.pHF, def, radius);
+      LOG("box=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
 #endif
-         setBMCF32(&bmc,">=",0.5);
-         procSimple(hBPD, pBM, pF, def, &bmc);
-         { // debug...
-            size_t t= 0;
-            for (int i= 0; i < 256; i++)
-            {
-               //LOG("%d: %u\n", i, hBPD[i]);
-               t+= hBPD[i] * bitCountZ(i);
-            }
-            LOG("bitcount=%zu /8= %zu\n", t, t>>3);
-         }
+      setBMCF32(&bmc,">=",0.5);
+      procSimple(aBPD, cux.pHU, cux.pHF, def, &bmc);
 
-         vf= volFrac(hBPD);
-         kf= chiEP3(hBPD);
-         LOG("volFrac=%G (ref=%G)\n", vf, vr);
-         LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
+      checkBPD(aBPD, 0);
+
+      vf= volFrac(aBPD);
+      kf= chiEP3(aBPD);
+      LOG("volFrac=%G (ref=%G)\n", vf, vr);
+      LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
 #ifdef MK_CUDA
-         {
-            Context ctx={0};
-            ctx.pHF= pF; ctx.nF= vol; ctx.bytesF= ctx.nF * sizeof(*pF);
-            ctx.pHU= pBM; ctx.nU= ctx.nF / 32; ctx.bytesU= ctx.nU * sizeof(*pBM);
-            ctx.nZ= 256; ctx.bytesZ= ctx.nZ * sizeof(uint); // ctx.pHZ= (void*)cudaMallocHost(ctx.bytesZ);
-            if (mkfProcess(&ctx, def, &bmc))
-            {
-               const uint *pBPD= ctx.pHZ;
-               LOG("mkfProcess() - volFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
-            }
-         }
-#endif
-         free(pBM);
+      LOG("%smkfProcess() - %s","***\n","\n");
+      if (mkfProcess(&cux, def, &bmc))
+      {
+         const uint *pBPD= cux.pHZ;
+         LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
+         checkBPD(pBPD, 1);
       }
-      free(pF);
+#endif
    }
+   buffRelease(&cux);
    //utilTest();
 	//LOG_CALL("() %s\n", "MKF");
 	return(0);

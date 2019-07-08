@@ -225,7 +225,7 @@ void ctuErr (cudaError_t *pE, const char *s)
 // MKCount rBPD[256],
 //extern "C" {
 
-extern "C" Bool32 mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
+extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
 {
    cudaError_t r;
 
@@ -279,10 +279,16 @@ extern "C" Bool32 mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pM
             uint *pBPD= (uint*)(pC->pDZ);
             const int rowStride= def[0] / 32;
             //const int def[2]= {64, pC->nF / (2 * 64) };
-
-            addPlane<<<def[1]-1,BLKD>>>(pBPD, pC->pDU, pC->pDU + def[1] * rowStride, rowStride, def[0], def[1]-1);
-            ctuErr(NULL, "addPlane()");
-
+            const int nRowPairs= def[1]-1;
+            const int nPlanePairs= def[2]-1;
+            const int planeStride= def[1] * rowStride;
+            for (int i= 0; i < nPlanePairs; i++)
+            {
+               const uint *pP0= pC->pDU + i * planeStride;
+               const uint *pP1= pC->pDU + (i+1) * planeStride;
+               addPlane<<<nRowPairs,BLKD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
+               ctuErr(NULL, "addPlane()");
+            }
             if (pC->pHZ)
             {
                r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
