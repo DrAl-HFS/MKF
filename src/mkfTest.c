@@ -92,16 +92,17 @@ void buffRelease (Context *pC)
 #endif
 } // buffRelease
 
-void checkBPD (const U32 aBPD[256], int verbose)
+void checkNU32 (const U32 u[], const int n, const char *pVrbFmt)
 { // debug...
-   size_t t= 0;
-   for (int i= 0; i < 256; i++)
+   size_t t[2]= { 0, 0 };
+   for (int i= 0; i < n; i++)
    {
-      if (verbose && (0 != aBPD[i])) { LOG("%d: %u\n", i, aBPD[i]); }
-      t+= aBPD[i] * bitCountZ(i);
+      if (pVrbFmt && (0 != u[i])) { LOG(pVrbFmt, i, u[i]); }
+      t[0]+= u[i] * bitCountZ(i);
+      t[1]+= bitCountZ(u[i]);
    }
-   LOG("checkBPD() - bitcount=%zu /8= %zu\n", t, t>>3);
-} // checkBPD
+   LOG("checkNU32() - bitcounts: dist=%zu /8= %zu, raw=%zu\n", t[0], t[0]>>3, t[1]);
+} // checkNU32
 
 int main (int argc, char *argv[])
 {
@@ -129,7 +130,7 @@ int main (int argc, char *argv[])
       setBMCF32(&bmc,">=",0.5);
       procSimple(aBPD, cux.pHU, cux.pHF, def, &bmc);
 
-      checkBPD(aBPD, 0);
+      checkNU32(aBPD, 256, NULL);
 
       vf= volFrac(aBPD);
       kf= chiEP3(aBPD);
@@ -141,15 +142,8 @@ int main (int argc, char *argv[])
       {
          const uint *pBPD= cux.pHZ;
          LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
-         checkBPD(pBPD, 1);
-         if (cux.pHU)
-         {
-            LOG("HU (%d) :\n", cux.nU);
-            for (int i= 0; i<cux.nU; i++)
-            {
-               if (0 != cux.pHU[i]) { LOG("[%d]: 0x%04X\n", i, cux.pHU[i]); }
-            }
-         }
+         checkNU32(pBPD, 256, "%d: %u\n");
+         checkNU32(cux.pHU, cux.nU, NULL); // "[%d]: 0x%04X\n"
       }
 #endif
    }
