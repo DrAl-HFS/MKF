@@ -38,6 +38,7 @@ ACC_INLINE void loadChunk
    bufChunk[3] |= (pR1[rowStride] << lsh);
 } // loadChunk
 
+#if 0
 ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
 {
    for (int i= 0; i < n; i++) // seq
@@ -53,6 +54,26 @@ ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
    }
    return(n);
 } // buildPattern
+#else
+ACC_INLINE void addPattern (U32 rBPD[256], U64 bufChunk[4], const int n)
+{
+   U8 r=0;
+
+   r= (bufChunk[0] & 0x1) |
+      ((bufChunk[1] & 0x1) << 1) |
+      ((bufChunk[2] & 0x1) << 2) |
+      ((bufChunk[3] & 0x1) << 3);
+   for (int i= 0; i < n; i++) // seq
+   {
+      for (int k= 0; k < 4; k++) // vect
+      {
+         bufChunk[k] >>= 1;
+         r|= (bufChunk[k] & 0x1) << (4+k);
+      }
+      rBPD[r]++; r>>= 4;
+   }
+} // addPattern
+#endif
 
 // Add a single row of 8bit/3D patterns (defined by four adjacent rows of
 // elements) to the result distribution array. Efficient parallel execution
@@ -67,30 +88,33 @@ ACC_INLINE void addRowBPD
    const int n    // Number of single bit elements packed in row
 )
 {  // seq
-   int m, k, j, i;
+   int m, k, i; // , j
    U64 bufChunk[4]= { 0,0,0,0 };
-   U8 bufPatt[CHUNK_SIZE];
+   //U8 bufPatt[CHUNK_SIZE];
 
    // First chunk of n bits yields n-1 patterns
    loadChunk(bufChunk, pRow[0]+0, pRow[1]+0, rowStride, 0);
-   k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
-   for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+   addPattern(rBPD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
+   //k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
+   //for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    // Subsequent whole chunks yield n patterns
    i= 0;
    m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
       loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
-      for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+      addPattern(rBPD, bufChunk, CHUNK_SIZE);
+      //k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
+      //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
    // Check for residual bits < CHUNK_SIZE
    k= n & CHUNK_MASK;
    if (k > 0)
    {
       loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      k= buildPattern(bufPatt, bufChunk, k);
-      for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+      addPattern(rBPD, bufChunk, k);
+      //k= buildPattern(bufPatt, bufChunk, k);
+      //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
 } // addRowBPD
 
