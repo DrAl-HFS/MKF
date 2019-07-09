@@ -56,7 +56,7 @@ int genBox (F32 *pF, const int def[3], const F32 r)
    return(n);
 } // genBox
 
-extern int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC);
+//extern int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC);
 
 Bool32 buffAlloc (Context *pC, const int def[3])
 {
@@ -74,8 +74,8 @@ Bool32 buffAlloc (Context *pC, const int def[3])
 #ifdef MK_CUDA
    if (cuBuffAlloc(pC,vol)) { r= 2; }
 #else
-   cux.pHF= malloc(n);
-   cux.pHU= malloc(n);
+   pC->pHF= malloc(pC->bytesF);
+   pC->pHU= malloc(pC->bytesU);
 #endif
    if (pC->pHF) { memset(pC->pHF, 0, pC->bytesF); ++r; }
    if (pC->pHU) { memset(pC->pHU, 0xFF, pC->bytesU); ++r; }

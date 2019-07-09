@@ -100,7 +100,7 @@ void procSimple (U32 rBPD[256], U32 * restrict pBM, const F32 * restrict pF, con
 {
    const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
    const int planeStride= rowStride * def[1];
-   const int volStride= planeStride * def[2];
+   //const int volStride= planeStride * def[2];
    const int nF= def[0]*def[1]*def[2];
 
    #pragma acc data present_or_create( pBM[:volStride] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( rBPD[:256] )
