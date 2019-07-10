@@ -1,12 +1,13 @@
-// binMap.h - packed binary map generation from scalar field.
+// binMap.h - packed binary map generation from scalar field, with (optional) OpenACC support.
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#ifndef BINMAP_H
-#define BINMAP_H
+#ifndef BIN_MAP_ACC_H
+#define BIN_MAP_ACC_H
 
+#include "binMapUtil.h"
 #include "util.h"
-#include "mkfTest.h"
+#include "mkfTest.h"    // for compiler pragma warning settings
 
 #ifdef __PGI   // HACKY
 #define ACC_INLINE inline
@@ -15,30 +16,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// Number of threshold values per mapping: 1 (simple threshold) or 2 (interval / hysteresis)
-#define BM_NUMT   (1)
-#define BM_FLAG_T2IVL  (1<<15)
-
-// Comparison operation descriptor (single threshold).
-// The possible 0 or 1 result of a comparison
-// is obtained from m[] via a comparison-to-index
-// function. Thus any relation < <= = != >= > can
-// be described as a combination of three bits.
-// The runtime cost is always two comparisons per
-// threshold value plus the lookup.
-typedef struct
-{
-   float t[BM_NUMT];
-   int   m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
-   // NB: 32bit alignment (pre-NVIDIA-Pascal).
-} BinMapF32;
-
-#define BMC_GT (0x4)
-#define BMC_EQ (0x2)
-#define BMC_LT (0x1)
-#define BMC_NV (0x0)
-#define BMC_AL (0x7)
 
 
 /***/
@@ -67,5 +44,5 @@ extern void binMapRowsF32
 } // extern "C"
 #endif
 
-#endif // BINMAP_H
+#endif // BIN_MAP_ACC_H
 

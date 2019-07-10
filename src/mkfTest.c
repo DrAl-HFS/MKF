@@ -1,7 +1,9 @@
 
-#include "mkfTools.h"
-#include "binMap.h"
-#include "mkf.h"
+//#include "mkfTools.h"
+#include "binMapAcc.h"
+#include "mkfAcc.h"
+#include "mkfCUDA.h"
+#include "mkfUtil.h"
 #include "geomHacks.h"
 
 
@@ -76,7 +78,7 @@ int main (int argc, char *argv[])
       n= genBlock(cux.pHF, def, radius);
       LOG("block=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
 #endif
-      setBMCF32(&bmc,">=",0.5);
+      setBinMapF32(&bmc,">=",0.5);
       procSimple(aBPD, cux.pHU, cux.pHF, def, &bmc);
 
       checkNU32(aBPD, 256, NULL);

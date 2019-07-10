@@ -1,9 +1,8 @@
-// binMap.c - packed binary map generation from scalar field.
+// binMapAcc.c - packed binary map generation from scalar field.
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#include "binMap.h"
-//#include "openacc.h"
+#include "binMapAcc.h"
 
 #ifndef ACC_INLINE
 #define ACC_INLINE
@@ -36,31 +35,8 @@ ACC_INLINE U8 bm2F32 (const F32 f, const BinMapCtxF32 *pC)
 } // bm2F32
 #endif
 
+
 /***/
-
-//pragma acc routine seq
-void setBMCF32 (BinMapF32 *pC, const char relopChars[], const F32 t)
-{
-   int i= 0, inv= 0, valid= 1;
-   pC->t[0]= t;
-   pC->m= BMC_NV;
-
-   do
-   {
-      switch(relopChars[i])
-      {
-         case '<' : pC->m|= BMC_LT; break;
-         case '=' : pC->m|= BMC_EQ; break;
-         case '>' : pC->m|= BMC_GT; break;
-         case '!' : if (0 == i) { inv= 1; break; } // else...
-         default : valid= 0;
-      }
-      ++i;
-   } while (valid);
-   if (inv) { pC->m^= BMC_AL; }
-   LOG_CALL("(%p, %s, %G) - m=0x%X\n", pC, relopChars, t, pC->m);
-   //acc_set_device_num( 0, acc_device_host );
-} // setBMCF32
 
 #pragma acc routine vector
 void binMapNF32G (U32 * restrict pBM, const F32 * restrict pF, const size_t n, const BinMapF32 * const pC)
@@ -112,16 +88,14 @@ void binMapRowsF32
 
 // TODO: non planar scalar fields (3D stride) ?
 
-
 #if 0
-testBMC (const F32 f0, const F32 fs, const int n, const BinMapF32 *pC)
-{
-   for (int i= 0; i<n; i++)
-   {
-      F32 f= f0 + i * fs;
-      U8 r= bmF32(f, &ctx);
-      LOG("\t%G -> %u\n", f, r);
-   }
+
+#include "openacc.h"
+
+void binMapInit (void)
+{  // Only multicore acceleration works presently: GPU produces garbage...
+   acc_set_device_num( 0, acc_device_host );
 }
+
 #endif
 

@@ -2,10 +2,10 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#ifndef MKF_TOOLS_H
-#define MKF_TOOLS_H
+#ifndef MKF_ACC_H
+#define MKF_ACC_H
 
-#include "binMap.h"
+#include "binMapAcc.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,17 +27,8 @@ typedef double MKMeasureVal;
 extern void procSimple (U32 rBPD[256], U32 *pBM, const F32 *pF, const int def[3], const BinMapF32 *pC);
 
 
-/***/
-// Compute measures on previously obtained Binary Pattern Distributions.
-
-// Volume fraction
-extern MKMeasureVal volFrac (const U32 hBPD[256]);
-
-// Euler-Poincare Chi for 3D
-extern MKMeasureVal chiEP3 (const U32 hBPD[256]);
-
 #ifdef __cplusplus
 } // extern "C"
 #endif
 
-#endif // MKF_TOOLS_H
+#endif // MKF_ACC_H

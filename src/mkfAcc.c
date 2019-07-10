@@ -2,7 +2,7 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#include "mkfTools.h"
+#include "mkfAcc.h"
 
 #ifndef ACC_INLINE
 #define ACC_INLINE
@@ -14,10 +14,6 @@
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
-
-/***/
-
-#include "weighting.inc"
 
 /***/
 
@@ -154,28 +150,4 @@ void procSimple (U32 rBPD[256], U32 * restrict pBM, const F32 * restrict pF, con
       }
    }
 } // procSimple
-
-
-/***/
-
-MKMeasureVal volFrac (const U32 h[256])
-{
-   size_t s[2]={0,0};
-   for (int i= 0; i<256; i+= 2)
-   {
-      s[0]+= h[i];
-      s[1]+= h[i+1];
-   }
-   LOG_CALL("() - s[]={%zu, %zu} (%zu)\n", s[0], s[1], s[0]+s[1]);
-   return( s[1] / (MKMeasureVal)(s[0] + s[1]) );
-} // volFrac
-
-MKMeasureVal chiEP3 (const U32 h[256])
-{
-   I32 k=0;
-   for (int i= 0; i<256; i++) { k+= (I32)gWEP3[i] * (I32)h[i]; }
-   //LOG_CALL("() - k[]={%i, %i}\n", k[0], k[1]);
-   return( (MKMeasureVal) k * M_PI / 6 );
-} // chiEP3
-
 

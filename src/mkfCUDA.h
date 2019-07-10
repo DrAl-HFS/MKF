@@ -2,8 +2,8 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors Jan-June 2019
 
-#ifndef MKF_H
-#define MKF_H
+#ifndef MKF_CUDA_H
+#define MKF_CUDA_H
 
 #include "ctUtil.h"
 
@@ -24,7 +24,7 @@ typedef struct
 
 //typedef size_t MKCount;
 
-#ifndef MKF_CU // nvcc doesn't like this prototype...
+#ifndef MKF_CUDA_CU // nvcc doesn't like this prototype...
 extern int mkfProcess (const Context *pC, const int def[3], const MKBMapF32 *pMC);
 #endif
 
@@ -32,4 +32,4 @@ extern int mkfProcess (const Context *pC, const int def[3], const MKBMapF32 *pMC
 } // extern "C"
 #endif
 
-#endif // MKF_H
+#endif // MKF_CUDA_H

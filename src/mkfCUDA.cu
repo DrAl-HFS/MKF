@@ -2,8 +2,8 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors Jan-June 2019
 
-#ifndef MKF_CU
-#define MKF_CU
+#ifndef MKF_CUDA_CU
+#define MKF_CUDA_CU
 #endif
 
 #include "mkf.h"
@@ -305,6 +305,6 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
    return(1); //0 == r);
 } // mkfProcess
 
-#ifdef MKF_CU
-#undef MKF_CU
+#ifdef MKF_CUDA_CU
+#undef MKF_CUDA_CU
 #endif
