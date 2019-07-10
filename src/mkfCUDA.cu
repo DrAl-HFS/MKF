@@ -2,11 +2,11 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors Jan-June 2019
 
-#ifndef MKF_CU
-#define MKF_CU
+#ifndef MKF_CUDA_CU
+#define MKF_CUDA_CU
 #endif
 
-#include "mkf.h"
+#include "mkfCUDA.h"
 
 // CUDA kernels and wrappers
 
@@ -15,7 +15,7 @@
 #define BLKM BLKD-1
 //define BLKN 1024/BLKD
 
-__global__ void vThresh8 (uint r[], const float f[], const size_t n, const MKBMapF32 mc)
+__global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint z[BLKD];
@@ -42,7 +42,7 @@ __global__ void vThresh8 (uint r[], const float f[], const size_t n, const MKBMa
    }
 } // vThresh8
 
-__global__ void vThresh32 (uint r[], const float f[], const size_t n, const MKBMapF32 mc)
+__global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint z[BLKD];
@@ -228,7 +228,7 @@ cudaError_t ctuErr (cudaError_t *pE, const char *s)
    return(e);
 } // ctuErr
 
-extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
+extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
 {
    cudaError_t r;
 
@@ -305,6 +305,6 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC)
    return(1); //0 == r);
 } // mkfProcess
 
-#ifdef MKF_CU
-#undef MKF_CU
+#ifdef MKF_CUDA_CU
+#undef MKF_CUDA_CU
 #endif

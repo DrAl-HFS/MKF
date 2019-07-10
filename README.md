@@ -18,4 +18,10 @@ cycle. This may allow earlier completion of simulations, or perhaps just the pro
 There are potentially many situations when it is desireable to restart, pause or terminate a simulation.
 
 
+#### Notes
 
+OpenACC acceleration works for multicore (i.e. vectorised CPU) but not especially well (compiler unable to detect
+parallelisable code despite effort to reduce/eliminate dependancies within packed binary map generation and processing).
+OpenACC for GPU target so far produces nothing useful, hence CUDA implementation. Despite encouraging test results in
+a separate test hack setup, the CUDA version produces nothing useful: erratic output on first run suggests a bug
+somewhere but cuda-memcheck / cuda-gdb have not revealed anything so far...
