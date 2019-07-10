@@ -20,9 +20,6 @@ extern "C" {
 
 /***/
 
-// Define map (comparison operator) using a string
-extern void setBMCF32 (BinMapF32 *pC, const char relopChars[], const F32 t);
-
 // Apply a map without considering alignment - assumes row length is a multiple of 8.
 // nF is the product of scalar field (X, Y, Z) "dimensions": this number of packed bits will be generated.
 extern void binMapNF32 (U32 * restrict pBM, const F32 * restrict pF, const size_t nF, const BinMapF32 *pC);
