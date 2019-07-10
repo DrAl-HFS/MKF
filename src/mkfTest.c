@@ -2,61 +2,10 @@
 #include "mkfTools.h"
 #include "binMap.h"
 #include "mkf.h"
+#include "geomHacks.h"
 
-/*  */
-
-// -> GEOMETRY ?
-F32 sphereVol (F32 r) { return((4 * M_PI / 3) * r * r *r); }
-
-F32 boxVol (F32 r) { return(8 * r * r * r); }
-
-F32 mag2 (F32 dx, F32 dy, F32 dz) { return(dx*dx + dy*dy + dz*dz); }
 
 /***/
-
-int genBall (F32 *pF, const int def[3], const F32 r)
-{
-   size_t i= 0, n= 0;
-   F32 c[3], r2= r * r;
-
-   for (int d=0; d<3; d++) { c[d]= 0.5 * def[d]; }
-
-   for (int j= 0; j<def[2]; j++)
-   {
-      for (int k= 0; k<def[1]; k++)
-      {
-         for (int l= 0; l<def[0]; l++)
-         {
-            if (mag2(j-c[0], k-c[1], l-c[2]) <= r2) { pF[i]= 1.0; ++n; }
-            ++i;
-         }
-      }
-   }
-   return(n);
-} // genBall
-
-int genBox (F32 *pF, const int def[3], const F32 r)
-{
-   size_t i= 0, n= 0;
-   F32 c[3];
-
-   for (int d=0; d<3; d++) { c[d]= 0.5 * def[d]; }
-
-   for (int j= 0; j<def[2]; j++)
-   {
-      for (int k= 0; k<def[1]; k++)
-      {
-         for (int l= 0; l<def[0]; l++)
-         {
-            if ( (abs(j-c[2]) <= r) && (abs(k-c[1]) <= r) && (abs(l-c[0]) <= r) ) { pF[i]= 1.0; ++n; }
-            ++i;
-         }
-      }
-   }
-   return(n);
-} // genBox
-
-//extern int mkfProcess (Context *pC, const int def[3], const MKBMapF32 *pMC);
 
 Bool32 buffAlloc (Context *pC, const int def[3])
 {
@@ -124,8 +73,8 @@ int main (int argc, char *argv[])
       LOG("ball=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
 #else
       vr= boxVol(fracR);
-      n= genBox(cux.pHF, def, radius);
-      LOG("box=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
+      n= genBlock(cux.pHF, def, radius);
+      LOG("block=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
 #endif
       setBMCF32(&bmc,">=",0.5);
       procSimple(aBPD, cux.pHU, cux.pHF, def, &bmc);
