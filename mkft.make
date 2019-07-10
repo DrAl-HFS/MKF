@@ -2,9 +2,11 @@
 UNAME := $(shell uname -a)
 PGCCPATH := $(shell command -v pgcc 2>/dev/null)
 NVCCPATH := $(shell command -v nvcc 2>/dev/null)
-LCUPATH := /opt/pgi/linux86-64/2019/cuda/10.1/lib64
-# $(shell echo $(PGI_PATH))/cuda/10.1/lib64 ???
-# $PGI_CUDA_LIB_PATH
+#PGI_PATH := $(shell "echo $PGI_PATH")
+ifndef PGI_PATH
+PGI_PATH := /opt/pgi/linux86-64/2019
+endif
+CULBPATH := $(PGI_PATH)/cuda/10.1/lib64
 
 ifdef NVCCPATH
 NVCC := nvcc
@@ -53,7 +55,7 @@ CU_OBJ := $(CU_SRC:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.o)
 CMN_SRC := $(shell ls $(CMN_DIR)/*.c)
 CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
 LIBDEF := -lm
-#-lcudart -L$(LCUPATH)
+#-lcudart -L$(CULBPATH)
 INCDEF := -I$(CMN_DIR) -I$(INC_DIR)
 #-DMK_
 
@@ -67,7 +69,7 @@ ifdef NVCC
 
 OBJ += $(CU_OBJ)
 
-LIBDEF += -L$(LCUPATH) -lcudart
+LIBDEF += -L$(CULBPATH) -lcudart
 
 INCDEF += -DMK_CUDA
 
