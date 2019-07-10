@@ -101,7 +101,7 @@ void checkNU32 (const U32 u[], const int n, const char *pVrbFmt)
       t[0]+= u[i] * bitCountZ(i);
       t[1]+= bitCountZ(u[i]);
    }
-   LOG("checkNU32() - bitcounts: dist=%zu /8= %zu, raw=%zu\n", t[0], t[0]>>3, t[1]);
+   LOG("checkNU32(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
 } // checkNU32
 
 int main (int argc, char *argv[])

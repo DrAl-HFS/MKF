@@ -7,7 +7,8 @@ LCUPATH := /opt/pgi/linux86-64/2019/cuda/10.1/lib64
 # $PGI_CUDA_LIB_PATH
 
 ifdef NVCCPATH
-CUCC := nvcc
+NVCC := nvcc
+NVOPT := -g -G
 endif
 
 ifdef PGCCPATH
@@ -15,7 +16,7 @@ BUILD := NCRMNTL
 CC := pgcc
 OPT := -g
 #-O2
-ACC := -Mautoinline -acc=verystrict -ta=multicore
+ACC := -Mautoinline -acc=verystrict -ta=multicore,tesla
 # -Minfo=all
 # multicore,tesla
 
@@ -62,7 +63,7 @@ OBJ := $(C_OBJ) $(CMN_OBJ)
 $(OBJ_DIR)/%.o : %.o
 	mv $< $@
 
-ifdef CUCC
+ifdef NVCC
 
 OBJ += $(CU_OBJ)
 
@@ -71,7 +72,7 @@ LIBDEF += -L$(LCUPATH) -lcudart
 INCDEF += -DMK_CUDA
 
 %.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
-	$(CUCC) $(OPT) $(INCDEF) $< -c
+	$(NVCC) $(NVOPT) $(INCDEF) $< -c
 
 endif
 
