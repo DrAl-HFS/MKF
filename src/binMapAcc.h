@@ -1,4 +1,4 @@
-// binMap.h - packed binary map generation from scalar field, with (optional) OpenACC support.
+// binMapAcc.h - packed binary map generation from scalar field, with (optional) OpenACC support.
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 

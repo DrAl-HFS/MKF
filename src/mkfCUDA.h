@@ -1,4 +1,4 @@
-// mkf.cu - Minkowski Functional pattern processing using CUDA
+// mkfCUDA.h - Minkowski Functional pattern processing using CUDA
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors Jan-June 2019
 

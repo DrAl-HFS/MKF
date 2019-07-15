@@ -3,10 +3,14 @@
 // (c) Project Contributors Jan-June 2019
 
 #ifndef MKF_CUDA_CU
-#define MKF_CUDA_CU
+#define MKF_CUDA_CU // supress header "multiple definition" glitch
 #endif
 
 #include "mkfCUDA.h"
+
+#ifdef MKF_CUDA_CU
+#undef MKF_CUDA_CU // header glitch supression done
+#endif
 
 // CUDA kernels and wrappers
 
@@ -217,6 +221,9 @@ __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1
    }
 } // addPlane
 
+
+/***/
+
 cudaError_t ctuErr (cudaError_t *pE, const char *s)
 {
    cudaError_t e;
@@ -265,8 +272,13 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
 
       if (pC->pDF && pC->pDU)
       {
+         int blkD= 256;
+         int nBlk;
+
+         if (pC->nF <= blkD) { blkD= BLKD; }
+         nBlk= (pC->nF + blkD-1) / blkD;
          // CAVEAT! Treated as 1D
-         vThresh32<<<pC->nF,BLKD>>>(pC->pDU, pC->pDF, pC->nF, *pMC);
+         vThresh32<<<nBlk,blkD>>>(pC->pDU, pC->pDF, pC->nF, *pMC);
          ctuErr(NULL, "vThresh32()");
 
          if (pC->pHU)
@@ -285,11 +297,15 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
             const int nRowPairs= def[1]-1;
             const int nPlanePairs= def[2]-1;
             const int planeStride= def[1] * rowStride;
+
+            if (nRowPairs <= blkD) { blkD= BLKD; }
+            nBlk= (nRowPairs + blkD-1) / blkD;
+
             for (int i= 0; i < nPlanePairs; i++)
             {
                const uint *pP0= pC->pDU + i * planeStride;
                const uint *pP1= pC->pDU + (i+1) * planeStride;
-               addPlane<<<nRowPairs,BLKD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
+               addPlane<<<nBlk,blkD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
                if (0 != ctuErr(NULL, "addPlane"))
                { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPD, pP0, pP1); }
             }
@@ -305,6 +321,103 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
    return(1); //0 == r);
 } // mkfProcess
 
-#ifdef MKF_CUDA_CU
-#undef MKF_CUDA_CU
+
+#ifdef MKF_CUDA_MAIN
+
+#include "geomHacks.h"
+
+int buffAlloc (Context *pC, const int def[3], const int blkZ)
+{
+   int vol= def[0] * def[1] * def[2];
+
+   pC->nF= vol;
+   pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
+   pC->nU= BITS_TO_WRDSH(vol,5);
+   pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
+   pC->nZ= blkZ * 256;
+   pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
+
+   LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
+
+   return cuBuffAlloc(pC,vol);
+} // buffAlloc
+
+void dumpUX (const uint u[], const int n)
+{
+   const int wrap=16;
+   int i=0;
+   while (i<n)
+   {
+      int k= i + wrap;
+      if (k > n) { k= n; }
+      for (int j= i; j < k; j++) { printf("%08X ", u[j]); }
+      printf("\n");
+      i+= k;
+   }
+} // dumpUX
+
+void mkft (Context *pC, const int def[3], const float radius)
+{
+   BinMapF32 bmc;
+   float vr, fracR= radius / def[0];
+   int n;
+
+#if 1
+   vr= sphereVol(fracR);
+   n= genBall(pC->pHF, def, radius);
+   LOG("ball=%zu (/%d=%G, ref=%G)\n", n, pC->nF, (F64)n / pC->nF, vr);
+#else
+   vr= boxVol(fracR);
+   n= genBlock(pC->pHF, def, radius);
+   LOG("block=%zu (/%d=%G, ref=%G)\n", n, pC->nF, (F64)n / pC->nF, vr);
 #endif
+   setBinMapF32(&bmc,">=",0.5);
+//   vf= volFrac(aBPD);
+//   kf= chiEP3(aBPD);
+//   LOG("volFrac=%G (ref=%G)\n", vf, vr);
+//   LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
+   LOG("%smkfProcess() - %s","***\n","\n");
+   mkfProcess(pC, def, &bmc);
+
+   LOG("%p[%u]:\n",pC->pHU,pC->nU);
+   dumpUX(pC->pHU, pC->nU);
+} // mkft
+
+__global__ void vAddB (float r[], const float a[], const float b[], const int n)
+{
+   int i= blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < n) { r[i]= a[i] + b[i]; }
+} // vAddB
+
+int main (int argc, char *argv[])
+{
+   const int def[3]= {128,128,128};
+   Context cux={0};
+
+   if (buffAlloc(&cux, def, 0))
+   {
+#if 1
+      const int n= 1024;
+      for (int i=0; i<n; i++) { cux.pHF[i]= i; cux.pHF[2*n - (1+i)]= 1+i; }
+      cudaMemcpy(cux.pDF, cux.pHF, 2*n*sizeof(cux.pHF[0]), cudaMemcpyHostToDevice); ctuErr(NULL, "cudaMemcpy 1");
+      vAddB<<<8,128>>>(cux.pDF+2*n, cux.pDF+0, cux.pDF+n, n);
+      cudaMemcpy(cux.pHF+2*n, cux.pDF+2*n, n*sizeof(cux.pHF[0]), cudaMemcpyDeviceToHost); ctuErr(NULL, "cudaMemcpy 2");
+      {
+         int i= 2 * n;
+         LOG("vAddB() - [%d]=%G", i, cux.pHF[i]);
+         for ( ; i < (3*n)-1; i++)
+         {
+            if (cux.pHF[i] != n) { LOG(" [%d]=%G", i, cux.pHF[i]); }
+         }
+         LOG(" [%d]=%G\n", i, cux.pHF[i]);
+      }
+      printf("***\n");
+#endif
+      mkft(&cux, def, 0.5*def[0] - 1.5);
+      cuBuffRelease(&cux);
+      cudaDeviceReset();
+   }
+} // main
+
+
+#endif // MKF_CUDA_MAIN

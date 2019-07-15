@@ -1,4 +1,4 @@
-// mkfTools.c - tools for calculating Minkowski Functionals on a scalar field (via packed binary map and pattern distribution).
+// mkfAcc.c - tools for calculating Minkowski Functionals on a scalar field (via packed binary map and pattern distribution).
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 

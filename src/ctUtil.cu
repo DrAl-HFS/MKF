@@ -67,12 +67,12 @@ extern "C" int cuBuffAlloc (Context *pC, uint n)
 
    r= cudaMallocHost(&(pC->pHF), pC->bytesF); sE+= (0!=r);
    r= cudaMallocHost(&(pC->pHU), pC->bytesU); sE+= (0!=r);
-   r= cudaMallocHost(&(pC->pHZ), pC->bytesZ); sE+= (0!=r);
+   if (pC->bytesZ > 0) { r= cudaMallocHost(&(pC->pHZ), pC->bytesZ); sE+= (0!=r); }
    LOG("cudaMallocHost() - %d: %p %zu, %p %zu, %p %zu\n", r, pC->pHF, pC->bytesF, pC->pHU, pC->bytesU, pC->pHZ, pC->bytesZ);
 
    r= cudaMalloc(&(pC->pDF), pC->bytesF); sE+= (0!=r);
    r= cudaMalloc(&(pC->pDU), pC->bytesU); sE+= (0!=r);
-   r= cudaMalloc(&(pC->pDZ), pC->bytesZ); sE+= (0!=r);
+   if (pC->bytesZ > 0) { r= cudaMalloc(&(pC->pDZ), pC->bytesZ); sE+= (0!=r); }
    LOG("cudaMalloc() : %p %p %p\n", pC->pDF, pC->pDU, pC->pDZ);
 
    return(0 == sE);
