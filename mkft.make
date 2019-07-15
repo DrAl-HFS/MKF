@@ -3,9 +3,7 @@ UNAME := $(shell uname -a)
 PGCCPATH := $(shell command -v pgcc 2>/dev/null)
 NVCCPATH := $(shell command -v nvcc 2>/dev/null)
 #PGI_PATH := $(shell "echo $PGI_PATH")
-ifndef PGI_PATH
-PGI_PATH := /opt/pgi/linux86-64/2019
-endif
+PGI_PATH ?= /opt/pgi/linux86-64/2019
 CULBPATH := $(PGI_PATH)/cuda/10.1/lib64
 
 ifdef NVCCPATH
