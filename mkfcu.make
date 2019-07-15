@@ -6,7 +6,8 @@ CUDA_PATH ?= /usr/local/cuda
 CULBPATH := $(CUDA_PATH)/lib64
 
 NVCC := nvcc
-NVOPT := -g -G 
+NVOPT := -g -G -arch=sm_50
+# -gencode=arch=compute_50,code=sm_50
 # -std=c++11
 # -std=c99
 # -std=gnu99
@@ -22,7 +23,7 @@ INC_DIR := inc
 
 SRC := $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/ctUtil.cu
 HDR := $(HDR_DIR)/mkfCUDA.h $(HDR_DIR)/ctUtil.h
-OBJ := $(OBJ_DIR)/geomHacks.o $(OBJ_DIR)/binMapUtil.o $(OBJ_DIR)/util.o $(OBJ_DIR)/report.o
+OBJ := $(OBJ_DIR)/mkfUtil.o $(OBJ_DIR)/binMapUtil.o $(OBJ_DIR)/geomHacks.o $(OBJ_DIR)/util.o $(OBJ_DIR)/report.o
 
 
 LIBDEF := -lm -L$(CULBPATH) -lcudart

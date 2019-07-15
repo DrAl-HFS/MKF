@@ -170,54 +170,32 @@ __device__ void addRowBPD
 __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   __shared__ uint bpd[32][256]; // 32KB
+   __shared__ uint bpd[BLKD][256]; // 32KB
 
    if (i < defH)
    {
       const uint * pRow[2]= { pPln0 + i*rowStride, pPln1 + i*rowStride };
       const int r= i & 0x1F;
 
+#if 0
       for (int j= 0; j<256; j++) { bpd[r][j]= 0; }
-
+#else // transpose zeroing for write coalescing
+      for (int k= r; k < 256; k+= BLKD)
+      {
+         for (int j= 0; j < BLKD; j++) { bpd[j][k]= 0; }
+      }
+#endif
       addRowBPD(bpd[r], pRow, rowStride, defW);
 
       __syncthreads();
 
-#if 1
-      // transposed reduction allows coalescing ???
-      for (int k= r; k < 256; k+= 32) // 32 -> blockDim.x ?
+      // transposed reduction should allows coalescing
+      for (int k= r; k < 256; k+= BLKD)
       {
          uint t= 0;
-         for (int j= 0; j<32; j++) { t+= bpd[j][k]; } // bpd[0][k]+=
+         for (int j= 0; j < BLKD; j++) { t+= bpd[j][k]; } // bpd[0][k]+=
          atomicAdd( rBPD+k, t );
       }
-#else
-      // Reduce
-      if (0 == (r & 0x3))
-      {  // r : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
-         for (int k= r+1, k < (r+4); k++)
-         {
-            for (int j= 0; j<256; j++) { bpd[r][j]+= bpd[k][j]; }
-         }
-
-         __syncthreads();
-
-         if (0 == (r & 0xF))
-         {  // r : { 0, 16 } 2P 3I
-            for (int k= r+4; k < (r+16); k+= 4)
-            {
-               for (int j= 0; j<256; j++) { bpd[r][j]+= bpd[k][j]; }
-            }
-
-            __syncthreads();
-
-            if (0 == r)
-            {
-                for (int j= 0; j<256; j++) { atomic_add(rBPD[j], bpd[r][j] + bpd[r+16][j]) };
-            }
-         }
-      }
-#endif
    }
 } // addPlane
 
@@ -247,11 +225,11 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
       {
          r= cudaMalloc(&(pC->pDF), pC->bytesF);
          ctuErr(&r, "cudaMalloc()");
-         if (pC->pDF)
-         {
-            r= cudaMemcpy(pC->pDF, pC->pHF, pC->bytesF, cudaMemcpyHostToDevice);
-            ctuErr(&r, "cudaMemcpy()");
-         }
+      }
+      if (pC->pDF)
+      {
+         r= cudaMemcpy(pC->pDF, pC->pHF, pC->bytesF, cudaMemcpyHostToDevice);
+         ctuErr(&r, "cudaMemcpy()");
       }
 
       if (NULL == pC->pDU)
@@ -259,27 +237,19 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
          r= cudaMalloc(&(pC->pDU), pC->bytesU);
          ctuErr(&r, "cudaMalloc()");
       }
-      if (NULL == pC->pDZ)
-      {
-         r= cudaMalloc(&(pC->pDZ), pC->bytesZ);
-         ctuErr(&r, "cudaMalloc()");
-      }
-      if (NULL == pC->pHZ)
-      {
-         r= cudaMallocHost(&(pC->pHZ), pC->bytesZ);
-         ctuErr(&r, "cudaMalloc()");
-      }
 
       if (pC->pDF && pC->pDU)
       {
-         int blkD= 256;
+         int blkD= BLKD;//256;
          int nBlk;
 
+         if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
          if (pC->nF <= blkD) { blkD= BLKD; }
          nBlk= (pC->nF + blkD-1) / blkD;
          // CAVEAT! Treated as 1D
          vThresh32<<<nBlk,blkD>>>(pC->pDU, pC->pDF, pC->nF, *pMC);
          ctuErr(NULL, "vThresh32()");
+         cudaDeviceSynchronize();
 
          if (pC->pHU)
          {
@@ -288,31 +258,47 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
             ctuErr(NULL, "{vThresh32+} cudaMemcpy()");
          }
 
-         if (pC->pDZ)
+         if (pC->bytesZ> 0)
          {
-            //size_t bpdBytes= 256*sizeof(uint);
-            //if ((pC->pDZ) && (pC->bytesZ >= bpdBytes))
-            uint *pBPD= (uint*)(pC->pDZ);
-            const int rowStride= def[0] / 32;
-            const int nRowPairs= def[1]-1;
-            const int nPlanePairs= def[2]-1;
-            const int planeStride= def[1] * rowStride;
-
-            if (nRowPairs <= blkD) { blkD= BLKD; }
-            nBlk= (nRowPairs + blkD-1) / blkD;
-
-            for (int i= 0; i < nPlanePairs; i++)
+            if (NULL == pC->pDZ)
             {
-               const uint *pP0= pC->pDU + i * planeStride;
-               const uint *pP1= pC->pDU + (i+1) * planeStride;
-               addPlane<<<nBlk,blkD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
-               if (0 != ctuErr(NULL, "addPlane"))
-               { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPD, pP0, pP1); }
+               r= cudaMalloc(&(pC->pDZ), pC->bytesZ);
+               ctuErr(&r, "cudaMalloc()");
+               cudaMemset(pC->pDZ, 0, pC->bytesZ);
             }
-            if (pC->pHZ)
+            if (NULL == pC->pHZ)
             {
-               r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
-               ctuErr(&r, "{addPlane+} cudaMemcpy()");
+               r= cudaMallocHost(&(pC->pHZ), pC->bytesZ);
+               ctuErr(&r, "cudaMalloc()");
+            }
+            if (pC->pDZ)
+            {
+               //size_t bpdBytes= 256*sizeof(uint);
+               //if ((pC->pDZ) && (pC->bytesZ >= bpdBytes))
+               uint *pBPD= (uint*)(pC->pDZ);
+               const int rowStride= def[0] / 32;
+               const int nRowPairs= def[1]-1;
+               const int nPlanePairs= def[2]-1;
+               const int planeStride= def[1] * rowStride;
+
+               //if (nRowPairs <= blkD) {
+               blkD= BLKD;
+               nBlk= (nRowPairs + blkD-1) / blkD;
+
+               for (int i= 0; i < nPlanePairs; i++)
+               {
+                  const uint *pP0= pC->pDU + i * planeStride;
+                  const uint *pP1= pC->pDU + (i+1) * planeStride;
+                  addPlane<<<nBlk,blkD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
+                  if (0 != ctuErr(NULL, "addPlane"))
+                  { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPD, pP0, pP1); }
+               }
+               cudaDeviceSynchronize();
+               if (pC->pHZ)
+               {
+                  r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
+                  ctuErr(&r, "{addPlane+} cudaMemcpy()");
+               }
             }
          }
       }
@@ -325,6 +311,7 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
 #ifdef MKF_CUDA_MAIN
 
 #include "geomHacks.h"
+#include "mkfUtil.h"
 
 int buffAlloc (Context *pC, const int def[3], const int blkZ)
 {
@@ -342,17 +329,30 @@ int buffAlloc (Context *pC, const int def[3], const int blkZ)
    return cuBuffAlloc(pC,vol);
 } // buffAlloc
 
-void dumpUX (const uint u[], const int n)
+
+static const char gSepCh[2]={' ','\n'};
+
+void dumpF (const float f[], const int n, const int wrap)
 {
-   const int wrap=16;
    int i=0;
    while (i<n)
    {
       int k= i + wrap;
       if (k > n) { k= n; }
-      for (int j= i; j < k; j++) { printf("%08X ", u[j]); }
-      printf("\n");
-      i+= k;
+      for (int j= i; j < k; j++) { LOG("%G%c", f[j], gSepCh[(j+1)==k]); }
+      i= k;
+   }
+} // dumpF
+
+void dumpUX (const uint u[], const int n, const int wrap)
+{
+   int i=0;
+   while (i<n)
+   {
+      int k= i + wrap;
+      if (k > n) { k= n; }
+      for (int j= i; j < k; j++) { LOG("%08X%c", u[j], gSepCh[(j+1)==k]); }
+      i= k;
    }
 } // dumpUX
 
@@ -360,7 +360,7 @@ void mkft (Context *pC, const int def[3], const float radius)
 {
    BinMapF32 bmc;
    float vr, fracR= radius / def[0];
-   int n;
+   int m, n;
 
 #if 1
    vr= sphereVol(fracR);
@@ -371,16 +371,40 @@ void mkft (Context *pC, const int def[3], const float radius)
    n= genBlock(pC->pHF, def, radius);
    LOG("block=%zu (/%d=%G, ref=%G)\n", n, pC->nF, (F64)n / pC->nF, vr);
 #endif
+   m= def[0] * def[1] * def[2];
+   //dumpF(pC->pHF+n, n, def[0]);
    setBinMapF32(&bmc,">=",0.5);
-//   vf= volFrac(aBPD);
-//   kf= chiEP3(aBPD);
-//   LOG("volFrac=%G (ref=%G)\n", vf, vr);
-//   LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
-   LOG("%smkfProcess() - %s","***\n","\n");
+   LOG("***\nmkfProcess() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
    mkfProcess(pC, def, &bmc);
-
+#if 0
    LOG("%p[%u]:\n",pC->pHU,pC->nU);
-   dumpUX(pC->pHU, pC->nU);
+   m= def[0] >> BLKS; // def[0] / BLKD;
+   n= m * def[1];
+   if (n > pC->nU/2) { n= pC->nU/2; }
+   while ((m<<1) < 16) { m<<= 1; }
+   dumpUX(pC->pHU+2*n, n, m);
+   LOG("%s\n","-");
+   dumpUX(pC->pHU+3*n, n, m);
+#endif
+   if (pC->pHZ)
+   {
+      const U32 *pU= (U32*)pC->pHZ;
+
+      m= 0;
+      for (int i= 0; i<256; i++)
+      {
+         m+= pU[i];
+         if (pU[i] > 0) { LOG("[%d]=%u\n", i, pU[i]); }
+      }
+      LOG("sum=%u (%u)\n", m, pC->nF);
+#if 1
+      float vf= volFrac(pU);
+      float kf= chiEP3(pU);
+
+      LOG("volFrac=%G (ref=%G)\n", vf, vr);
+      LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
+#endif
+   }
 } // mkft
 
 __global__ void vAddB (float r[], const float a[], const float b[], const int n)
@@ -389,35 +413,38 @@ __global__ void vAddB (float r[], const float a[], const float b[], const int n)
    if (i < n) { r[i]= a[i] + b[i]; }
 } // vAddB
 
+void sanityTest (Context *pC)
+{
+   const int n= 1024;
+   int i, e=0;
+   for (i=0; i<n; i++) { pC->pHF[i]= i; pC->pHF[2*n - (1+i)]= 1+i; }
+   cudaMemcpy(pC->pDF, pC->pHF, 2*n*sizeof(pC->pHF[0]), cudaMemcpyHostToDevice); ctuErr(NULL, "cudaMemcpy 1");
+   vAddB<<<8,128>>>(pC->pDF+2*n, pC->pDF+0, pC->pDF+n, n);
+   cudaMemcpy(pC->pHF+2*n, pC->pDF+2*n, n*sizeof(pC->pHF[0]), cudaMemcpyDeviceToHost); ctuErr(NULL, "cudaMemcpy 2");
+
+   i= 2 * n;
+   LOG("sanityTest() - vAddB() - [%d]=%G", i, pC->pHF[i]);
+   for ( ; i < (3*n)-1; i++)
+   {
+      if (pC->pHF[i] != n) { ++e; LOG(" [%d]=%G", i, pC->pHF[i]); }
+   }
+   LOG(" [%d]=%G\n", i, pC->pHF[i]);
+
+   printf("*e=%d*\n", e);
+} // sanityTest();
+
 int main (int argc, char *argv[])
 {
-   const int def[3]= {128,128,128};
+   const int def[3]= {64,64,64};
    Context cux={0};
 
-   if (buffAlloc(&cux, def, 0))
+   if (buffAlloc(&cux, def, 1))
    {
-#if 1
-      const int n= 1024;
-      for (int i=0; i<n; i++) { cux.pHF[i]= i; cux.pHF[2*n - (1+i)]= 1+i; }
-      cudaMemcpy(cux.pDF, cux.pHF, 2*n*sizeof(cux.pHF[0]), cudaMemcpyHostToDevice); ctuErr(NULL, "cudaMemcpy 1");
-      vAddB<<<8,128>>>(cux.pDF+2*n, cux.pDF+0, cux.pDF+n, n);
-      cudaMemcpy(cux.pHF+2*n, cux.pDF+2*n, n*sizeof(cux.pHF[0]), cudaMemcpyDeviceToHost); ctuErr(NULL, "cudaMemcpy 2");
-      {
-         int i= 2 * n;
-         LOG("vAddB() - [%d]=%G", i, cux.pHF[i]);
-         for ( ; i < (3*n)-1; i++)
-         {
-            if (cux.pHF[i] != n) { LOG(" [%d]=%G", i, cux.pHF[i]); }
-         }
-         LOG(" [%d]=%G\n", i, cux.pHF[i]);
-      }
-      printf("***\n");
-#endif
-      mkft(&cux, def, 0.5*def[0] - 1.5);
+      //sanityTest(&cux);
+      mkft(&cux, def, 0.5*def[0] - 0.5);
       cuBuffRelease(&cux);
-      cudaDeviceReset();
    }
+   cudaDeviceReset();
 } // main
-
 
 #endif // MKF_CUDA_MAIN
