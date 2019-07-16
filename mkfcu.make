@@ -35,10 +35,10 @@ $(OBJ_DIR)/%.o : %.o
 	mv $< $@
 
 %.o : $(CMN_DIR)/%.c
-	gcc -g -std=c99 -I$(CMN_DIR) $< -c
+	gcc -g -std=c99 $(INCDEF) $< -c
 
 %.o : $(SRC_DIR)/%.c
-	gcc -g -std=c99 -I$(CMN_DIR) $< -c
+	gcc -g -std=c99 $(INCDEF) $< -c
 
 $(TARGET) : $(SRC) $(HDR) $(OBJ)
 	$(NVCC) $(NVOPT) $(INCDEF) $(SRC) $(OBJ) $(LIBDEF) -o $@
