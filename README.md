@@ -22,6 +22,9 @@ There are potentially many situations when it is desireable to restart, pause or
 
 OpenACC acceleration works for multicore (i.e. vectorised CPU) but not especially well (compiler unable to detect
 parallelisable code despite effort to reduce/eliminate dependancies within packed binary map generation and processing).
-OpenACC for GPU target so far produces nothing useful, hence CUDA implementation. Despite encouraging test results in
-a separate test hack setup, the CUDA version produces nothing useful: erratic output on first run suggests a bug
-somewhere but cuda-memcheck / cuda-gdb have not revealed anything so far...
+OpenACC for GPU target so far produces nothing useful, hence CUDA implementation. 
+
+CUDA version greatly improved by inclusion of *Synchronise() calls - yields deterministic (albeit incorrect) results in
+all cases. There is a consistent undercount of binary patterns and this (weirdly) changes with image content (size of ball).
+Suspect this is an internal pattern chunk boundary problem...
+
