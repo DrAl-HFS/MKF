@@ -43,7 +43,7 @@ void buffRelease (Context *pC)
 #endif
 } // buffRelease
 
-void checkNU32 (const U32 u[], const int n, const char *pVrbFmt)
+void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
 { // debug...
    size_t t[2]= { 0, 0 };
    for (int i= 0; i < n; i++)
@@ -53,7 +53,7 @@ void checkNU32 (const U32 u[], const int n, const char *pVrbFmt)
       t[1]+= bitCountZ(u[i]);
    }
    LOG("checkNU32(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
-} // checkNU32
+} // checkNZ
 
 int main (int argc, char *argv[])
 {
@@ -61,7 +61,7 @@ int main (int argc, char *argv[])
    const F32 radius= 0.5*def[0] - 1.5;
    F32 fracR;
    BinMapF32 bmc;
-   U32 aBPD[256]={0,};
+   size_t aBPFD[256]={0,};
    MKMeasureVal vf, vr, kf;
    Context cux={0};
    int n;
@@ -79,22 +79,22 @@ int main (int argc, char *argv[])
       LOG("block=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
 #endif
       setBinMapF32(&bmc,">=",0.5);
-      procSimple(aBPD, cux.pHU, cux.pHF, def, &bmc);
+      mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
 
-      checkNU32(aBPD, 256, NULL);
+      checkNZ(aBPFD, 256, "[%d]=%zu\n");
 
-      vf= volFrac(aBPD);
-      kf= chiEP3(aBPD);
+      vf= volFrac(aBPFD);
+      kf= chiEP3(aBPFD);
       LOG("volFrac=%G (ref=%G)\n", vf, vr);
       LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
 #ifdef MK_CUDA
       LOG("%smkfProcess() - %s","***\n","\n");
-      if (mkfProcess(&cux, def, &bmc))
+      if (mkfCUDAGetBPFDSimple(&cux, def, &bmc))
       {
-         const uint *pBPD= cux.pHZ;
-         LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPD), chiEP3(pBPD));
-         checkNU32(pBPD, 256, "%d: %u\n");
-         checkNU32(cux.pHU, cux.nU, NULL); // "[%d]: 0x%04X\n"
+         const size_t *pBPFD= cux.pHZ;
+         LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
+         checkNZ(pBPFD, 256, "[%d]=%zu\n");
+         //checkNZ(cux.pHU, cux.nU, NULL); // "[%d]: 0x%04X\n"
       }
 #endif
    }

@@ -24,7 +24,7 @@ typedef double MKMeasureVal;
 //extern int addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int rowStride, const int n);
 
 // Simple version for basic testing
-extern void procSimple (U32 rBPD[256], U32 *pBM, const F32 *pF, const int def[3], const BinMapF32 *pC);
+extern void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 *pBM, const F32 *pF, const int def[3], const BinMapF32 *pC);
 
 
 #ifdef __cplusplus

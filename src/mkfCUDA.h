@@ -27,7 +27,7 @@ typedef struct
 */
 
 #ifndef MKF_CUDA_CU // nvcc doesn't like this prototype...
-extern int mkfProcess (const Context *pC, const int def[3], const BinMapF32 *pMC);
+extern int mkfCUDAGetBPFDSimple (const Context *pC, const int def[3], const BinMapF32 *pMC);
 #endif
 
 #ifdef __cplusplus

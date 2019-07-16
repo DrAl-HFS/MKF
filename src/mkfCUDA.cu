@@ -12,7 +12,7 @@
 #undef MKF_CUDA_CU // header glitch supression done
 #endif
 
-// Cuda wide count for atomicAdd
+// Wide counter for atomicAdd (nvcc dislikes size_t)
 typedef unsigned long long CUACount;
 
 
@@ -219,7 +219,7 @@ cudaError_t ctuErr (cudaError_t *pE, const char *s)
    return(e);
 } // ctuErr
 
-extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
+extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC)
 {
    cudaError_t r;
 
@@ -311,7 +311,7 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
 
    return(1); //0 == r);
-} // mkfProcess
+} // mkfCUDAGetBPFDSimple
 
 
 #ifdef MKF_CUDA_MAIN
@@ -380,8 +380,8 @@ void mkft (Context *pC, const int def[3], const float radius)
    m= def[0] * def[1] * def[2];
    //dumpF(pC->pHF+n, n, def[0]);
    setBinMapF32(&bmc,">=",0.5);
-   LOG("***\nmkfProcess() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
-   mkfProcess(pC, def, &bmc);
+   LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
+   mkfCUDAGetBPFDSimple(pC, def, &bmc);
 #if 0
    LOG("%p[%u]:\n",pC->pHU,pC->nU);
    m= def[0] >> BLKS; // def[0] / BLKD;
@@ -413,6 +413,7 @@ void mkft (Context *pC, const int def[3], const float radius)
    }
 } // mkft
 
+#if 0
 __global__ void vAddB (float r[], const float a[], const float b[], const int n)
 {
    int i= blockIdx.x * blockDim.x + threadIdx.x;
@@ -438,6 +439,7 @@ void sanityTest (Context *pC)
 
    printf("*e=%d*\n", e);
 } // sanityTest();
+#endif
 
 int main (int argc, char *argv[])
 {
@@ -447,7 +449,7 @@ int main (int argc, char *argv[])
    if (buffAlloc(&cux, def, 1))
    {
       //sanityTest(&cux);
-      mkft(&cux, def, 0.5*def[0] - 0.5);
+      mkft(&cux, def, 0.5*def[0] - 1.5);
       cuBuffRelease(&cux);
    }
    cudaDeviceReset();

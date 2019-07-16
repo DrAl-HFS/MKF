@@ -35,6 +35,7 @@ ACC_INLINE void loadChunk
 } // loadChunk
 
 #if 0
+// store binary patterns to temp
 ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
 {
    for (int i= 0; i < n; i++) // seq
@@ -50,8 +51,28 @@ ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
    }
    return(n);
 } // buildPattern
+#endif
+
+// Update frequency distribution of binary patterns
+#if 1
+// Transpose pattern assembly : better parallelisability?
+ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
+{
+   for (int i= 0; i < n; i++) // seq
+   {
+      U8 r[4]; // temporary to permit/encourage vectorisation
+
+      for (int k= 0; k < 4; k++) // vect
+      {
+         r[k]= (bufChunk[k] & 0x3) << (2*k);
+         bufChunk[k] >>= 1;
+      }
+      rBPFD[(r[0] | r[1] | r[2] | r[3])]++;
+   }
+} // addPattern
 #else
-ACC_INLINE void addPattern (U32 rBPD[256], U64 bufChunk[4], const int n)
+// "Conventional" pattern assembly in 4bit slices
+ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
 {
    U8 r=0;
 
@@ -66,7 +87,7 @@ ACC_INLINE void addPattern (U32 rBPD[256], U64 bufChunk[4], const int n)
          bufChunk[k] >>= 1;
          r|= (bufChunk[k] & 0x1) << (4+k);
       }
-      rBPD[r]++; r>>= 4;
+      rBPFD[r]++; r>>= 4;
    }
 } // addPattern
 #endif
@@ -78,7 +99,7 @@ ACC_INLINE void addPattern (U32 rBPD[256], U64 bufChunk[4], const int n)
 // ii) successive chunks need merge of leading/trailing bits
 ACC_INLINE void addRowBPD
 (
-   U32 rBPD[256], // result pattern distribution
+   size_t rBPFD[256], // result pattern distribution
    const U32 * restrict pRow[2],
    const int rowStride,
    const int n    // Number of single bit elements packed in row
@@ -90,7 +111,7 @@ ACC_INLINE void addRowBPD
 
    // First chunk of n bits yields n-1 patterns
    loadChunk(bufChunk, pRow[0]+0, pRow[1]+0, rowStride, 0);
-   addPattern(rBPD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
+   addPattern(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    //k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    //for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    // Subsequent whole chunks yield n patterns
@@ -99,7 +120,7 @@ ACC_INLINE void addRowBPD
    while (++i < m)
    {
       loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      addPattern(rBPD, bufChunk, CHUNK_SIZE);
+      addPattern(rBPFD, bufChunk, CHUNK_SIZE);
       //k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
@@ -108,7 +129,7 @@ ACC_INLINE void addRowBPD
    if (k > 0)
    {
       loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      addPattern(rBPD, bufChunk, k);
+      addPattern(rBPFD, bufChunk, k);
       //k= buildPattern(bufPatt, bufChunk, k);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
@@ -118,7 +139,7 @@ ACC_INLINE void addRowBPD
 
 #include "openacc.h"
 
-void procSimple (U32 rBPD[256], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 * const pC)
+void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 * const pC)
 {
    const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
    const int planeStride= rowStride * def[1];
@@ -126,7 +147,7 @@ void procSimple (U32 rBPD[256], U32 * restrict pBM, const F32 * restrict pF, con
    const int nF= def[0]*def[1]*def[2];
 
    acc_set_device_num( 0, acc_device_host );
-   #pragma acc data present_or_create( pBM[:(planeStride * def[2])] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( rBPD[:256] )
+   #pragma acc data present_or_create( pBM[:(planeStride * def[2])] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( rBPFD[:256] )
    {  // #pragma acc parallel vector ???
       if ((rowStride<<5) == def[0])
       {  // Multiple of 32
@@ -148,9 +169,9 @@ void procSimple (U32 rBPD[256], U32 * restrict pBM, const F32 * restrict pF, con
             const U32 * restrict pRow[2];
             pRow[0]= pPlane[0] + i * rowStride;
             pRow[1]= pPlane[1] + i * rowStride;
-            addRowBPD(rBPD, pRow, rowStride, def[0]);
+            addRowBPD(rBPFD, pRow, rowStride, def[0]);
          }
       }
    }
-} // procSimple
+} // mkfAccGetBPFDSimple
 
