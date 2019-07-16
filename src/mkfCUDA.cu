@@ -12,6 +12,12 @@
 #undef MKF_CUDA_CU // header glitch supression done
 #endif
 
+// Cuda wide count for atomicAdd
+typedef unsigned long long CUACount;
+
+
+/***/
+
 // CUDA kernels and wrappers
 
 #define BLKS 5
@@ -167,10 +173,10 @@ __device__ void addRowBPD
    }
 } // addRowBPD
 
-__global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__global__ void addPlane (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   __shared__ uint bpd[256][BLKD]; // 32KB
+   __shared__ uint bpfd[256][BLKD]; // C-row-major (lexicographic) memory order. 32KB
 
    if (i < defH)
    {
@@ -182,19 +188,19 @@ __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1
 #else // transpose zeroing for write coalescing
       for (int k= r; k < 256; k+= BLKD)
       {
-         for (int j= 0; j < BLKD; j++) { bpd[k][j]= 0; }
+         for (int j= 0; j < BLKD; j++) { bpfd[k][j]= 0; }
       }
 #endif
-      addRowBPD(&(bpd[0][r]), pRow, rowStride, defW);
+      addRowBPD(&(bpfd[0][r]), pRow, rowStride, defW);
 
       __syncthreads();
 
       // transposed reduction should allows coalescing
       for (int k= r; k < 256; k+= BLKD)
       {
-         uint t= 0;
-         for (int j= 0; j < BLKD; j++) { t+= bpd[k][j]; }
-         atomicAdd( rBPD+k, t );
+         CUACount t= 0;
+         for (int j= 0; j < BLKD; j++) { t+= bpfd[k][j]; }
+         atomicAdd( rBPFD+k, t );
       }
    }
 } // addPlane
@@ -275,7 +281,7 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
             {
                //size_t bpdBytes= 256*sizeof(uint);
                //if ((pC->pDZ) && (pC->bytesZ >= bpdBytes))
-               uint *pBPD= (uint*)(pC->pDZ);
+               CUACount *pBPFD= (CUACount*)(pC->pDZ);
                const int rowStride= def[0] / 32;
                const int nRowPairs= def[1]-1;
                const int nPlanePairs= def[2]-1;
@@ -289,9 +295,9 @@ extern "C" int mkfProcess (Context *pC, const int def[3], const BinMapF32 *pMC)
                {
                   const uint *pP0= pC->pDU + i * planeStride;
                   const uint *pP1= pC->pDU + (i+1) * planeStride;
-                  addPlane<<<nBlk,blkD>>>(pBPD, pP0, pP1, rowStride, def[0], nRowPairs);
+                  addPlane<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs);
                   if (0 != ctuErr(NULL, "addPlane"))
-                  { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPD, pP0, pP1); }
+                  { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPFD, pP0, pP1); }
                }
                cudaDeviceSynchronize();
                if (pC->pHZ)
@@ -388,7 +394,7 @@ void mkft (Context *pC, const int def[3], const float radius)
 #endif
    if (pC->pHZ)
    {
-      const U32 *pU= (U32*)pC->pHZ;
+      const size_t *pU= (size_t*)pC->pHZ;
 
       m= 0;
       for (int i= 0; i<256; i++)

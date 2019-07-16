@@ -20,10 +20,10 @@ typedef double MKMeasureVal;
 // Compute measures on previously obtained Binary Pattern Distributions.
 
 // Volume fraction
-extern MKMeasureVal volFrac (const U32 hBPD[256]);
+extern MKMeasureVal volFrac (const size_t hBPD[256]);
 
 // Euler-Poincare Chi for 3D
-extern MKMeasureVal chiEP3 (const U32 hBPD[256]);
+extern MKMeasureVal chiEP3 (const size_t hBPD[256]);
 
 #ifdef __cplusplus
 } // extern "C"

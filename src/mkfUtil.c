@@ -11,22 +11,22 @@
 
 /***/
 
-MKMeasureVal volFrac (const U32 aBPD[256])
+MKMeasureVal volFrac (const size_t aBPFD[256])
 {
    size_t s[2]={0,0};
    for (int i= 0; i<256; i+= 2)
    {
-      s[0]+= aBPD[i];
-      s[1]+= aBPD[i+1];
+      s[0]+= aBPFD[i];
+      s[1]+= aBPFD[i+1];
    }
    LOG_CALL("() - s[]={%zu, %zu} (%zu)\n", s[0], s[1], s[0]+s[1]);
    return( s[1] / (MKMeasureVal)(s[0] + s[1]) );
 } // volFrac
 
-MKMeasureVal chiEP3 (const U32 aBPD[256])
+MKMeasureVal chiEP3 (const size_t aBPFD[256])
 {
-   I32 k=0;
-   for (int i= 0; i<256; i++) { k+= (I32)gWEP3[i] * (I32)aBPD[i]; }
+   I64 k=0;
+   for (int i= 0; i<256; i++) { k+= (I64)gWEP3[i] * (signed)aBPFD[i]; }
    //LOG_CALL("() - k[]={%i, %i}\n", k[0], k[1]);
    return( (MKMeasureVal) k * M_PI / 6 );
 } // chiEP3
