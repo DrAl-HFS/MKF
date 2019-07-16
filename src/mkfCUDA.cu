@@ -142,7 +142,7 @@ __device__ int ap4x2xN (uint bpd[256], size_t bufChunk[4], const int n)
    return(n);
 } // ap4x2xN
 
-__device__ void addRowBPD
+__device__ void addRowBPFD
 (
    uint bpd[256], // result pattern distribution
    const uint * pRow[2],
@@ -171,9 +171,9 @@ __device__ void addRowBPD
       loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
       k= ap4x2xN(bpd, bufChunk, k);
    }
-} // addRowBPD
+} // addRowBPFD
 
-__global__ void addPlane (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    __shared__ uint bpfd[256][BLKD]; // C-row-major (lexicographic) memory order. 32KB
@@ -191,7 +191,7 @@ __global__ void addPlane (CUACount rBPFD[256], const uint * pPln0, const uint * 
          for (int j= 0; j < BLKD; j++) { bpfd[k][j]= 0; }
       }
 #endif
-      addRowBPD(&(bpfd[0][r]), pRow, rowStride, defW);
+      addRowBPFD(&(bpfd[0][r]), pRow, rowStride, defW);
 
       __syncthreads();
 
@@ -203,7 +203,7 @@ __global__ void addPlane (CUACount rBPFD[256], const uint * pPln0, const uint * 
          atomicAdd( rBPFD+k, t );
       }
    }
-} // addPlane
+} // addPlaneBPFD
 
 
 /***/
@@ -295,7 +295,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
                {
                   const uint *pP0= pC->pDU + i * planeStride;
                   const uint *pP1= pC->pDU + (i+1) * planeStride;
-                  addPlane<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs);
+                  addPlaneBPFD<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs);
                   if (0 != ctuErr(NULL, "addPlane"))
                   { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPFD, pP0, pP1); }
                }
@@ -366,7 +366,7 @@ void mkft (Context *pC, const int def[3], const float radius)
 {
    BinMapF32 bmc;
    float vr, fracR= radius / def[0];
-   int m, n;
+   int n;
 
 #if 1
    vr= sphereVol(fracR);
@@ -377,7 +377,6 @@ void mkft (Context *pC, const int def[3], const float radius)
    n= genBlock(pC->pHF, def, radius);
    LOG("block=%zu (/%d=%G, ref=%G)\n", n, pC->nF, (F64)n / pC->nF, vr);
 #endif
-   m= def[0] * def[1] * def[2];
    //dumpF(pC->pHF+n, n, def[0]);
    setBinMapF32(&bmc,">=",0.5);
    LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
@@ -394,22 +393,13 @@ void mkft (Context *pC, const int def[3], const float radius)
 #endif
    if (pC->pHZ)
    {
-      const size_t *pU= (size_t*)pC->pHZ;
+      const size_t *pBPFD= (size_t*)pC->pHZ;
+      LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
 
-      m= 0;
       for (int i= 0; i<256; i++)
       {
-         m+= pU[i];
-         if (pU[i] > 0) { LOG("[%d]=%u\n", i, pU[i]); }
+         if (pBPFD[i] > 0) { LOG("[%d]=%u\n", i, pBPFD[i]); }
       }
-      LOG("sum=%u (%u)\n", m, pC->nF);
-#if 1
-      float vf= volFrac(pU);
-      float kf= chiEP3(pU);
-
-      LOG("volFrac=%G (ref=%G)\n", vf, vr);
-      LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
-#endif
    }
 } // mkft
 

@@ -97,7 +97,7 @@ ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
 // seems unlikely due to memory access patterns:-
 //  i) requires *atomic_add()* to distribution array
 // ii) successive chunks need merge of leading/trailing bits
-ACC_INLINE void addRowBPD
+ACC_INLINE void addRowBPFD
 (
    size_t rBPFD[256], // result pattern distribution
    const U32 * restrict pRow[2],
@@ -133,7 +133,7 @@ ACC_INLINE void addRowBPD
       //k= buildPattern(bufPatt, bufChunk, k);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
-} // addRowBPD
+} // addRowBPFD
 
 /***/
 
@@ -169,7 +169,7 @@ void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 * restrict pBM, const F32 * res
             const U32 * restrict pRow[2];
             pRow[0]= pPlane[0] + i * rowStride;
             pRow[1]= pPlane[1] + i * rowStride;
-            addRowBPD(rBPFD, pRow, rowStride, def[0]);
+            addRowBPFD(rBPFD, pRow, rowStride, def[0]);
          }
       }
    }

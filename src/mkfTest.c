@@ -58,7 +58,7 @@ void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
 int main (int argc, char *argv[])
 {
    const int def[3]= {64,64,64};
-   const F32 radius= 0.5*def[0] - 1.5;
+   const F32 radius= 0.5*def[0] - 2.5;
    F32 fracR;
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
@@ -80,15 +80,11 @@ int main (int argc, char *argv[])
 #endif
       setBinMapF32(&bmc,">=",0.5);
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
-
+      LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
       checkNZ(aBPFD, 256, "[%d]=%zu\n");
 
-      vf= volFrac(aBPFD);
-      kf= chiEP3(aBPFD);
-      LOG("volFrac=%G (ref=%G)\n", vf, vr);
-      LOG("chiEP=%G (ref=%G)\n", kf, 4 * M_PI);
 #ifdef MK_CUDA
-      LOG("%smkfProcess() - %s","***\n","\n");
+      LOG("%smkfCUDAGetBPFDSimple() - %s","***\n","\n");
       if (mkfCUDAGetBPFDSimple(&cux, def, &bmc))
       {
          const size_t *pBPFD= cux.pHZ;
