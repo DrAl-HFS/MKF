@@ -88,14 +88,3 @@ void binMapRowsF32
 
 // TODO: non planar scalar fields (3D stride) ?
 
-#if 0
-
-#include "openacc.h"
-
-void binMapInit (void)
-{  // Only multicore acceleration works presently: GPU produces garbage...
-   acc_set_device_num( 0, acc_device_host );
-}
-
-#endif
-
