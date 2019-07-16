@@ -170,7 +170,7 @@ __device__ void addRowBPD
 __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   __shared__ uint bpd[BLKD][256]; // 32KB
+   __shared__ uint bpd[256][BLKD]; // 32KB
 
    if (i < defH)
    {
@@ -178,14 +178,14 @@ __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1
       const int r= i & 0x1F;
 
 #if 0
-      for (int j= 0; j<256; j++) { bpd[r][j]= 0; }
+      for (int j= 0; j<256; j++) { bpd[j][r]= 0; }
 #else // transpose zeroing for write coalescing
       for (int k= r; k < 256; k+= BLKD)
       {
-         for (int j= 0; j < BLKD; j++) { bpd[j][k]= 0; }
+         for (int j= 0; j < BLKD; j++) { bpd[k][j]= 0; }
       }
 #endif
-      addRowBPD(bpd[r], pRow, rowStride, defW);
+      addRowBPD(&(bpd[0][r]), pRow, rowStride, defW);
 
       __syncthreads();
 
@@ -193,7 +193,7 @@ __global__ void addPlane (uint rBPD[256], const uint * pPln0, const uint * pPln1
       for (int k= r; k < 256; k+= BLKD)
       {
          uint t= 0;
-         for (int j= 0; j < BLKD; j++) { t+= bpd[j][k]; } // bpd[0][k]+=
+         for (int j= 0; j < BLKD; j++) { t+= bpd[k][j]; }
          atomicAdd( rBPD+k, t );
       }
    }
