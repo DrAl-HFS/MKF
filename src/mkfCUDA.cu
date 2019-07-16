@@ -87,20 +87,33 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
-__device__ void loadChunk
+__device__ void loadChunkSh0
 (
-   size_t bufChunk[4],     // chunk buffer
-   const uint * pR0, // Location within row of first -
-   const uint * pR1, //  - and second planes
-   const int rowStride,       // stride between successive rows within each plane
-   const int lsh              // shift at which to append chunks (0/1)
+   size_t bufChunk[4],  // chunk buffer
+   const uint * pR0,    // Location within row of first -
+   const uint * pR1,    //  - and second planes
+   const int rowStride  // stride between successive rows within each plane
 )
 {  // vect
-   bufChunk[0] |= (pR0[0] << lsh);
-   bufChunk[1] |= (pR0[rowStride] << lsh);
-   bufChunk[2] |= (pR1[0] << lsh);
-   bufChunk[3] |= (pR1[rowStride] << lsh);
-} // loadChunk
+   bufChunk[0]= pR0[0];
+   bufChunk[1]= pR0[rowStride];
+   bufChunk[2]= pR1[0];
+   bufChunk[3]= pR1[rowStride];
+} // loadChunkSh0
+
+__device__ void loadChunkSh1
+(
+   size_t bufChunk[4],  // chunk buffer
+   const uint * pR0,    // Location within row of first -
+   const uint * pR1,    //  - and second planes
+   const int rowStride  // stride between successive rows within each plane
+)
+{  // vect
+   bufChunk[0] |= (pR0[0] << 1);
+   bufChunk[1] |= (pR0[rowStride] << 1);
+   bufChunk[2] |= (pR1[0] << 1);
+   bufChunk[3] |= (pR1[rowStride] << 1);
+} // loadChunkSh1
 
 __device__ unsigned char bp4x2 (size_t bufChunk[4])
 {
@@ -115,31 +128,9 @@ __device__ unsigned char bp4x2 (size_t bufChunk[4])
    return(r);
 } // bp4x2
 
-__device__ int ap4x2xN (uint bpd[256], size_t bufChunk[4], const int n)
+__device__ void ap4x2xN (uint bpd[256], size_t bufChunk[4], const int n)
 {
-   const int m= n / 4;
-   int i, j;
-   for (i= 0; i < m; i++) // seq
-   {
-      bpd[ bp4x2(bufChunk) ]++;
-      bpd[ bp4x2(bufChunk) ]++;
-      bpd[ bp4x2(bufChunk) ]++;
-      bpd[ bp4x2(bufChunk) ]++;
-   }
-   j= i * 4;
-   if (j++ < n)
-   {
-      bpd[ bp4x2(bufChunk) ]++;
-      if (j++ < n)
-      {
-         bpd[ bp4x2(bufChunk) ]++;
-         if (j++ < n)
-         {
-            bpd[ bp4x2(bufChunk) ]++;
-         }
-      }
-   }
-   return(n);
+   for (int i= 0; i < n; i++) { bpd[ bp4x2(bufChunk) ]++; }
 } // ap4x2xN
 
 __device__ void addRowBPFD
@@ -154,22 +145,22 @@ __device__ void addRowBPFD
    size_t bufChunk[4]= { 0,0,0,0 };
 
    // First chunk of n bits yields n-1 patterns
-   loadChunk(bufChunk, pRow[0]+0, pRow[1]+0, rowStride, 0);
-   k= ap4x2xN(bpd, bufChunk, MIN(CHUNK_SIZE-1, n-1));
+   loadChunkSh0(bufChunk, pRow[0]+0, pRow[1]+0, rowStride);
+   ap4x2xN(bpd, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    // Subsequent whole chunks yield n patterns
    i= 0;
    m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
-      loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      k= ap4x2xN(bpd, bufChunk, CHUNK_SIZE);
+      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
+      ap4x2xN(bpd, bufChunk, CHUNK_SIZE);
    }
    // Check for residual bits < CHUNK_SIZE
    k= n & CHUNK_MASK;
    if (k > 0)
    {
-      loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
-      k= ap4x2xN(bpd, bufChunk, k);
+      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
+      ap4x2xN(bpd, bufChunk, k);
    }
 } // addRowBPFD
 
