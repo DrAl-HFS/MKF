@@ -202,7 +202,7 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
       //addRowBPFD(&(bpfd[0][r]), pRow, rowStride, defW);
       addRowBPFD(bpfd+r*BINS, pRow, rowStride, defW);
 
-      if (0 == r) { for (int k= 0; k < BLKM; k++) { lognu(k,bpfd+k*BINS,BINS); } }
+      //if (0 == r) { for (int k= 0; k < BLKM; k++) { lognu(k,bpfd+k*BINS,BINS); } }
       __syncthreads(); // Perhaps unneccessary (?) - control flow divergence not possible...
 
       for (int k= r; k < BINS; k+= BLKD)
