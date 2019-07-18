@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+#define MKF_BINS (1<<8)
+
 typedef double MKMeasureVal;
 
 //typedef struct { MKMeasureVal v, k; } MKVK;
@@ -20,10 +22,10 @@ typedef double MKMeasureVal;
 // Compute measures on previously obtained Binary Pattern Distributions.
 
 // Volume fraction
-extern MKMeasureVal volFrac (const size_t hBPD[256]);
+extern MKMeasureVal volFrac (const size_t hBPD[MKF_BINS]);
 
 // Euler-Poincare Chi for 3D
-extern MKMeasureVal chiEP3 (const size_t hBPD[256]);
+extern MKMeasureVal chiEP3 (const size_t hBPD[MKF_BINS]);
 
 #ifdef __cplusplus
 } // extern "C"

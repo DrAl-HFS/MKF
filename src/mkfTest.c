@@ -6,15 +6,18 @@
 #include "mkfUtil.h"
 #include "geomHacks.h"
 #ifdef __PGI
-#include "openacc.h"
+#include "openacc.h" // -> /opt/pgi/linux86-64/2019/include/openacc.h
+// PGI: _DEF_OPENACC
+// GNU: _OPENACC_H
+#define OPEN_ACC_API
 #endif
-
 
 /***/
 
 void setupAcc (void)
 {  // Only multicore acceleration works presently: GPU produces garbage...
-#ifdef _OPENACC_H
+#ifdef OPEN_ACC_API
+   LOG_CALL("() - %s\n", "acc_set_device_num( 0, acc_device_host )");
    acc_set_device_num( 0, acc_device_host );
 #endif
 } // setupAcc
@@ -62,9 +65,16 @@ void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
       t[0]+= u[i] * bitCountZ(i);
       t[1]+= bitCountZ(u[i]);
    }
-   LOG("checkNU32(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
+   LOG_CALL("(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
 } // checkNZ
 
+void compareNZ (const size_t u0[], const size_t u1[], const int n)
+{
+   for (int i= 0; i < n; i++)
+   {
+      if (u0[i] != u1[i]) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); }
+   }
+} // compareNZ
 
 int main (int argc, char *argv[])
 {
@@ -93,23 +103,28 @@ int main (int argc, char *argv[])
             n= genBall(cux.pHF, def, radius);
             break;
       }
-      LOG("[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, cux.nF, (F64)n / cux.nF, vr);
+      LOG("def[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, cux.nF, (F64)n / cux.nF, vr);
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();
+      LOG("%smkfAccGetBPFDSimple() - \n", "***\n");
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
       LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
-      checkNZ(aBPFD, 256, "[%d]=%zu\n");
 
 #ifdef MK_CUDA
-      LOG("%smkfCUDAGetBPFDSimple() - %s","***\n","\n");
+      LOG("%smkfCUDAGetBPFDSimple() - \n", "***\n");
       if (mkfCUDAGetBPFDSimple(&cux, def, &bmc))
       {
-         const size_t *pBPFD= cux.pHZ;
+         size_t *pBPFD= cux.pHZ;
+
+         //pBPFD[0xFF]= aBPFD[0xFF]; // HAAACK!
          LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
-         checkNZ(pBPFD, 256, "[%d]=%zu\n");
+         //checkNZ(pBPFD, 256, "[%d]=%zu\n");
          //checkNZ(cux.pHU, cux.nU, NULL); // "[%d]: 0x%04X\n"
+         compareNZ(aBPFD, pBPFD, MKF_BINS);
       }
+#else
+      checkNZ(aBPFD, MKF_BINS, "[%d]=%zu\n");
 #endif
    }
    buffRelease(&cux);

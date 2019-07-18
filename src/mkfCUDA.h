@@ -7,6 +7,7 @@
 
 #include "ctUtil.h"
 #include "binMapUtil.h"
+#include "mkfUtil.h"
 
 #ifdef __cplusplus
 extern "C" {

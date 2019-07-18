@@ -22,8 +22,9 @@ typedef unsigned long long CUACount;
 
 #define BLKS 5
 #define BLKD (1<<BLKS)
-#define BLKM BLKD-1
-#define BINS (1<<8)
+#define BLKM (BLKD-1)
+#define BINS MKF_BINS
+#define BINM (BINS-1)
 //define BLKN 1024/BLKD
 
 __global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
@@ -202,9 +203,13 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
       //addRowBPFD(&(bpfd[0][r]), pRow, rowStride, defW);
       addRowBPFD(bpfd+r*BINS, pRow, rowStride, defW);
 
-      //if (0 == r) { for (int k= 0; k < BLKM; k++) { lognu(k,bpfd+k*BINS,BINS); } }
-      __syncthreads(); // Perhaps unneccessary (?) - control flow divergence not possible...
-
+      __syncthreads(); // Probably unneccessary (?) - no hazardous control flow divergence possible...
+#if 0
+      if (0 == r) // { for (int k= 0; k < BLKM; k++) { lognu(k,bpfd+k*BINS,BINS); } }
+      {
+         for (int k= 0; k < BINS*BLKD; k++) { atomicAdd( rBPFD+(k&BINM), bpfd[k] ); } // rBPFD[(k&BINM)]+= bpfd[k]; }
+      }
+#else
       for (int k= r; k < BINS; k+= BLKD)
       {  // (transposed reduction for read coalescing)
          CUACount t= 0;
@@ -212,6 +217,7 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
          for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
          atomicAdd( rBPFD+k, t );
       }
+#endif
    }
 } // addPlaneBPFD
 
@@ -399,7 +405,7 @@ void mkft (Context *pC, const int def[3], U8 id, const float radius)
          n= genBall(pC->pHF, def, radius);
          break;
    }
-   LOG("[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, pC->nF, (F64)n / pC->nF, vr);
+   LOG("def[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, pC->nF, (F64)n / pC->nF, vr);
    //dumpF(pC->pHF+n, n, def[0]);
    setBinMapF32(&bmc,">=",0.5);
    LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
