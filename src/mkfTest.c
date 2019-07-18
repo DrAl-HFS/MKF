@@ -64,20 +64,26 @@ int main (int argc, char *argv[])
    size_t aBPFD[256]={0,};
    MKMeasureVal vf, vr, kf;
    Context cux={0};
-   int n;
+   int n, id=0;
+   const char *name[2]={"ball","box"};
 
    if (buffAlloc(&cux,def))
    {
       fracR= radius / def[0];
-#if 1
-      vr= sphereVol(fracR);
-      n= genBall(cux.pHF, def, radius);
-      LOG("ball=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
-#else
-      vr= boxVol(fracR);
-      n= genBlock(cux.pHF, def, radius);
-      LOG("block=%zu (/%d=%G)\n", n, cux.nF, (F64)n / cux.nF);
-#endif
+      switch(id)
+      {
+         case 1 :
+            vr= boxVol(fracR);
+            n= genBlock(cux.pHF, def, radius);
+            break;
+         default :
+            id= 0;
+            vr= sphereVol(fracR);
+            n= genBall(cux.pHF, def, radius);
+            break;
+      }
+      LOG("[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, cux.nF, (F64)n / cux.nF, vr);
+
       setBinMapF32(&bmc,">=",0.5);
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
       LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
