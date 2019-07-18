@@ -5,9 +5,19 @@
 #include "mkfCUDA.h"
 #include "mkfUtil.h"
 #include "geomHacks.h"
+#ifdef __PGI
+#include "openacc.h"
+#endif
 
 
 /***/
+
+void setupAcc (void)
+{  // Only multicore acceleration works presently: GPU produces garbage...
+#ifdef _OPENACC_H
+   acc_set_device_num( 0, acc_device_host );
+#endif
+} // setupAcc
 
 Bool32 buffAlloc (Context *pC, const int def[3])
 {
@@ -55,6 +65,7 @@ void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
    LOG("checkNU32(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
 } // checkNZ
 
+
 int main (int argc, char *argv[])
 {
    const int def[3]= {64,64,64};
@@ -62,7 +73,7 @@ int main (int argc, char *argv[])
    F32 fracR;
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
-   MKMeasureVal vf, vr, kf;
+   MKMeasureVal vr;
    Context cux={0};
    int n, id=0;
    const char *name[2]={"ball","box"};
@@ -85,6 +96,7 @@ int main (int argc, char *argv[])
       LOG("[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, cux.nF, (F64)n / cux.nF, vr);
 
       setBinMapF32(&bmc,">=",0.5);
+      setupAcc();
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
       LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
       checkNZ(aBPFD, 256, "[%d]=%zu\n");

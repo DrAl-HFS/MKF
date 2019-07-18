@@ -135,9 +135,8 @@ ACC_INLINE void addRowBPFD
    }
 } // addRowBPFD
 
-/***/
 
-#include "openacc.h"
+/***/
 
 void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 * const pC)
 {
@@ -146,7 +145,6 @@ void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 * restrict pBM, const F32 * res
    //const int volStride= planeStride * def[2];
    const int nF= def[0]*def[1]*def[2];
 
-   acc_set_device_num( 0, acc_device_host );
    #pragma acc data present_or_create( pBM[:(planeStride * def[2])] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( rBPFD[:256] )
    {  // #pragma acc parallel vector ???
       if ((rowStride<<5) == def[0])
