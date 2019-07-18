@@ -8,7 +8,7 @@ CULBPATH := $(PGI_PATH)/cuda/10.1/lib64
 
 ifdef NVCCPATH
 NVCC := nvcc
-NVOPT := -g -G -arch=sm_50
+NVOPT := -g -G -arch=sm_50 -ccbin=pgc++
 endif
 
 ifdef PGCCPATH
