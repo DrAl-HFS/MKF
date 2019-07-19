@@ -91,9 +91,9 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 
 __device__ void loadChunkSh0
 (
-   size_t bufChunk[4],  // chunk buffer
-   const uint * pR0,    // Location within row of first -
-   const uint * pR1,    //  - and second planes
+   U64   bufChunk[4],  // chunk buffer
+   const U32 * pR0,    // Location within row of first -
+   const U32 * pR1,    //  - and second planes
    const int rowStride  // stride between successive rows within each plane
 )
 {  // vect
@@ -105,19 +105,19 @@ __device__ void loadChunkSh0
 
 __device__ void loadChunkSh1
 (
-   size_t bufChunk[4],  // chunk buffer
-   const uint * pR0,    // Location within row of first -
-   const uint * pR1,    //  - and second planes
+   U64   bufChunk[4],  // chunk buffer
+   const U32 * pR0,    // Location within row of first -
+   const U32 * pR1,    //  - and second planes
    const int rowStride  // stride between successive rows within each plane
 )
 {  // vect
-   bufChunk[0] |= (pR0[0] << 1);
-   bufChunk[1] |= (pR0[rowStride] << 1);
-   bufChunk[2] |= (pR1[0] << 1);
-   bufChunk[3] |= (pR1[rowStride] << 1);
+   bufChunk[0] |= ((size_t) pR0[0]) << 1;
+   bufChunk[1] |= ((size_t) pR0[rowStride]) << 1;
+   bufChunk[2] |= ((size_t) pR1[0]) << 1;
+   bufChunk[3] |= ((size_t) pR1[rowStride]) << 1;
 } // loadChunkSh1
 
-__device__ void ap4x2xN (uint bpfd[BINS], size_t bufChunk[4], const int n)
+__device__ void ap4x2xN (U32 bpfd[BINS], U64 bufChunk[4], const int n)
 {
    for (int i= 0; i < n; i++)
    {
@@ -133,7 +133,7 @@ __device__ void ap4x2xN (uint bpfd[BINS], size_t bufChunk[4], const int n)
    }
 } // ap4x2xN
 
-__device__ uint lognu (int id, uint u[], const int n)
+__device__ uint lognu (int id, U32 u[], const int n)
 {
    uint t=0;
    printf("(%d: ", id);
@@ -148,15 +148,15 @@ __device__ uint lognu (int id, uint u[], const int n)
 
 __device__ void addRowBPFD
 (
-   uint        bpfd[BINS], // result pattern distribution
-   const uint  * pRow[2],
+   U32         bpfd[BINS], // result pattern distribution
+   const U32  * pRow[2],
    const int   rowStride,
    const int   n    // Number of single bit elements packed in row
 )
 {  // seq
    //uint dbg[4]={0,0,0,0};
    int m, k, i;
-   size_t bufChunk[4]= { 0,0,0,0 };
+   U64 bufChunk[4]= { 0,0,0,0 };
 
    //dbg[3]= lognu(bpfd,256);
    // First chunk of n bits yields n-1 patterns
@@ -185,13 +185,13 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
 //   __shared__ uint bpfd[BINS][BLKD]; // C-row-major (lexicographic) memory order. 32KB
-   __shared__ uint bpfd[BINS*BLKD]; // 32KB
+   __shared__ U32 bpfd[BINS*BLKD]; // 32KB
 
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
    if (i < defH)
    {
-      const uint * pRow[2]= { pPln0 + i*rowStride, pPln1 + i*rowStride };
+      const U32 * pRow[2]= { pPln0 + i*rowStride, pPln1 + i*rowStride };
       const int r= i & BLKM;
 
       for (int k= r; k < BINS; k+= BLKD)
@@ -309,8 +309,8 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
 
                for (int i= 0; i < nPlanePairs; i++)
                {
-                  const uint *pP0= pC->pDU + i * planeStride;
-                  const uint *pP1= pC->pDU + (i+1) * planeStride;
+                  const U32 *pP0= pC->pDU + i * planeStride;
+                  const U32 *pP1= pC->pDU + (i+1) * planeStride;
                   addPlaneBPFD<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs);
                   if (0 != ctuErr(NULL, "addPlane"))
                   { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPFD, pP0, pP1); }
@@ -390,8 +390,7 @@ void mkft (Context *pC, const int def[3], U8 id, const float radius)
    const char *name[2]={"ball","box"};
    BinMapF32 bmc;
    float vr, fracR= radius / def[1];
-   size_t t;
-   int n;
+   size_t n;
 
    switch(id)
    {
@@ -411,7 +410,7 @@ void mkft (Context *pC, const int def[3], U8 id, const float radius)
    LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
    mkfCUDAGetBPFDSimple(pC, def, &bmc);
 #if 0
-   t= bitCountNU32(pC->pHU, pC->bytesU>>2);
+   size_t t= bitCountNU32(pC->pHU, pC->bytesU>>2);
    LOG("bitCountNU32() -> %zu\n", t);
    LOG("%p[%u]:\n",pC->pHU,pC->nU);
    m= def[0] >> BLKS; // def[0] / BLKD;
@@ -464,7 +463,7 @@ void sanityTest (Context *pC)
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,64,128};
+   const int def[3]= {64,64,64};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))

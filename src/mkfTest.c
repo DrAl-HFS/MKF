@@ -85,8 +85,9 @@ int main (int argc, char *argv[])
    size_t aBPFD[256]={0,};
    MKMeasureVal vr;
    Context cux={0};
-   int n, id=0;
+   int id=0;
    const char *name[2]={"ball","box"};
+   size_t n;
 
    if (buffAlloc(&cux,def))
    {

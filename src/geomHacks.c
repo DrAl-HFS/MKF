@@ -15,7 +15,7 @@ float mag2 (const float dx, const float dy, const float dz) { return(dx*dx + dy*
 
 /***/
 
-int genBall (float f[], const int def[3], const float r)
+size_t genBall (float f[], const int def[3], const float r)
 {
    size_t i= 0, n= 0;
    float c[3], r2= r * r;
@@ -36,7 +36,7 @@ int genBall (float f[], const int def[3], const float r)
    return(n);
 } // genBall
 
-int genBlock (float f[], const int def[3], const float r)
+size_t genBlock (float f[], const int def[3], const float r)
 {
    size_t i= 0, n= 0;
    float c[3];
@@ -55,4 +55,4 @@ int genBlock (float f[], const int def[3], const float r)
       }
    }
    return(n);
-} // genBox
+} // genBlock

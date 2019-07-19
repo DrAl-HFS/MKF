@@ -25,9 +25,9 @@ extern float mag2 (const float dx, const float dy, const float dz); // { return(
 /***/
 
 // Rasterise primitive into scalar field
-extern int genBall (float f[], const int def[3], const float r);
+extern size_t genBall (float f[], const int def[3], const float r);
 
-extern int genBlock (float f[], const int def[3], const float r);
+extern size_t genBlock (float f[], const int def[3], const float r);
 
 #ifdef __cplusplus
 } // extern "C"

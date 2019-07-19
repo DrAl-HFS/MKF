@@ -17,21 +17,34 @@
 
 /***/
 
-// Load chunk from 4 adjacent rows within 2 neighbouring planes of binary map,
-// appending to remaining bits of last chunk if required
-ACC_INLINE void loadChunk
+// Load chunk from 4 adjacent rows within 2 neighbouring planes of binary map
+ACC_INLINE void loadChunkSh0
 (
    U64 bufChunk[4],     // chunk buffer
    const U32 * restrict pR0, // Location within row of first -
    const U32 * restrict pR1, //  - and second planes
-   const U32 rowStride,       // stride between successive rows within each plane
-   const U32 lsh              // shift at which to append chunks (0/1)
+   const U32 rowStride       // stride between successive rows within each plane
 )
 {  // vect
-   bufChunk[0] |= (pR0[0] << lsh);
-   bufChunk[1] |= (pR0[rowStride] << lsh);
-   bufChunk[2] |= (pR1[0] << lsh);
-   bufChunk[3] |= (pR1[rowStride] << lsh);
+   bufChunk[0]= pR0[0];
+   bufChunk[1]= pR0[rowStride];
+   bufChunk[2]= pR1[0];
+   bufChunk[3]= pR1[rowStride];
+} // loadChunk
+
+// As above but appending to last bits of preceding chunk
+ACC_INLINE void loadChunkSh1
+(
+   U64 bufChunk[4],     // chunk buffer
+   const U32 * restrict pR0, // Location within row of first -
+   const U32 * restrict pR1, //  - and second planes
+   const U32 rowStride       // stride between successive rows within each plane
+)
+{  // vect
+   bufChunk[0] |= ( (U64) pR0[0] ) << 1;
+   bufChunk[1] |= ( (U64) pR0[rowStride] ) << 1;
+   bufChunk[2] |= ( (U64) pR1[0] ) << 1;
+   bufChunk[3] |= ( (U64) pR1[rowStride] ) << 1;
 } // loadChunk
 
 #if 0
@@ -110,7 +123,7 @@ ACC_INLINE void addRowBPFD
    //U8 bufPatt[CHUNK_SIZE];
 
    // First chunk of n bits yields n-1 patterns
-   loadChunk(bufChunk, pRow[0]+0, pRow[1]+0, rowStride, 0);
+   loadChunkSh0(bufChunk, pRow[0]+0, pRow[1]+0, rowStride);
    addPattern(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    //k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    //for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
@@ -119,7 +132,7 @@ ACC_INLINE void addRowBPFD
    m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
-      loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
+      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
       addPattern(rBPFD, bufChunk, CHUNK_SIZE);
       //k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
@@ -128,7 +141,7 @@ ACC_INLINE void addRowBPFD
    k= n & CHUNK_MASK;
    if (k > 0)
    {
-      loadChunk(bufChunk, pRow[0]+i, pRow[1]+i, rowStride, 1);
+      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
       addPattern(rBPFD, bufChunk, k);
       //k= buildPattern(bufPatt, bufChunk, k);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
