@@ -91,46 +91,44 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 
 class ChunkBuf
 {
-   unsigned long long l[4];
-   //ChunkBuf (void) { l[0]= l[1]= l[2]= l[3]= 0; }
+   unsigned long long u00, u01, u10, u11;
+
 public:
    __device__ ChunkBuf (const uint * pR0, const uint * pR1, const int rowStride)
    {
-      l[0]= pR0[0];
-      l[1]= pR0[rowStride];
-      l[2]= pR1[0];
-      l[3]= pR1[rowStride];
+      u00= pR0[0];
+      u01= pR0[rowStride];
+      u10= pR1[0];
+      u11= pR1[rowStride];
    }
    __device__ void loadSh1 (const uint * pR0, const uint * pR1, const int rowStride)
    {
 #if 0
-      l[0]= ( l[0] & 0x1 ) | (((unsigned long long) pR0[0]) << 1);
-      l[1]= ( l[1] & 0x1 ) | (((unsigned long long) pR0[rowStride]) << 1);
-      l[2]= ( l[2] & 0x1 ) | (((unsigned long long) pR1[0]) << 1);
-      l[3]= ( l[3] & 0x1 ) | (((unsigned long long) pR1[rowStride]) << 1);
+      u00= ( u00 & 0x1 ) | (((unsigned long long) pR0[0]) << 1);
+      u01= ( u01 & 0x1 ) | (((unsigned long long) pR0[rowStride]) << 1);
+      u10= ( u10 & 0x1 ) | (((unsigned long long) pR1[0]) << 1);
+      u11= ( u11 & 0x1 ) | (((unsigned long long) pR1[rowStride]) << 1);
 #else
-      l[0]|= ( (unsigned long long) pR0[0] ) << 1;
-      l[1]|= ( (unsigned long long) pR0[rowStride] ) << 1;
-      l[2]|= ( (unsigned long long) pR1[0] ) << 1;
-      l[3]|= ( (unsigned long long) pR1[rowStride] ) << 1;
+      u00|= ( (unsigned long long) pR0[0] ) << 1;
+      u01|= ( (unsigned long long) pR0[rowStride] ) << 1;
+      u10|= ( (unsigned long long) pR1[0] ) << 1;
+      u11|= ( (unsigned long long) pR1[rowStride] ) << 1;
 #endif
    }
    __device__ void add (uint bpfd[BINS], const int n)
    {
+      uint bp;
       for (int i= 0; i < n; i++)
       {
-         uint bp=  (l[0] & 0x3) |
-                  ((l[1] & 0x3) << 2) |
-                  ((l[2] & 0x3) << 4) |
-                  ((l[3] & 0x3) << 6);
-         bpfd[ bp ]+= 1;
-         l[0] >>= 1;
-         l[1] >>= 1;
-         l[2] >>= 1;
-         l[3] >>= 1;
+         bp=  ( u00 & 0x3);       u00 >>= 1;
+         bp|= ((u01 & 0x3) << 2); u01 >>= 1;
+         bp|= ((u10 & 0x3) << 4); u10 >>= 1;
+         bp|= ((u11 & 0x3) << 6); u11 >>= 1;
+
+         bpfd[ bp ]++;
       }
    }
-};
+}; // class ChunkBuf
 
 __device__ void addRowBPFD
 (
@@ -140,7 +138,6 @@ __device__ void addRowBPFD
    const int   n    // Number of single bit elements packed in row
 )
 {  // seq
-   //uint dbg[4]={0,0,0,0};
    int m, k, i;
    ChunkBuf  cb(pRow[0]+0, pRow[1]+0, rowStride);
    k= MIN(CHUNK_SIZE-1, n-1); //dbg[0]+= k;
@@ -160,13 +157,11 @@ __device__ void addRowBPFD
       cb.loadSh1(pRow[0]+i, pRow[1]+i, rowStride); // ensure LSB aligned?
       cb.add(bpfd, k); //dbg[2]+= k;
    }
-   //printf(" dbg: %u,%u,%u; bpfd: %u+%u\n",dbg[0],dbg[1],dbg[2], dbg[3],lognu(bpfd,256)-dbg[3]);
 } // addRowBPFD
 
 __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-//   __shared__ uint bpfd[BINS][BLKD]; // C-row-major (lexicographic) memory order. 32KB
    __shared__ uint bpfd[BINS*BLKD]; // 32KB
 
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
@@ -178,11 +173,9 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
 
       for (int k= r; k < BINS; k+= BLKD)
       {  // (transposed zeroing for write coalescing)
-         //for (int j= 0; j < BLKD; j++) { bpfd[k][j]= 0; }
          for (int j= 0; j < BLKD; j++) { bpfd[j*BINS+k]= 0; }
       }
 
-      //addRowBPFD(&(bpfd[0][r]), pRow, rowStride, defW);
       addRowBPFD(bpfd+r*BINS, pRow, rowStride, defW);
 
       __syncthreads(); // Probably unneccessary (?) - no hazardous control flow divergence possible...
@@ -195,7 +188,6 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
       for (int k= r; k < BINS; k+= BLKD)
       {  // (transposed reduction for read coalescing)
          CUACount t= 0;
-         //for (int j= 0; j < BLKD; j++) { t+= bpfd[k][j]; }
          for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
          atomicAdd( rBPFD+k, t );
       }
