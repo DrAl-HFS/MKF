@@ -89,62 +89,48 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
-__device__ void loadChunkSh0
-(
-   U64   bufChunk[4],  // chunk buffer
-   const uint * pR0,    // Location within row of first -
-   const uint * pR1,    //  - and second planes
-   const int rowStride  // stride between successive rows within each plane
-)
-{  // vect
-   bufChunk[0]= pR0[0];
-   bufChunk[1]= pR0[rowStride];
-   bufChunk[2]= pR1[0];
-   bufChunk[3]= pR1[rowStride];
-} // loadChunkSh0
-
-__device__ void loadChunkSh1
-(
-   U64   bufChunk[4],  // chunk buffer
-   const uint * pR0,    // Location within row of first -
-   const uint * pR1,    //  - and second planes
-   const int rowStride  // stride between successive rows within each plane
-)
-{  // vect
-   bufChunk[0] |= ((size_t) pR0[0]) << 1;
-   bufChunk[1] |= ((size_t) pR0[rowStride]) << 1;
-   bufChunk[2] |= ((size_t) pR1[0]) << 1;
-   bufChunk[3] |= ((size_t) pR1[rowStride]) << 1;
-} // loadChunkSh1
-
-__device__ void ap4x2xN (uint bpfd[BINS], U64 bufChunk[4], const int n)
+class ChunkBuf
 {
-   for (int i= 0; i < n; i++)
+   unsigned long long l[4];
+   //ChunkBuf (void) { l[0]= l[1]= l[2]= l[3]= 0; }
+public:
+   __device__ ChunkBuf (const uint * pR0, const uint * pR1, const int rowStride)
    {
-      unsigned char bp=  (bufChunk[0] & 0x3) |
-               ((bufChunk[1] & 0x3) << 2) |
-               ((bufChunk[2] & 0x3) << 4) |
-               ((bufChunk[3] & 0x3) << 6);
-      bpfd[ bp ]+= 1;
-      bufChunk[0] >>= 1;
-      bufChunk[1] >>= 1;
-      bufChunk[2] >>= 1;
-      bufChunk[3] >>= 1;
+      l[0]= pR0[0];
+      l[1]= pR0[rowStride];
+      l[2]= pR1[0];
+      l[3]= pR1[rowStride];
    }
-} // ap4x2xN
-
-__device__ uint lognu (int id, uint u[], const int n)
-{
-   uint t=0;
-   printf("(%d: ", id);
-   for (int i= 0; i < n; i++)
+   __device__ void loadSh1 (const uint * pR0, const uint * pR1, const int rowStride)
    {
-      t+= u[i];
-      if (0!=u[i]) { printf("%d:%u ",i,u[i]); }
+#if 0
+      l[0]= ( l[0] & 0x1 ) | (((unsigned long long) pR0[0]) << 1);
+      l[1]= ( l[1] & 0x1 ) | (((unsigned long long) pR0[rowStride]) << 1);
+      l[2]= ( l[2] & 0x1 ) | (((unsigned long long) pR1[0]) << 1);
+      l[3]= ( l[3] & 0x1 ) | (((unsigned long long) pR1[rowStride]) << 1);
+#else
+      l[0]|= ( (unsigned long long) pR0[0] ) << 1;
+      l[1]|= ( (unsigned long long) pR0[rowStride] ) << 1;
+      l[2]|= ( (unsigned long long) pR1[0] ) << 1;
+      l[3]|= ( (unsigned long long) pR1[rowStride] ) << 1;
+#endif
    }
-   printf(":%d %u|%u)\n", id, t, t/63);
-   return(t);
-} // lognu
+   __device__ void add (uint bpfd[BINS], const int n)
+   {
+      for (int i= 0; i < n; i++)
+      {
+         uint bp=  (l[0] & 0x3) |
+                  ((l[1] & 0x3) << 2) |
+                  ((l[2] & 0x3) << 4) |
+                  ((l[3] & 0x3) << 6);
+         bpfd[ bp ]+= 1;
+         l[0] >>= 1;
+         l[1] >>= 1;
+         l[2] >>= 1;
+         l[3] >>= 1;
+      }
+   }
+};
 
 __device__ void addRowBPFD
 (
@@ -156,27 +142,23 @@ __device__ void addRowBPFD
 {  // seq
    //uint dbg[4]={0,0,0,0};
    int m, k, i;
-   U64 bufChunk[4]= { 0,0,0,0 };
-
-   //dbg[3]= lognu(bpfd,256);
-   // First chunk of n bits yields n-1 patterns
-   loadChunkSh0(bufChunk, pRow[0]+0, pRow[1]+0, rowStride);
+   ChunkBuf  cb(pRow[0]+0, pRow[1]+0, rowStride);
    k= MIN(CHUNK_SIZE-1, n-1); //dbg[0]+= k;
-   ap4x2xN(bpfd, bufChunk, k);
+   cb.add(bpfd, k);
    // Subsequent whole chunks yield n patterns
    i= 0;
    m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
-      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
-      ap4x2xN(bpfd, bufChunk, CHUNK_SIZE); //dbg[1]+= CHUNK_SIZE;
+      cb.loadSh1(pRow[0]+i, pRow[1]+i, rowStride);
+      cb.add(bpfd, CHUNK_SIZE);
    }
    // Check for residual bits < CHUNK_SIZE
    k= n & CHUNK_MASK;
    if (k > 0)
    {
-      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
-      ap4x2xN(bpfd, bufChunk, k); //dbg[2]+= k;
+      cb.loadSh1(pRow[0]+i, pRow[1]+i, rowStride); // ensure LSB aligned?
+      cb.add(bpfd, k); //dbg[2]+= k;
    }
    //printf(" dbg: %u,%u,%u; bpfd: %u+%u\n",dbg[0],dbg[1],dbg[2], dbg[3],lognu(bpfd,256)-dbg[3]);
 } // addRowBPFD
