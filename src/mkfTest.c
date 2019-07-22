@@ -79,32 +79,13 @@ void compareNZ (const size_t u0[], const size_t u1[], const int n)
 int main (int argc, char *argv[])
 {
    const int def[3]= {64,64,64};
-   const F32 radius= 0.5*def[0] - 2.5;
-   F32 fracR;
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
-   MKMeasureVal vr;
    Context cux={0};
-   int id=0;
-   const char *name[2]={"ball","box"};
-   size_t n;
 
    if (buffAlloc(&cux,def))
    {
-      fracR= radius / def[0];
-      switch(id)
-      {
-         case 1 :
-            vr= boxVol(fracR);
-            n= genBlock(cux.pHF, def, radius);
-            break;
-         default :
-            id= 0;
-            vr= sphereVol(fracR);
-            n= genBall(cux.pHF, def, radius);
-            break;
-      }
-      LOG("def[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], radius, n, cux.nF, (F64)n / cux.nF, vr);
+      float vr= genPattern(cux.pHF, 1, def, 0.5*def[0] - 2.5);
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

@@ -5,7 +5,7 @@
 #ifndef GEOM_HACKS_H
 #define GEOM_HACKS_H
 
-#include "platform.h"
+#include "report.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -28,6 +28,8 @@ extern float mag2 (const float dx, const float dy, const float dz); // { return(
 extern size_t genBall (float f[], const int def[3], const float r);
 
 extern size_t genBlock (float f[], const int def[3], const float r);
+
+extern float genPattern (float f[], int id, const int def[3], const float param);
 
 #ifdef __cplusplus
 } // extern "C"

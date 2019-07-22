@@ -56,3 +56,31 @@ size_t genBlock (float f[], const int def[3], const float r)
    }
    return(n);
 } // genBlock
+
+float genPattern (float f[], int id, const int def[3], const float param)
+{
+   const char *name[]={"empty","ball","solid","box"};
+   size_t n, nF= def[0] * def[1] * def[2];
+   float vr=0, fracR= param / def[1];
+
+   switch(id)
+   {
+      case 3 :
+         vr= boxVol(fracR);
+         n= genBlock(f, def, param);
+         break;
+      case 2 : vr= 1;
+         memset(f, -1, sizeof(f[0])*nF);
+         break;
+      case 1 :
+         vr= sphereVol(fracR);
+         n= genBall(f, def, param);
+         break;
+      default :
+         id= 0; vr= 0;
+         memset(f, 0, sizeof(f[0])*nF);
+         break;
+   }
+   LOG("def[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, n, nF, (F64)n / nF, vr);
+   return(vr);
+} // genPattern
