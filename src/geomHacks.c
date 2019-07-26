@@ -63,6 +63,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
    size_t n, nF= def[0] * def[1] * def[2];
    float vr=0, fracR= param / def[1];
 
+   n= nF;
    switch(id)
    {
       case 3 :

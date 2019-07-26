@@ -90,6 +90,8 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
 typedef unsigned long long ULL;
+typedef uint   U16P;
+
 class ChunkBuf
 {
    ULL u00, u01, u10, u11;
@@ -104,17 +106,10 @@ public:
    }
    __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
    {
-#if 0
-      u00= ( u00 & 0x1 ) | (((ULL) pR0[0]) << 1);
-      u01= ( u01 & 0x1 ) | (((ULL) pR0[rowStride]) << 1);
-      u10= ( u10 & 0x1 ) | (((ULL) pR1[0]) << 1);
-      u11= ( u11 & 0x1 ) | (((ULL) pR1[rowStride]) << 1);
-#else
       u00|= ( (ULL) pR0[0] ) << 1;
       u01|= ( (ULL) pR0[rowStride] ) << 1;
       u10|= ( (ULL) pR1[0] ) << 1;
       u11|= ( (ULL) pR1[rowStride] ) << 1;
-#endif
    }
    __device__ void add (uint bpfd[BINS], const int n)
    {
@@ -127,6 +122,19 @@ public:
          bp|= ((u11 & 0x3) << 6); u11 >>= 1;
 
          bpfd[ bp ]++;
+      }
+   __device__ void add16b (U16P bpfd[BINS], const int n)
+   {
+      const uint w[2]={1,1<<16};
+      uint bp;
+      for (int i= 0; i < n; i++)
+      {
+         bp=  ( u00 & 0x3);       u00 >>= 1;
+         bp|= ((u01 & 0x3) << 2); u01 >>= 1;
+         bp|= ((u10 & 0x3) << 4); u10 >>= 1;
+         bp|= ((u11 & 0x3) << 6); u11 >>= 1;
+
+         bpfd[ bp >> 1 ]+= w[bp & 1];
       }
       //printf("add(%d):%X ",n,bp);
    }
@@ -161,16 +169,26 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__device__ void reduceBins (CUACount rBPFD[BINS], const uint bpfd[BINS*BLKD], const int row)
+{
+   for (int k= row; k < BINS; k+= BLKD)
+   {  // (transposed reduction for read coalescing)
+      CUACount t= 0;
+      for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
+      atomicAdd( rBPFD+k, t );
+   }
+} // reduceBins
+
+__global__ void addPlaneBPFD (CUACount rBPFD[BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   const int r= i & BLKM;
+   const int row= i & BLKM;
    __shared__ uint bpfd[BINS*BLKD]; // 32KB
 
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
 
-   for (int k= r; k < BINS; k+= BLKD)
+   for (int k= row; k < BINS; k+= BLKD)
    {  // (transposed zeroing for write coalescing)
       for (int j= 0; j < BLKD; j++) { bpfd[j*BINS+k]= 0; }
    }
@@ -182,13 +200,7 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
       addRowBPFD(bpfd+r*BINS, pRow, rowStride, defW);
    }
    __syncthreads();
-
-   for (int k= r; k < BINS; k+= BLKD)
-   {  // (transposed reduction for read coalescing)
-      CUACount t= 0;
-      for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
-      atomicAdd( rBPFD+k, t );
-   }
+   reduceBins(rBPFD, bpfd, row);
 } // addPlaneBPFD
 
 
