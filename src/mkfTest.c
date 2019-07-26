@@ -78,7 +78,7 @@ void compareNZ (const size_t u0[], const size_t u1[], const int n)
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,64,64};
+   const int def[3]= {64,65,64};
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
    Context cux={0};

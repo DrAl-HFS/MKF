@@ -89,30 +89,31 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
+typedef unsigned long long ULL;
 class ChunkBuf
 {
-   unsigned long long u00, u01, u10, u11;
+   ULL u00, u01, u10, u11;
 
 public:
-   __device__ ChunkBuf (const uint * pR0, const uint * pR1, const int rowStride)
+   __device__ ChunkBuf (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
    {
       u00= pR0[0];
       u01= pR0[rowStride];
       u10= pR1[0];
       u11= pR1[rowStride];
    }
-   __device__ void loadSh1 (const uint * pR0, const uint * pR1, const int rowStride)
+   __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
    {
 #if 0
-      u00= ( u00 & 0x1 ) | (((unsigned long long) pR0[0]) << 1);
-      u01= ( u01 & 0x1 ) | (((unsigned long long) pR0[rowStride]) << 1);
-      u10= ( u10 & 0x1 ) | (((unsigned long long) pR1[0]) << 1);
-      u11= ( u11 & 0x1 ) | (((unsigned long long) pR1[rowStride]) << 1);
+      u00= ( u00 & 0x1 ) | (((ULL) pR0[0]) << 1);
+      u01= ( u01 & 0x1 ) | (((ULL) pR0[rowStride]) << 1);
+      u10= ( u10 & 0x1 ) | (((ULL) pR1[0]) << 1);
+      u11= ( u11 & 0x1 ) | (((ULL) pR1[rowStride]) << 1);
 #else
-      u00|= ( (unsigned long long) pR0[0] ) << 1;
-      u01|= ( (unsigned long long) pR0[rowStride] ) << 1;
-      u10|= ( (unsigned long long) pR1[0] ) << 1;
-      u11|= ( (unsigned long long) pR1[rowStride] ) << 1;
+      u00|= ( (ULL) pR0[0] ) << 1;
+      u01|= ( (ULL) pR0[rowStride] ) << 1;
+      u10|= ( (ULL) pR1[0] ) << 1;
+      u11|= ( (ULL) pR1[rowStride] ) << 1;
 #endif
    }
    __device__ void add (uint bpfd[BINS], const int n)
@@ -127,13 +128,14 @@ public:
 
          bpfd[ bp ]++;
       }
+      //printf("add(%d):%X ",n,bp);
    }
 }; // class ChunkBuf
 
 __device__ void addRowBPFD
 (
    uint         bpfd[BINS], // result pattern distribution
-   const uint  * pRow[2],
+   const uint  * __restrict__ pRow[2],
    const int   rowStride,
    const int   n    // Number of single bit elements packed in row
 )
@@ -159,7 +161,7 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH) //, CUACount dbg[32])
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    __shared__ uint bpfd[BINS*BLKD]; // 32KB
@@ -178,20 +180,15 @@ __global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uin
 
       addRowBPFD(bpfd+r*BINS, pRow, rowStride, defW);
 
-      __syncthreads(); // Probably unneccessary (?) - no hazardous control flow divergence possible...
-#if 0
-      if (0 == r) // { for (int k= 0; k < BLKM; k++) { lognu(k,bpfd+k*BINS,BINS); } }
-      {
-         for (int k= 0; k < BINS*BLKD; k++) { atomicAdd( rBPFD+(k&BINM), bpfd[k] ); } // rBPFD[(k&BINM)]+= bpfd[k]; }
-      }
-#else
+      //__syncthreads(); // Just in case...
+
       for (int k= r; k < BINS; k+= BLKD)
       {  // (transposed reduction for read coalescing)
          CUACount t= 0;
          for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
          atomicAdd( rBPFD+k, t );
       }
-#endif
+      //atomicAdd( dbg+r, 1 );
    }
 } // addPlaneBPFD
 
@@ -241,6 +238,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
          if (pC->nF <= blkD) { blkD= BLKD; }
          nBlk= (pC->nF + blkD-1) / blkD;
+         LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",pBM->t[0], pBM->m);
          // CAVEAT! Treated as 1D
          vThresh32<<<nBlk,blkD>>>(pC->pDU, pC->pDF, pC->nF, *pBM);
          ctuErr(NULL, "vThresh32()");
@@ -282,9 +280,9 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
       {
          const U32 *pP0= pC->pDU + i * planeStride;
          const U32 *pP1= pC->pDU + (i+1) * planeStride;
-         addPlaneBPFD<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs);
-         if (0 != ctuErr(NULL, "addPlane"))
-         { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)", nRowPairs, BLKD, pBPFD, pP0, pP1); }
+         addPlaneBPFD<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
+         if (0 != ctuErr(NULL, "addPlane"));
+         { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
       }
       cudaDeviceSynchronize();
       if (pC->pHZ)
@@ -338,7 +336,7 @@ int buffAlloc (Context *pC, const int def[3], const int blkZ)
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
    pC->nU= BITS_TO_WRDSH(vol,5);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
-   pC->nZ= blkZ * 256;
+   pC->nZ= BLKD + blkZ * 256;
    pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
 
    LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
@@ -386,7 +384,6 @@ void mkft (Context *pC, const int def[3])
 
    //dumpF(pC->pHF+n, n, def[0]);
    setBinMapF32(&bmc,">=",0.5);
-   LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",bmc.t[0], bmc.m);
    mkfCUDAGetBPFDSimple(pC, def, &bmc);
 #if 0
    size_t t= bitCountNU32(pC->pHU, pC->bytesU>>2);
@@ -403,18 +400,25 @@ void mkft (Context *pC, const int def[3])
    if (pC->pHZ)
    {
       const size_t *pBPFD= (size_t*)pC->pHZ;
+      size_t s= 0;
       LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
 
       for (int i= 0; i<256; i++)
       {
          if (pBPFD[i] > 0) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
       }
+      for (int r= 0; r<BLKD; r++)
+      {
+         s+= pBPFD[256+r];
+         //LOG("r%d=%u\n", r, pBPFD[256+r]);
+      }
+      LOG("s=%zu\n", s);
    }
 } // mkft
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,64,64};
+   const int def[3]= {64,65,2};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))
@@ -428,21 +432,25 @@ int main (int argc, char *argv[])
       else
       {
          Context t= cux;
-         int l= def[1] * def[2];
+         const int wDef= def[0] >> 5;
+         const int lDef= def[1] * def[2];
          t.pHF= t.pDF= NULL;
 
-         for (int i= 0; i < l; i++)
+         for (int i= 0; i < lDef; i++)
          {
-            int j= 2 * i;
-            t.pHU[j+0]= 0xFFFFFFFE;
+            int j= wDef * i;
+            t.pHU[j+0]= 0x7FFFFFFF; // NB: L to R order -> bits 0 to 31
             t.pHU[j+1]= 0xFFFFFFFF;
+            //t.pHU[j+2]= 0xFFFFFFFF;
+            //t.pHU[j+3]= 0xFFFFFFFF;
          }
          mkft(&t,def);
-         for (int i= 0; i < l; i++)
+         for (int i= 0; i < lDef; i++)
          {
-            int j= 2 * i;
+            int j= wDef * i;
             t.pHU[j+0]= 0xFFFFFFFF;
-            t.pHU[j+1]= 0x7FFFFFFF;
+            t.pHU[j+1]= 0xFFFFFFFE;
+            //t.pHU[j+2]= 0xFFFFFFFF;
          }
          mkft(&t,def);
       }
