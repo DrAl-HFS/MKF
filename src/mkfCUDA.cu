@@ -161,34 +161,33 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH) //, CUACount dbg[32])
+__global__ void addPlaneBPFD (CUACount rBPFD[256], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
+   const int r= i & BLKM;
    __shared__ uint bpfd[BINS*BLKD]; // 32KB
 
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
+
+   for (int k= r; k < BINS; k+= BLKD)
+   {  // (transposed zeroing for write coalescing)
+      for (int j= 0; j < BLKD; j++) { bpfd[j*BINS+k]= 0; }
+   }
+
    if (i < defH)
    {
       const U32 * pRow[2]= { pPln0 + i*rowStride, pPln1 + i*rowStride };
-      const int r= i & BLKM;
-
-      for (int k= r; k < BINS; k+= BLKD)
-      {  // (transposed zeroing for write coalescing)
-         for (int j= 0; j < BLKD; j++) { bpfd[j*BINS+k]= 0; }
-      }
 
       addRowBPFD(bpfd+r*BINS, pRow, rowStride, defW);
+   }
+   __syncthreads();
 
-      //__syncthreads(); // Just in case...
-
-      for (int k= r; k < BINS; k+= BLKD)
-      {  // (transposed reduction for read coalescing)
-         CUACount t= 0;
-         for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
-         atomicAdd( rBPFD+k, t );
-      }
-      //atomicAdd( dbg+r, 1 );
+   for (int k= r; k < BINS; k+= BLKD)
+   {  // (transposed reduction for read coalescing)
+      CUACount t= 0;
+      for (int j= 0; j < BLKD; j++) { t+= bpfd[j*BINS+k]; }
+      atomicAdd( rBPFD+k, t );
    }
 } // addPlaneBPFD
 
@@ -281,7 +280,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
          const U32 *pP0= pC->pDU + i * planeStride;
          const U32 *pP1= pC->pDU + (i+1) * planeStride;
          addPlaneBPFD<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
-         if (0 != ctuErr(NULL, "addPlane"));
+         if (0 != ctuErr(NULL, "addPlane"))
          { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
       }
       cudaDeviceSynchronize();
@@ -418,7 +417,7 @@ void mkft (Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,65,2};
+   const int def[3]= {64,64,2};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))
