@@ -78,14 +78,14 @@ void compareNZ (const size_t u0[], const size_t u1[], const int n)
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,64,64};
+   const int def[3]= {256,256,256};
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
    Context cux={0};
 
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 1, def, 0.5*def[0] - 2.5);
+      float vr= genPattern(cux.pHF, 1, def, 0.3*def[0] - 0.5);
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

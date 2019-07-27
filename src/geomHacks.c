@@ -15,6 +15,16 @@ float mag2 (const float dx, const float dy, const float dz) { return(dx*dx + dy*
 
 /***/
 
+I64 prodSumA1VN (const int v[], const int a, const int n)
+{
+   I64 r= v[0] + a;
+   for (int i=1; i<n; i++) { r*= v[i] + a; }
+   return(r);
+} // prodSumA1VN
+
+
+/***/
+
 size_t genBall (float f[], const int def[3], const float r)
 {
    size_t i= 0, n= 0;

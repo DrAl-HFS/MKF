@@ -86,14 +86,15 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
    }
 } // vThresh32
 
+#define PACK16
+
 #define CHUNK_SHIFT (5)
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
 typedef unsigned long long ULL;
 typedef uint   U16P;
-
-//uint froodldoodl=0;
+// ushort2 ???
 
 class ChunkBuf
 {
@@ -101,7 +102,7 @@ class ChunkBuf
 
    __device__ uint buildNext (void)
    {
-      uint bp=  ( u00 & 0x3);       u00 >>= 1;
+      uint bp=  ( u00 & 0x3); u00 >>= 1;
       bp|= ((u01 & 0x3) << 2); u01 >>= 1;
       bp|= ((u10 & 0x3) << 4); u10 >>= 1;
       bp|= ((u11 & 0x3) << 6); u11 >>= 1;
@@ -123,30 +124,30 @@ public:
       u10|= ( (ULL) pR1[0] ) << 1;
       u11|= ( (ULL) pR1[rowStride] ) << 1;
    }
+#ifndef PACK16
    __device__ void add (uint bpfd[BINS], const int n)
    {
-      for (int i= 0; i < n; i++)
-      {
-         uint bp= buildNext();
-         bpfd[ bp ]++;
-      }
+      for (int i= 0; i < n; i++) { bpfd[ buildNext() ]++; }
    } // add
-   __device__ void addU16P (U16P bpfd[BINS16P], const int n)
+#else
+   __device__ void add (U16P bpfd[BINS16P], const int n)
    {
-      const uint w[2]={1,1<<16}; // even -> lo, odd -> hi (16b)
+      //const ushort2 lh[2]={ushort2(1,0),ushort2(0,1)}; //
+      const U16P lh[2]={1,1<<16}; // even -> lo, odd -> hi (16b)
 
       for (int i= 0; i < n; i++)
       {
-         uint bp= buildNext();
-         bpfd[ bp >> 1 ]+= w[bp & 1];
+         const uint bp= buildNext();
+         bpfd[ bp >> 1 ]+= lh[bp & 1];
       }
-   } // addU16P
+   } // add16P
+#endif
 }; // class ChunkBuf
 
 __device__ void addRowBPFD
 (
    uint         bpfd[BINS], // result pattern distribution
-   const uint  * __restrict__ pRow[2],
+   const uint  * __restrict__ pRow[2], // restrict relevant to const ?
    const int   rowStride,
    const int   n    // Number of single bit elements packed in row
 )
@@ -172,28 +173,28 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__device__ void zeroBins (uint bpfd[BINS*BLKD], const int row, const int bins)
+__device__ void zeroBins (uint bpfd[BINS*BLKD], const int laneIdx, const int bins)
 {
-   for (int k= row; k < BINS; k+= blockDim.x)
+   for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed zeroing for write coalescing)
-      for (int j= 0; j < blockDim.x; j++) { bpfd[j*BINS+k]= 0; }
+      for (int j= 0; j < blockDim.x; j++) { bpfd[j*bins+k]= 0; }
    }
 } // zeroBins
 
-__device__ void reduceBins (CUACount rBPFD[BINS], const uint bpfd[BINS*BLKD], const int row, const int bins)
+#ifndef PACK16
+__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const uint bpfd[BINS*BLKD], const int laneIdx, const int bins)
 {
-   for (int k= row; k < bins; k+= blockDim.x)
+   for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
       CUACount t= 0;
       for (int j= 0; j < blockDim.x; j++) { t+= bpfd[j*bins+k]; }
       atomicAdd( rBPFD+k, t );
    }
 } // reduceBins
-
-//BINS16P
-__device__ void reduceBinsU16P (CUACount rBPFD[BINS], const U16P bpfd[BINS16P*BLKD], const int row, const int bins)
+#else
+__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const U16P bpfd[BINS16P*BLKD], const int laneIdx, const int bins)
 {
-   for (int k= row; k < bins; k+= blockDim.x)
+   for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
       CUACount t[2]= {0,0};
       for (int j= 0; j < blockDim.x; j++)
@@ -207,24 +208,30 @@ __device__ void reduceBinsU16P (CUACount rBPFD[BINS], const U16P bpfd[BINS16P*BL
       atomicAdd( rBPFD+i+1, t[1] );
    }
 } // reduceBins
+#endif
 
-__global__ void addPlaneBPFD (CUACount rBPFD[BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__global__ void addPlaneBPFD (CUACount rBPFD[MKF_BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   const int row= i & BLKM;
+   const int laneIdx= i & BLKM;
+#ifndef PACK16
    __shared__ uint bpfd[BINS*BLKD]; // 32KB
-
+   const int bins= BINS;
+#else
+   __shared__ U16P bpfd[BINS16P*BLKD]; // 16KB
+   const int bins= BINS16P;
+#endif
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
-   zeroBins(bpfd, row, BINS);
+   zeroBins(bpfd, laneIdx, bins);
    if (i < defH)
    {
       const U32 * pRow[2]= { pPln0 + i*rowStride, pPln1 + i*rowStride };
 
-      addRowBPFD(bpfd+row*BINS, pRow, rowStride, defW);
+      addRowBPFD(bpfd+laneIdx*bins, pRow, rowStride, defW);
    }
    __syncthreads();
-   reduceBins(rBPFD, bpfd, row, BINS);
+   reduceBins(rBPFD, bpfd, laneIdx, bins);
 } // addPlaneBPFD
 
 
@@ -413,9 +420,10 @@ size_t bitCountNU32 (U32 u[], const int n)
    return(t);
 } // bitCountNU32
 
-void mkft (Context *pC, const int def[3])
+size_t mkft (Context *pC, const int def[3])
 {
    BinMapF32 bmc;
+   size_t sum= 0;
 
    //dumpF(pC->pHF+n, n, def[0]);
    setBinMapF32(&bmc,">=",0.5);
@@ -435,29 +443,26 @@ void mkft (Context *pC, const int def[3])
    if (pC->pHZ)
    {
       const size_t *pBPFD= (size_t*)pC->pHZ;
-      size_t s= 0;
       LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
 
-      for (int i= 0; i<256; i++)
+      for (int i= 0; i<MKF_BINS; i++)
       {
+         sum+= pBPFD[i];
          if (pBPFD[i] > 0) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
       }
-      for (int r= 0; r<BLKD; r++)
-      {
-         s+= pBPFD[256+r];
-         //LOG("r%d=%u\n", r, pBPFD[256+r]);
-      }
-      LOG("s=%zu\n", s);
    }
+   return(sum);
 } // mkft
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,64,2};
+   const int def[3]= {256,256,2};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))
    {
+      const size_t nC= prodSumA1VN(def,-1,3);
+      LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
       //sanityTest(&cux);
       if (0)
       {
@@ -473,19 +478,14 @@ int main (int argc, char *argv[])
 
          for (int i= 0; i < lDef; i++)
          {
-            int j= wDef * i;
-            t.pHU[j+0]= 0x7FFFFFFF; // NB: L to R order -> bits 0 to 31
-            t.pHU[j+1]= 0xFFFFFFFF;
-            //t.pHU[j+2]= 0xFFFFFFFF;
-            //t.pHU[j+3]= 0xFFFFFFFF;
+            for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
+            t.pHU[wDef * i]= 0x7FFFFFFF; // NB: L to R order -> bits 0 to 31
          }
          mkft(&t,def);
          for (int i= 0; i < lDef; i++)
          {
-            int j= wDef * i;
-            t.pHU[j+0]= 0xFFFFFFFF;
-            t.pHU[j+1]= 0xFFFFFFFE;
-            //t.pHU[j+2]= 0xFFFFFFFF;
+            for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
+            t.pHU[wDef * i+1]= 0xFFFFFFFE;
          }
          mkft(&t,def);
       }

@@ -24,6 +24,12 @@ extern float mag2 (const float dx, const float dy, const float dz); // { return(
 
 /***/
 
+// PRODUCT(v[i] + a) Used for image definition: (X-1)(Y-1)(Z-1) point elements -> cells
+extern I64 prodSumA1VN (const int v[], const int a, const int n);
+
+
+/***/
+
 // Rasterise primitive into scalar field
 extern size_t genBall (float f[], const int def[3], const float r);
 
