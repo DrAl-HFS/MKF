@@ -7,6 +7,7 @@ CULBPATH := $(CUDA_PATH)/lib64
 
 NVCC := nvcc
 NVOPT := -g -G -arch=sm_50
+# -dc
 # -gencode=arch=compute_50,code=sm_50
 # -std=c++11
 # -std=c99
