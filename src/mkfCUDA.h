@@ -5,27 +5,13 @@
 #ifndef MKF_CUDA_H
 #define MKF_CUDA_H
 
-#include "ctUtil.h"
-#include "binMapUtil.h"
+#include "binMapCUDA.h"
 #include "mkfUtil.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/*
-#define MC_GT (1<<2)
-#define MC_EQ (1<<1)
-#define MC_LT (1<<0)
-
-typedef struct
-{
-   float t[1];
-   int   m;
-} MKBMapF32;
-
-//typedef size_t MKCount;
-*/
 
 #ifndef MKF_CUDA_CU // nvcc doesn't like this prototype...
 extern int mkfCUDAGetBPFDSimple (const Context *pC, const int def[3], const BinMapF32 *pMC);

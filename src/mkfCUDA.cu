@@ -7,6 +7,7 @@
 #endif
 
 #include "mkfCUDA.h"
+//include "binMapCUDA.h"
 
 #ifdef MKF_CUDA_CU
 #undef MKF_CUDA_CU // header glitch supression done
@@ -20,51 +21,23 @@ typedef unsigned long long CUACount;
 
 // CUDA kernels and wrappers
 
-#define BLKS 5
-#define BLKD (1<<BLKS)
-#define BLKM (BLKD-1)
-#define BINS MKF_BINS
-#define BINM (BINS-1)
-#define BINS16P (BINS/2)
-//define BLKN 1024/BLKD
+#define VT_BLKS 5
+#define VT_BLKD (1<<VT_BLKS)
+#define VT_BLKM (VT_BLKD-1)
 
-__global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
+__global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinMapF32 bm)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint z[BLKD];
+   __shared__ uint z[VT_BLKD];
    if (i < n)
    {
-      const int j= i & BLKM;
-      const int k= i & 0x7; // j & 0x7
-      const int d= 1 + (f[i] > mc.t[0]) - (f[i] < mc.t[0]);
-      z[j]= ((mc.m >> d) & 0x1) << k; // smaller shift faster ?
-
-      __syncthreads();
-
-      if (0 == k)
-      {  // j : { 0, 8, 16, 24 } 4P, 7I
-         for (int l=1; l<8; l++) { z[j]|= z[j+l]; }
-
-         __syncthreads();
-
-         if (0 == j)
-         {
-            r[i>>BLKS]= ( z[0] << 0 ) | ( z[8] << 8 ) | ( z[16] << 16 ) | ( z[24] << 24 );
-         }
-      }
-   }
-} // vThresh8
-
-__global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
-{
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint z[BLKD];
-   if (i < n)
-   {
-      const int j= i & BLKM;
-      const int d= 1 + (f[i] > mc.t[0]) - (f[i] < mc.t[0]);
-      z[j]= ((mc.m >> d) & 0x1) << j; // assume "barrel" shifter
-
+      const int j= i & VT_BLKM;
+#if 1
+      const int d= 1 + (f[i] > bm.t[0]) - (f[i] < bm.t[0]);
+      z[j]= ((bm.m >> d) & 0x1) << j; // assume "barrel" shifter
+#else
+      z[j]= bm1f32(f[i],bm) << j;
+#endif
       __syncthreads();
 
       if (0 == (j & 0x3))
@@ -80,21 +53,34 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 
             __syncthreads();
 
-            if (0 == j) { r[i>>BLKS]= z[0] | z[16]; }
+            if (0 == j) { r[i>>VT_BLKS]= z[0] | z[16]; }
          }
       }
    }
 } // vThresh32
 
+
 #define PACK16
+
+#ifdef PACK16
+#define BPFD_W32_BINS (MKF_BINS/2)
+//#define BPFD_BLKS 6
+#else
+#define BPFD_W32_BINS MKF_BINS
+//#define BPFD_BLKS 5
+#endif
+
+//ifdef PACK16 #define BPFD_BLKS 6 #else#endif
+#define BPFD_BLKS 5
+#define BPFD_BLKD (1<<BPFD_BLKS)
+#define BPFD_BLKM (BPFD_BLKD-1)
+
+typedef unsigned long long ULL;
+typedef uint   U16P; // ushort2 ???
 
 #define CHUNK_SHIFT (5)
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
-
-typedef unsigned long long ULL;
-typedef uint   U16P;
-// ushort2 ???
 
 class ChunkBuf
 {
@@ -125,12 +111,12 @@ public:
       u11|= ( (ULL) pR1[rowStride] ) << 1;
    }
 #ifndef PACK16
-   __device__ void add (uint bpfd[BINS], const int n)
+   __device__ void add (uint bpfd[], const int n)
    {
       for (int i= 0; i < n; i++) { bpfd[ buildNext() ]++; }
    } // add
 #else
-   __device__ void add (U16P bpfd[BINS16P], const int n)
+   __device__ void add (U16P bpfd[], const int n)
    {
       //const ushort2 lh[2]={ushort2(1,0),ushort2(0,1)}; //
       const U16P lh[2]={1,1<<16}; // even -> lo, odd -> hi (16b)
@@ -146,7 +132,7 @@ public:
 
 __device__ void addRowBPFD
 (
-   uint         bpfd[BINS], // result pattern distribution
+   uint         bpfd[], // result pattern distribution
    const uint  * __restrict__ pRow[2], // restrict relevant to const ?
    const int   rowStride,
    const int   n    // Number of single bit elements packed in row
@@ -173,7 +159,7 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__device__ void zeroBins (uint bpfd[BINS*BLKD], const int laneIdx, const int bins)
+__device__ void zeroBins (uint bpfd[], const int laneIdx, const int bins)
 {
    for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed zeroing for write coalescing)
@@ -182,7 +168,7 @@ __device__ void zeroBins (uint bpfd[BINS*BLKD], const int laneIdx, const int bin
 } // zeroBins
 
 #ifndef PACK16
-__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const uint bpfd[BINS*BLKD], const int laneIdx, const int bins)
+__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const uint bpfd[], const int laneIdx, const int bins)
 {
    for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
@@ -192,7 +178,7 @@ __device__ void reduceBins (CUACount rBPFD[MKF_BINS], const uint bpfd[BINS*BLKD]
    }
 } // reduceBins
 #else
-__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const U16P bpfd[BINS16P*BLKD], const int laneIdx, const int bins)
+__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const U16P bpfd[], const int laneIdx, const int bins)
 {
    for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
@@ -213,13 +199,12 @@ __device__ void reduceBins (CUACount rBPFD[MKF_BINS], const U16P bpfd[BINS16P*BL
 __global__ void addPlaneBPFD (CUACount rBPFD[MKF_BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   const int laneIdx= i & BLKM;
+   const int laneIdx= i & BPFD_BLKM;
+   const int bins= BPFD_W32_BINS;
 #ifndef PACK16
-   __shared__ uint bpfd[BINS*BLKD]; // 32KB
-   const int bins= BINS;
+   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB per warp
 #else
-   __shared__ U16P bpfd[BINS16P*BLKD]; // 16KB
-   const int bins= BINS16P;
+   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB per warp
 #endif
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
@@ -251,7 +236,7 @@ cudaError_t ctuErr (cudaError_t *pE, const char *s)
 extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pBM)
 {
    cudaError_t r;
-   int blkD= BLKD;//256;
+   int blkD= BPFD_BLKD;//256;
    int nBlk= 0;
 
    if (pC->pHF)
@@ -278,7 +263,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         if (pC->nF <= blkD) { blkD= BLKD; }
+         if (pC->nF <= blkD) { blkD= BPFD_BLKD; }
          nBlk= (pC->nF + blkD-1) / blkD;
          LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",pBM->t[0], pBM->m);
          // CAVEAT! Treated as 1D
@@ -315,7 +300,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
       const int planeStride= def[1] * rowStride;
 
       //if (nRowPairs <= blkD) {
-      blkD= BLKD;
+      blkD= BPFD_BLKD;
       nBlk= (nRowPairs + blkD-1) / blkD;
 
       for (int i= 0; i < nPlanePairs; i++)
@@ -378,7 +363,7 @@ int buffAlloc (Context *pC, const int def[3], const int blkZ)
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
    pC->nU= BITS_TO_WRDSH(vol,5);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
-   pC->nZ= BLKD + blkZ * 256;
+   pC->nZ= BPFD_BLKD + blkZ * 256;
    pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
 
    LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
