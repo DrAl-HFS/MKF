@@ -17,10 +17,32 @@ extern "C" {
 /***/
 
 // Basic formulae
-extern float sphereVol (const float r); // { return((4 * M_PI / 3) * r * r *r); }
-extern float boxVol (const float r); // { return(8 * r * r * r); }
+extern float sphereArea (const float r); // 4.pi.r^2
+extern float sphereVol (const float r);  // 4/3.pi.r^3
 
-extern float mag2 (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
+extern float sphereCapArea (const float a, const float h); // pi.(a^2+h^2)
+extern float sphereCapVol (const float a, const float h); // pi/6.h.(3.a^2+h^2))
+
+extern float blockArea (const float r[3]); // 4.(r0.r1+r1.r2+r0.r2)
+extern float blockVol (const float r[3]);  // 8.r0.r1.r2
+
+extern float sqrMag3 (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
+
+
+/***/
+
+#define ID_ENCLOSE   (-1)
+#define ID_DISTINCT  (0)
+#define ID_TANGENT   (1)
+#define ID_INTERSECT (2)
+
+typedef struct
+{  // Circle of intersection -
+   float dA, a; // - distance from centre A, radius
+} IntersectSS;
+// Intersection formulae
+extern int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float sAB);
+
 
 /***/
 
@@ -33,7 +55,7 @@ extern I64 prodSumA1VN (const int v[], const int a, const int n);
 // Rasterise primitive into scalar field
 extern size_t genBall (float f[], const int def[3], const float r);
 
-extern size_t genBlock (float f[], const int def[3], const float r);
+extern size_t genBlock (float f[], const int def[3], const float r[3]);
 
 extern float genPattern (float f[], int id, const int def[3], const float param);
 

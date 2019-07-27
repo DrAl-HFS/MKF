@@ -203,9 +203,9 @@ __global__ void addPlaneBPFD (CUACount rBPFD[MKF_BINS], const uint * pPln0, cons
    const int laneIdx= i & BPFD_BLKM;
    const int bins= BPFD_W32_BINS;
 #ifndef PACK16
-   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB per warp
+   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB/Warp -> 1W per SM
 #else
-   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB per warp
+   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB/Warp -> 2W per SM
 #endif
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
