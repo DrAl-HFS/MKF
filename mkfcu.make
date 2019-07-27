@@ -21,8 +21,8 @@ OBJ_DIR := obj
 CMN_DIR := ../Common/src
 INC_DIR := inc
 
-SRC := $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/ctUtil.cu
-HDR := $(HDR_DIR)/mkfCUDA.h $(HDR_DIR)/ctUtil.h
+SRC := $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/binMapCUDA.cu $(SRC_DIR)/ctUtil.cu
+HDR := $(HDR_DIR)/mkfCUDA.h $(SRC_DIR)/binMapCUDA.h $(HDR_DIR)/ctUtil.h
 OBJ := $(OBJ_DIR)/mkfUtil.o $(OBJ_DIR)/binMapUtil.o $(OBJ_DIR)/geomHacks.o $(OBJ_DIR)/util.o $(OBJ_DIR)/report.o
 
 

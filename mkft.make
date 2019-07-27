@@ -16,7 +16,7 @@ BUILD := NCRMNTL
 CC := pgcc
 OPT := -g
 #-O2
-ACC := -Mautoinline -acc=verystrict -ta=multicore,tesla
+ACC := -Mautoinline -acc=verystrict -ta=multicore
 # -Minfo=all
 # multicore,tesla
 
