@@ -64,14 +64,15 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
 
 #ifdef PACK16
 #define BPFD_W32_BINS (MKF_BINS/2)
-//#define BPFD_BLKS 6
+#define BPFD_BLKS 6
 #else
 #define BPFD_W32_BINS MKF_BINS
 //#define BPFD_BLKS 5
 #endif
 
-//ifdef PACK16 #define BPFD_BLKS 6 #else#endif
+#ifndef BPFD_BLKS
 #define BPFD_BLKS 5
+#endif
 #define BPFD_BLKD (1<<BPFD_BLKS)
 #define BPFD_BLKM (BPFD_BLKD-1)
 
@@ -236,7 +237,7 @@ cudaError_t ctuErr (cudaError_t *pE, const char *s)
 extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pBM)
 {
    cudaError_t r;
-   int blkD= BPFD_BLKD;//256;
+   int blkD= 0;
    int nBlk= 0;
 
    if (pC->pHF)
@@ -263,7 +264,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         if (pC->nF <= blkD) { blkD= BPFD_BLKD; }
+         blkD= VT_BLKD;
          nBlk= (pC->nF + blkD-1) / blkD;
          LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",pBM->t[0], pBM->m);
          // CAVEAT! Treated as 1D
