@@ -106,7 +106,7 @@ int main (int argc, char *argv[])
          compareNZ(aBPFD, pBPFD, MKF_BINS);
       }
 #else
-      checkNZ(aBPFD, MKF_BINS, "[%d]=%zu\n");
+      //checkNZ(aBPFD, MKF_BINS, "[%d]=%zu\n");
 #endif
    }
    buffRelease(&cux);

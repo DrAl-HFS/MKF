@@ -8,7 +8,7 @@
 #include "ctUtil.h"
 #include "binMapUtil.h"
 
-__device__ int bm1f32 (const float f, const BinMapF32& bm);
+//__device__ int bm1f32 (const float f, const BinMapF32& bm);
 
 //extern
 //__global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinMapF32 mc);

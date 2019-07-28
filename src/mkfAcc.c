@@ -67,7 +67,6 @@ ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
 #endif
 
 // Update frequency distribution of binary patterns
-#if 1
 // Transpose pattern assembly : better parallelisability?
 ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
 {
@@ -83,9 +82,9 @@ ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
       rBPFD[(r[0] | r[1] | r[2] | r[3])]++;
    }
 } // addPattern
-#else
+
 // "Conventional" pattern assembly in 4bit slices
-ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
+ACC_INLINE void addPatternOM (size_t rBPFD[256], U64 bufChunk[4], const int n)
 {
    U8 r=0;
 
@@ -102,8 +101,7 @@ ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
       }
       rBPFD[r]++; r>>= 4;
    }
-} // addPattern
-#endif
+} // addPatternOM
 
 // Add a single row of 8bit/3D patterns (defined by four adjacent rows of
 // elements) to the result distribution array. Efficient parallel execution

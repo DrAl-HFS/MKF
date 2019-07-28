@@ -25,11 +25,11 @@ int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float s
       if (0 != sAB)
       {
          const float r2s= (0.5 / sAB);
-         const float s2= sAB*sAB;
-         const float rA2= rA*rA;
-         const float t= rA2 + s2 - rB*rB;
+         const float s2AB= sAB*sAB;
+         const float r2A= rA*rA;
+         const float t= r2A + s2AB - rB*rB;
          const float t2= t*t;
-         const float d2= 4 * s2 * rA2;
+         const float d2= 4 * s2AB * r2A;
          pI->dA= r2s * t;
          if (d2 >= t2)
          {
@@ -100,15 +100,19 @@ size_t genBlock (float f[], const int def[3], const float r[3])
 
 void testHack (float rA, float rB)
 {
-   LOG("testHack() / intersectSS1() %s", "\n");
+   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
+   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
    for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
    {
       IntersectSS ss;
-      float hA, hB;
-      intersectSS1(&ss,rA,rB,sAB);
-      hA= rA - ss.dA;
-      hB= rB - (sAB - ss.dA);
-      LOG("%G -> D: %G%+G rI: %G  A: %G%+G\n", sAB, ss.dA, sAB - ss.dA, ss.a, sphereCapArea(ss.a, hA), sphereCapArea(ss.a, hB));
+      if (intersectSS1(&ss, rA, rB, sAB) >= ID_TANGENT)
+      {
+         float hA, hB;
+         hA= rA - ss.dA;
+         hB= rB - (sAB - ss.dA);
+         LOG("%G -> D: %G%+G rI: %G  A: %G%+G\n", sAB, ss.dA, sAB - ss.dA, ss.a, sphereCapArea(ss.a, hA), sphereCapArea(ss.a, hB));
+      }
+      else LOG("%G\n", sAB);
    }
 } // testHack
 
