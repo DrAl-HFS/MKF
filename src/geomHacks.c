@@ -51,30 +51,12 @@ int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float s
    return(ID_DISTINCT);
 } // intersectSS1
 
-void testHack (float rA, float rB)
-{
-   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
-   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
-   for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
-   {
-      IntersectSS ss;
-      if (intersectSS1(&ss, rA, rB, sAB) >= ID_TANGENT)
-      {
-         float hA, hB;
-         hA= rA - ss.dA;
-         hB= rB - (sAB - ss.dA);
-         LOG("%G -> D: %G%+G rI: %G  A: %G%+G\n", sAB, ss.dA, sAB - ss.dA, ss.a, sphereCapArea(ss.a, hA), sphereCapArea(ss.a, hB));
-      }
-      else LOG("%G\n", sAB);
-   }
-} // testHack
-
 typedef struct
 {
    float v, a;
 } VA3D;
 
-void measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
+int measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
 {
    const float r0= b[0].r * mScale;
    const float r1= b[1].r * mScale;
@@ -101,7 +83,26 @@ void measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
          m[0].a-= sphereCapArea(ss.a, h0) + sphereCapArea(ss.a, h1);
       }
    }
-} // measure
+   return(t);
+} // measureScaled
+
+void testHack (float rA, float rB)
+{
+   Ball3D b[2]={0};
+   VA3D m;
+   int t;
+
+   b[0].r= rA; b[1].r= rB;
+
+   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
+   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
+   for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
+   {
+      b[1].c[0]= sAB;
+      t= measureScaled(&m, b, 1);
+      LOG("%G -> t=%d A=%G V=%G\n", sAB, t, m.a, m.v);
+   }
+} // testHack
 
 /***/
 
@@ -173,8 +174,9 @@ float genPattern (float f[], int id, const int def[3], const float param)
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nF= def[0] * def[1] * def[2];
    float vr=0, scale= 1.0 / def[1];
+   int t=0;
 
-   testHack(2,4);
+   testHack(2,2);
 
    n= nF;
    switch(id)
@@ -184,10 +186,10 @@ float genPattern (float f[], int id, const int def[3], const float param)
          Ball3D b[2];
          VA3D m;
 
-         b[0].r= 0.45 * param;
-         b[1].r= 0.55 * param;
+         b[0].r= 0.55 * param;
+         b[1].r= 0.45 * param;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.45 * def[d]; b[1].c[d]= 0.55 * def[d]; }
-         measureScaled(&m, b, scale);
+         t= measureScaled(&m, b, scale);
          vr= m.v;
          n= genNBall(f, def, b, 2);
          break;
@@ -218,6 +220,6 @@ float genPattern (float f[], int id, const int def[3], const float param)
          memset(f, 0, sizeof(f[0])*nF);
          break;
    }
-   LOG("def[%d,%d,%d] %s(%G)->%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, n, nF, (F64)n / nF, vr);
+   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, vr);
    return(vr);
 } // genPattern

@@ -31,10 +31,10 @@ extern float sqrMag3 (const float dx, const float dy, const float dz); // { retu
 
 /***/
 
-#define ID_ENCLOSE   (-1)
 #define ID_DISTINCT  (0)
 #define ID_TANGENT   (1)
 #define ID_INTERSECT (2)
+#define ID_ENCLOSE   (3)
 
 typedef struct
 {  // Circle of intersection -
