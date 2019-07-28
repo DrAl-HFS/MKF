@@ -52,8 +52,13 @@ extern I64 prodSumA1VN (const int v[], const int a, const int n);
 
 /***/
 
+typedef struct
+{
+   float r, c[3];
+} Ball3D;
+
 // Rasterise primitive into scalar field
-extern size_t genBall (float f[], const int def[3], const float r);
+extern size_t genNBall (float f[], const int def[3], const Ball3D *pB, const int nB);
 
 extern size_t genBlock (float f[], const int def[3], const float r[3]);
 

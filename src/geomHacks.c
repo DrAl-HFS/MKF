@@ -15,7 +15,14 @@ float sphereCapVol (const float a, const float h) { return((M_PI / 6) * h * (3*a
 float blockArea (const float r[3]) { return(4 * (r[0]*r[1] + r[1]*r[2] + r[0]*r[2])); }
 float blockVol (const float r[3]) { return(8 * r[0]*r[1]*r[2]); }
 
-float sqrMag3 (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
+float sqrMag3D (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
+float sep3D (const float a[3], const float b[3])
+{
+   float s2= sqrMag3D(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
+   if (s2 > 0) { return sqrtf(s2); }
+   //else
+   return(0);
+} // sep3D
 
 int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float sAB)
 {
@@ -35,7 +42,7 @@ int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float s
          {
             if (d2 == t2) { return(ID_TANGENT); }
             //else
-            pI->a= r2s * sqrt( d2 - t2 );
+            pI->a= r2s * sqrtf( d2 - t2 );
             return(ID_INTERSECT);
          }
       }
@@ -43,6 +50,58 @@ int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float s
    }
    return(ID_DISTINCT);
 } // intersectSS1
+
+void testHack (float rA, float rB)
+{
+   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
+   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
+   for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
+   {
+      IntersectSS ss;
+      if (intersectSS1(&ss, rA, rB, sAB) >= ID_TANGENT)
+      {
+         float hA, hB;
+         hA= rA - ss.dA;
+         hB= rB - (sAB - ss.dA);
+         LOG("%G -> D: %G%+G rI: %G  A: %G%+G\n", sAB, ss.dA, sAB - ss.dA, ss.a, sphereCapArea(ss.a, hA), sphereCapArea(ss.a, hB));
+      }
+      else LOG("%G\n", sAB);
+   }
+} // testHack
+
+typedef struct
+{
+   float v, a;
+} VA3D;
+
+void measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
+{
+   const float r0= b[0].r * mScale;
+   const float r1= b[1].r * mScale;
+   const float s= sep3D(b[0].c, b[1].c) * mScale;
+   IntersectSS ss;
+   const int t= intersectSS1(&ss, r0, r1, s);
+
+   if (ID_ENCLOSE == t)
+   {
+      float r= MAX(r0, r1);
+      m[0].v= sphereVol(r);
+      m[0].a= sphereArea(r);
+   }
+   else
+   {
+      m[0].a= sphereArea(r0) + sphereArea(r1);
+      m[0].v= sphereVol(r0) + sphereVol(r1);
+      if (ID_INTERSECT == t)
+      {
+         float h0, h1;
+         h0= r0 - ss.dA;
+         h1= r1 - (s - ss.dA);
+         m[0].v-= sphereCapVol(ss.a, h0) + sphereCapVol(ss.a, h1);
+         m[0].a-= sphereCapArea(ss.a, h0) + sphereCapArea(ss.a, h1);
+      }
+   }
+} // measure
 
 /***/
 
@@ -56,26 +115,37 @@ I64 prodSumA1VN (const int v[], const int a, const int n)
 
 /***/
 
-size_t genBall (float f[], const int def[3], const float r)
+Bool32 inBall (const float x[3], const Ball3D *pB)
+{
+   return( sqrMag3D(x[0]-pB->c[0], x[1]-pB->c[1], x[2]-pB->c[2]) <= (pB->r * pB->r) );
+} // inBall
+
+size_t genNBall (float f[], const int def[3], const Ball3D *pB, const int nB)
 {
    size_t i= 0, n= 0;
-   float c[3], r2= r * r;
+   int c[3];
 
-   for (int d=0; d<3; d++) { c[d]= 0.5 * def[d]; }
-
-   for (int j= 0; j<def[2]; j++)
+   for (c[0]= 0; c[0]<def[0]; c[0]++)
    {
-      for (int k= 0; k<def[1]; k++)
+      for (c[1]= 0; c[1]<def[1]; c[1]++)
       {
-         for (int l= 0; l<def[0]; l++)
+         for (c[2]= 0; c[2]<def[2]; c[2]++)
          {
-            if (sqrMag3(j-c[0], k-c[1], l-c[2]) <= r2) { f[i]= 1.0; ++n; }
+            float d[3]={c[0],c[1],c[2]};
+            for (int b= 0; b < nB; b++)
+            {
+               if (inBall(d,pB+b))
+               {
+                  f[i]= 1.0; ++n;
+                  break;
+               }
+            }
             ++i;
          }
       }
    }
    return(n);
-} // genBall
+} // genNBall
 
 size_t genBlock (float f[], const int def[3], const float r[3])
 {
@@ -98,37 +168,32 @@ size_t genBlock (float f[], const int def[3], const float r[3])
    return(n);
 } // genBlock
 
-void testHack (float rA, float rB)
-{
-   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
-   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
-   for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
-   {
-      IntersectSS ss;
-      if (intersectSS1(&ss, rA, rB, sAB) >= ID_TANGENT)
-      {
-         float hA, hB;
-         hA= rA - ss.dA;
-         hB= rB - (sAB - ss.dA);
-         LOG("%G -> D: %G%+G rI: %G  A: %G%+G\n", sAB, ss.dA, sAB - ss.dA, ss.a, sphereCapArea(ss.a, hA), sphereCapArea(ss.a, hB));
-      }
-      else LOG("%G\n", sAB);
-   }
-} // testHack
-
 float genPattern (float f[], int id, const int def[3], const float param)
 {
-   const char *name[]={"empty","ball","solid","box"};
+   const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nF= def[0] * def[1] * def[2];
-   float vr=0, fracR= param / def[1];
+   float vr=0, scale= 1.0 / def[1];
 
    testHack(2,4);
 
    n= nF;
    switch(id)
    {
+      case 4 :
+      {
+         Ball3D b[2];
+         VA3D m;
+
+         b[0].r= 0.45 * param;
+         b[1].r= 0.55 * param;
+         for (int d=0; d<3; d++) { b[0].c[d]= 0.45 * def[d]; b[1].c[d]= 0.55 * def[d]; }
+         measureScaled(&m, b, scale);
+         vr= m.v;
+         n= genNBall(f, def, b, 2);
+         break;
+      }
       case 3 :
-      {  float r[3]={fracR,fracR,fracR};
+      {  float r[3]={param*scale,param*scale,param*scale};
          vr= blockVol(r);
       }
       {  float r[3]={param,param,param};
@@ -139,9 +204,15 @@ float genPattern (float f[], int id, const int def[3], const float param)
          memset(f, -1, sizeof(f[0])*nF);
          break;
       case 1 :
-         vr= sphereVol(fracR);
-         n= genBall(f, def, param);
+      {
+         Ball3D b;
+
+         vr= sphereVol(param*scale);
+         b.r= param;
+         for (int d=0; d<3; d++) { b.c[d]= 0.5 * def[d]; }
+         n= genNBall(f, def, &b, 1);
          break;
+      }
       default :
          id= 0; vr= 0;
          memset(f, 0, sizeof(f[0])*nF);

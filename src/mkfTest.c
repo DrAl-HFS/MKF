@@ -85,7 +85,7 @@ int main (int argc, char *argv[])
 
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 1, def, 0.3*def[0] - 0.5);
+      float vr= genPattern(cux.pHF, 4, def, 0.3*def[0] - 0.5);
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();
