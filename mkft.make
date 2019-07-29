@@ -23,7 +23,7 @@ ACC := -Mautoinline -acc=verystrict -ta=multicore
 else # Default compiler gcc / clang, assume no ACC
 BUILD := FLLSRC
 CC := gcc
-OPT := -Wall -Os
+OPT := -Wall -g -O0
 # full debug...
 #OPT := -Wall -g -O0
 # problematic...
@@ -53,9 +53,7 @@ CU_OBJ := $(CU_SRC:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.o)
 CMN_SRC := $(shell ls $(CMN_DIR)/*.c)
 CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
 LIBDEF := -lm
-#-lcudart -L$(CULBPATH)
 INCDEF := -I$(CMN_DIR) -I$(INC_DIR)
-#-DMK_
 
 OBJ := $(C_OBJ) $(CMN_OBJ)
 
@@ -69,7 +67,7 @@ OBJ += $(CU_OBJ)
 
 LIBDEF += -L$(CULBPATH) -lcudart
 
-INCDEF += -DMK_CUDA
+INCDEF += -DMKF_CUDA
 
 %.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
 	$(NVCC) $(NVOPT) $(INCDEF) $< -c
