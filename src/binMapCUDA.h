@@ -8,9 +8,14 @@
 #include "ctUtil.h"
 #include "binMapUtil.h"
 
-//__device__ int bm1f32 (const float f, const BinMapF32& bm);
-
-//extern
-//__global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinMapF32 mc);
+extern "C" void binMapCudaRowsF32
+(
+   U32 * pBM,
+   const F32 * pF,
+   const int rowLenF,      // row length ie. "X dimension"
+   const int rowStrideBM,  // 32bit word stride of rows of packed binary map, should be >=
+   const int nRows,        // product of other "dimensions" (Y * Z)
+   const BinMapF32 *pC
+);
 
 #endif // BIN_MAP_CUDA_H

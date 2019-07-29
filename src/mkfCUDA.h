@@ -8,17 +8,9 @@
 #include "binMapCUDA.h"
 #include "mkfUtil.h"
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 
 #ifndef MKF_CUDA_CU // nvcc doesn't like this prototype...
-extern int mkfCUDAGetBPFDSimple (const Context *pC, const int def[3], const BinMapF32 *pMC);
-#endif
-
-#ifdef __cplusplus
-} // extern "C"
+extern "C" int mkfCUDAGetBPFDSimple (const Context *pC, const int def[3], const BinMapF32 *pMC);
 #endif
 
 #endif // MKF_CUDA_H

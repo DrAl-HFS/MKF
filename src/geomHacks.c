@@ -113,6 +113,12 @@ I64 prodSumA1VN (const int v[], const int a, const int n)
    return(r);
 } // prodSumA1VN
 
+float *repNF (float f[], const int n, const float k)
+{
+   for (int i=0; i<n; i++) { f[i]= k; }
+   return(f);
+} // repNF
+
 
 /***/
 
@@ -173,7 +179,9 @@ float genPattern (float f[], int id, const int def[3], const float param)
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nF= def[0] * def[1] * def[2];
-   float vr=0, scale= 1.0 / def[1];
+   float r[3], scale= 1.0 / def[1];
+   Ball3D b[2];
+   VA3D m={0,0};
    int t=0;
 
    testHack(2,2);
@@ -182,44 +190,34 @@ float genPattern (float f[], int id, const int def[3], const float param)
    switch(id)
    {
       case 4 :
-      {
-         Ball3D b[2];
-         VA3D m;
-
          b[0].r= 0.55 * param;
          b[1].r= 0.45 * param;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.45 * def[d]; b[1].c[d]= 0.55 * def[d]; }
          t= measureScaled(&m, b, scale);
-         vr= m.v;
          n= genNBall(f, def, b, 2);
          break;
-      }
       case 3 :
-      {  float r[3]={param*scale,param*scale,param*scale};
-         vr= blockVol(r);
-      }
-      {  float r[3]={param,param,param};
-         n= genBlock(f, def, r);
-      }
+         repNF(r,3,param*scale);
+         m.a= blockArea(r);
+         m.v= blockVol(r);
+         n= genBlock(repNF(r,3,param), def, r);
          break;
-      case 2 : vr= 1;
+      case 2 :
+         m.v= 1;
          memset(f, -1, sizeof(f[0])*nF);
          break;
       case 1 :
-      {
-         Ball3D b;
-
-         vr= sphereVol(param*scale);
-         b.r= param;
-         for (int d=0; d<3; d++) { b.c[d]= 0.5 * def[d]; }
-         n= genNBall(f, def, &b, 1);
+         m.a= sphereArea(param*scale);
+         m.v= sphereVol(param*scale);
+         b[0].r= param;
+         for (int d=0; d<3; d++) { b[0].c[d]= 0.5 * def[d]; }
+         n= genNBall(f, def, b, 1);
          break;
-      }
       default :
-         id= 0; vr= 0;
+         id= 0;
          memset(f, 0, sizeof(f[0])*nF);
          break;
    }
-   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, vr);
-   return(vr);
+   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, m.v);
+   return(m.v);
 } // genPattern

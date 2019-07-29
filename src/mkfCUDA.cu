@@ -21,44 +21,6 @@ typedef unsigned long long CUACount;
 
 // CUDA kernels and wrappers
 
-#define VT_BLKS 5
-#define VT_BLKD (1<<VT_BLKS)
-#define VT_BLKM (VT_BLKD-1)
-
-__global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinMapF32 bm)
-{
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint z[VT_BLKD];
-   if (i < n)
-   {
-      const int j= i & VT_BLKM;
-#if 1
-      const int d= 1 + (f[i] > bm.t[0]) - (f[i] < bm.t[0]);
-      z[j]= ((bm.m >> d) & 0x1) << j; // assume "barrel" shifter
-#else
-      z[j]= bm1f32(f[i],bm) << j;
-#endif
-      __syncthreads();
-
-      if (0 == (j & 0x3))
-      {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
-         for (int l=1; l<4; l++) { z[j]|= z[j+l]; }
-
-         __syncthreads();
-
-         //if (0 == j) { r[i>>BLKS]= z[0] | z[4] | z[8] | z[12] | z[16] | z[20] | z[24] | z[28]; }
-         if (0 == (j & 0xF))
-         {  // j : { 0, 16 } 2P 3I
-            for (int l=4; l<16; l+=4) { z[j]|= z[j+l]; }
-
-            __syncthreads();
-
-            if (0 == j) { r[i>>VT_BLKS]= z[0] | z[16]; }
-         }
-      }
-   }
-} // vThresh32
-
 
 #define PACK16
 
@@ -223,18 +185,8 @@ __global__ void addPlaneBPFD (CUACount rBPFD[MKF_BINS], const uint * pPln0, cons
 
 /***/
 
-cudaError_t ctuErr (cudaError_t *pE, const char *s)
-{
-   cudaError_t e;
-   if (NULL == pE) { e= cudaGetLastError(); } else { e= *pE; }
-   if (0 != e)
-   {
-      ERROR("%s - r=%d -> %s\n", s, e, cudaGetErrorName(e));
-   }
-   return(e);
-} // ctuErr
-
-extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pBM)
+extern "C"
+int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC)
 {
    cudaError_t r;
    int blkD= 0;
@@ -264,13 +216,7 @@ extern "C" int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMap
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         blkD= VT_BLKD;
-         nBlk= (pC->nF + blkD-1) / blkD;
-         LOG("***\nmkfCUDAGetBPFDSimple() - bmc: %f,0x%X\n",pBM->t[0], pBM->m);
-         // CAVEAT! Treated as 1D
-         vThresh32<<<nBlk,blkD>>>(pC->pDU, pC->pDF, pC->nF, *pBM);
-         ctuErr(NULL, "vThresh32()");
-         cudaDeviceSynchronize();
+         binMapCudaRowsF32(pC->pDU, pC->pDF, def[0], (def[0]+31)/32, def[1] * def[2], pMC);
 
          if (pC->pHU)
          {

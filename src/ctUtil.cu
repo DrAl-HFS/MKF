@@ -92,3 +92,16 @@ extern "C" int cuBuffRelease (Context *pC)
    if (pC->pHZ) { r= cudaFreeHost(pC->pHZ); sE+= (0!=r); }
    return(0 == sE);
 } // ctuReleaseCtx
+
+#if 1
+cudaError_t ctuErr (cudaError_t *pE, const char *s)
+{
+   cudaError_t e;
+   if (NULL == pE) { e= cudaGetLastError(); } else { e= *pE; }
+   if (0 != e)
+   {
+      ERROR("%s - r=%d -> %s\n", s, e, cudaGetErrorName(e));
+   }
+   return(e);
+} // ctuErr
+#endif

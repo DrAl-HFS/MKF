@@ -28,4 +28,6 @@ extern int cuBuffRelease (Context *pC);
 } // extern "C"
 #endif
 
+extern cudaError_t ctuErr (cudaError_t *pE, const char *s);
+
 #endif // CT_UTIL_H
