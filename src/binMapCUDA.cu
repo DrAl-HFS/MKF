@@ -5,11 +5,9 @@
 #include "binMapCUDA.h"
 
 
-
 #define VT_BLKS 5
 #define VT_BLKD (1<<VT_BLKS)
 #define VT_BLKM (VT_BLKD-1)
-
 
 /***/
 
@@ -53,12 +51,9 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
    if (i < n)
    {
       const int j= i & VT_BLKM;
-#if 0
-      const int d= 1 + (f[i] > bm.t[0]) - (f[i] < bm.t[0]);
-      z[j]= ((bm.m >> d) & 0x1) << j; // assume "barrel" shifter
-#else
+
       z[j]= bm1f32(f[i],bm) << j;
-#endif
+
       __syncthreads();
 
       if (0 == (j & 0x3))
@@ -80,7 +75,7 @@ __global__ void vThresh32 (uint r[], const float f[], const size_t n, const BinM
    }
 } // vThresh32
 
-//extern "C"
+extern "C"
 void binMapCudaRowsF32
 (
    U32 * pBM,

@@ -8,7 +8,12 @@
 #include "ctUtil.h"
 #include "binMapUtil.h"
 
-extern "C" void binMapCudaRowsF32
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+//extern "C"
+void binMapCudaRowsF32
 (
    U32 * pBM,
    const F32 * pF,
@@ -17,5 +22,9 @@ extern "C" void binMapCudaRowsF32
    const int nRows,        // product of other "dimensions" (Y * Z)
    const BinMapF32 *pC
 );
+
+#ifdef __cplusplus
+} // extern "C"
+#endif
 
 #endif // BIN_MAP_CUDA_H

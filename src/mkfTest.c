@@ -35,7 +35,7 @@ Bool32 buffAlloc (Context *pC, const int def[3])
 
    LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
 
-#ifdef MK_CUDA
+#ifdef MKF_CUDA
    if (cuBuffAlloc(pC,vol)) { r= 2; }
 #else
    pC->pHF= malloc(pC->bytesF);
@@ -48,7 +48,7 @@ Bool32 buffAlloc (Context *pC, const int def[3])
 
 void buffRelease (Context *pC)
 {
-#ifdef MK_CUDA
+#ifdef MKF_CUDA
    cuBuffRelease(pC);
 #else
    if (NULL != pC->pHF) { free(pC->pHF); pC->pHF= NULL; }
@@ -93,7 +93,7 @@ int main (int argc, char *argv[])
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
       LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
 
-#ifdef MK_CUDA
+#ifdef MKF_CUDA
       LOG("%smkfCUDAGetBPFDSimple() - \n", "***\n");
       if (mkfCUDAGetBPFDSimple(&cux, def, &bmc))
       {

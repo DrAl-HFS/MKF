@@ -28,6 +28,8 @@ extern int cuBuffRelease (Context *pC);
 } // extern "C"
 #endif
 
+#ifdef __NVCC__ // MKF_CUDA
 extern cudaError_t ctuErr (cudaError_t *pE, const char *s);
+#endif
 
 #endif // CT_UTIL_H
