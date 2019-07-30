@@ -131,21 +131,21 @@ __device__ void zeroBins (uint bpfd[], const int laneIdx, const int bins)
 } // zeroBins
 
 #ifndef PACK16
-__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const uint bpfd[], const int laneIdx, const int bins)
+__device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const int laneIdx, const int bins)
 {
    for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
-      CUACount t= 0;
+      ULL t= 0;
       for (int j= 0; j < blockDim.x; j++) { t+= bpfd[j*bins+k]; }
       atomicAdd( rBPFD+k, t );
    }
 } // reduceBins
 #else
-__device__ void reduceBins (CUACount rBPFD[MKF_BINS], const U16P bpfd[], const int laneIdx, const int bins)
+__device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const int laneIdx, const int bins)
 {
    for (int k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
-      CUACount t[2]= {0,0};
+      ULL t[2]= {0,0};
       for (int j= 0; j < blockDim.x; j++)
       {
          const U16P u= bpfd[j*bins+k];
@@ -159,7 +159,7 @@ __device__ void reduceBins (CUACount rBPFD[MKF_BINS], const U16P bpfd[], const i
 } // reduceBins
 #endif
 
-__global__ void addPlaneBPFD (CUACount rBPFD[MKF_BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    const int laneIdx= i & BPFD_BLKM;
@@ -240,7 +240,7 @@ int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC)
    {
       //size_t bpdBytes= 256*sizeof(uint);
       //if ((pC->pDZ) && (pC->bytesZ >= bpdBytes))
-      CUACount *pBPFD= (CUACount*)(pC->pDZ);
+      ULL *pBPFD= (ULL*)(pC->pDZ);
       const int rowStride= def[0] / 32;
       const int nRowPairs= def[1]-1;
       const int nPlanePairs= def[2]-1;

@@ -10,11 +10,11 @@
 
 
 #ifdef __cplusplus
-} // extern "C"
+extern "C" {
 #endif
 
 //extern "C"
-int mkfCUDAGetBPFDSimple (const Context *pC, const int def[3], const BinMapF32 *pMC);
+int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC);
 
 #ifdef __cplusplus
 } // extern "C"
