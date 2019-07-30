@@ -13,8 +13,10 @@
 extern "C" {
 #endif
 
+int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM);
+
 //extern "C"
-int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC);
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -186,11 +186,33 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uin
 /***/
 
 extern "C"
-int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC)
+int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM)
+{
+   const int rowStride= def[0] / 32;
+   const int nRowPairs= def[1]-1;
+   const int nPlanePairs= def[2]-1;
+   const int planeStride= def[1] * rowStride;
+
+   //if (nRowPairs <= blkD) {
+   int blkD= BPFD_BLKD;
+   int nBlk= (nRowPairs + blkD-1) / blkD;
+
+   for (int i= 0; i < nPlanePairs; i++)
+   {
+      const U32 *pP0= pBM + i * planeStride;
+      const U32 *pP1= pBM + (i+1) * planeStride;
+      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
+      if (0 != ctuErr(NULL, "addPlaneBPFD"))
+      { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+   }
+   cudaDeviceSynchronize();
+   return(MKF_BINS);
+} // mkfCUDAGetBPFD
+
+extern "C"
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
 {
    cudaError_t r;
-   int blkD= 0;
-   int nBlk= 0;
 
    if (pC->pHF)
    {
@@ -238,27 +260,7 @@ int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
    if (pC->pDU && pC->pDZ)
    {
-      //size_t bpdBytes= 256*sizeof(uint);
-      //if ((pC->pDZ) && (pC->bytesZ >= bpdBytes))
-      ULL *pBPFD= (ULL*)(pC->pDZ);
-      const int rowStride= def[0] / 32;
-      const int nRowPairs= def[1]-1;
-      const int nPlanePairs= def[2]-1;
-      const int planeStride= def[1] * rowStride;
-
-      //if (nRowPairs <= blkD) {
-      blkD= BPFD_BLKD;
-      nBlk= (nRowPairs + blkD-1) / blkD;
-
-      for (int i= 0; i < nPlanePairs; i++)
-      {
-         const U32 *pP0= pC->pDU + i * planeStride;
-         const U32 *pP1= pC->pDU + (i+1) * planeStride;
-         addPlaneBPFD<<<nBlk,blkD>>>(pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
-         if (0 != ctuErr(NULL, "addPlane"))
-         { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-      }
-      cudaDeviceSynchronize();
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, pC->pDU);
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
@@ -266,7 +268,7 @@ int mkfCUDAGetBPFDSimple (Context *pC, const int def[3], const BinMapF32 *pMC)
       }
    }
    return(1);
-} // mkfCUDAGetBPFDSimple
+} // mkfCUDAGetBPFDautoCtx
 
 
 #ifdef MKF_CUDA_MAIN
@@ -354,12 +356,13 @@ size_t bitCountNU32 (U32 u[], const int n)
 
 size_t mkft (Context *pC, const int def[3])
 {
-   BinMapF32 bmc;
+   cudaError_t r;
    size_t sum= 0;
 
-   //dumpF(pC->pHF+n, n, def[0]);
-   setBinMapF32(&bmc,">=",0.5);
-   mkfCUDAGetBPFDSimple(pC, def, &bmc);
+   r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
+   r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
+   mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, pC->pDU);
+   r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 #if 0
    size_t t= bitCountNU32(pC->pHU, pC->bytesU>>2);
    LOG("bitCountNU32() -> %zu\n", t);

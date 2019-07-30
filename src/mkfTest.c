@@ -94,8 +94,8 @@ int main (int argc, char *argv[])
       LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
 
 #ifdef MKF_CUDA
-      LOG("%smkfCUDAGetBPFDSimple() - \n", "***\n");
-      if (mkfCUDAGetBPFDSimple(&cux, def, &bmc))
+      LOG("mkfCUDAGetBPFDautoCtx() - %G\n", bmc.t[0]);
+      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
       {
          size_t *pBPFD= cux.pHZ;
 
