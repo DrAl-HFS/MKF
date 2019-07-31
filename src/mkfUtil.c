@@ -96,6 +96,8 @@ void symTst (void)
 void mkfuTest (void)
 {
    U8 d[33]={0};
+   //I8 v[16], nV=0;
+   int s=0;
    //rangeNI(mm,
    for (int i= 0; i<256; i++)
    {
@@ -104,7 +106,27 @@ void mkfuTest (void)
    }
    for (int i= -16; i<=16; i++)
    {
+      U8 z, lz=-1;
       U8 n= d[16+i];
-      if (0 != n) { LOG("[%d] %u\n", i, n); }
+      if (0 != n)
+      {
+         //v[nV++]= i;
+         LOG("\n%+d : [%u]= ", i, n);
+         s+= n;
+         for (int j= 0; j<256; j++)
+         {
+            if (gWEP3[j] == i)
+            {
+               LOG("%02X ", j);
+               z= bitCountZ(j);
+               if (z != lz)
+               {
+                  lz= z;
+                  LOG("(z=%u) ", z);
+               }
+            }
+         }
+      }
    }
+   LOG("\ns=%d\n***\n", s);
 } // mkfuTest
