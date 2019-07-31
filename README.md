@@ -24,7 +24,7 @@ OpenACC acceleration works for multicore (i.e. vectorised CPU) but not especiall
 parallelisable code despite effort to reduce/eliminate dependancies within packed binary map generation and processing).
 OpenACC for GPU target so far produces nothing useful, hence CUDA implementation. 
 
-CUDA version greatly improved by inclusion of *Synchronise() calls - yields deterministic (albeit incorrect) results in
-all cases. There is a consistent undercount of binary patterns and this (weirdly) changes with image content (size of ball).
-Suspect this is an internal pattern chunk boundary problem...
+CUDA version performing correctly after init/reduce operations in pattern assembly were move outside memory access range
+check. Now using 16bit for temp. (per-thread) pattern frequency counts to allow multiple warp execution (constrained by
+shared/register memory per SM).
 
