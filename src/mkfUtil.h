@@ -27,6 +27,8 @@ extern MKMeasureVal volFrac (const size_t hBPD[MKF_BINS]);
 // Euler-Poincare Chi for 3D
 extern MKMeasureVal chiEP3 (const size_t hBPD[MKF_BINS]);
 
+extern void mkfuTest (void);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

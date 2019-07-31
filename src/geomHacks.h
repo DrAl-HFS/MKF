@@ -46,8 +46,12 @@ extern int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const 
 
 /***/
 
+extern int rangeNI (int mm[], const int x[], const int n);
+
+extern int midRangeNI (const int x[], const int n);
+
 // PRODUCT(v[i] + a) Used for image definition: (X-1)(Y-1)(Z-1) point elements -> cells
-extern I64 prodSumA1VN (const int v[], const int a, const int n);
+extern I64 prodOffsetNI (const int x[], const int n, const int o); //*pO);
 
 
 /***/
@@ -63,6 +67,9 @@ extern size_t genNBall (float f[], const int def[3], const Ball3D *pB, const int
 extern size_t genBlock (float f[], const int def[3], const float r[3]);
 
 extern float genPattern (float f[], int id, const int def[3], const float param);
+
+extern void geomTest (float, float);
+
 
 #ifdef __cplusplus
 } // extern "C"

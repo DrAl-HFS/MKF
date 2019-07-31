@@ -24,11 +24,11 @@ void setupAcc (void)
 
 Bool32 buffAlloc (Context *pC, const int def[3])
 {
-   int r=0, vol= def[0] * def[1] * def[2];
+   int r=0, vol= prodOffsetNI(def, 3, 0);
 
    pC->nF= vol;
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= BITS_TO_WRDSH(vol,5);
+   pC->nU= BITS_TO_WRDSH(def[0],5) * def[1] * def[2];
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    pC->nZ= 256;
    pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
@@ -43,6 +43,7 @@ Bool32 buffAlloc (Context *pC, const int def[3])
 #endif
    if (pC->pHF) { memset(pC->pHF, 0, pC->bytesF); ++r; }
    if (pC->pHU) { memset(pC->pHU, 0xFF, pC->bytesU); ++r; }
+   LOG("pHF=%p pHU=%p\n", pC->pHF, pC->pHU);
    return(r >= 2);
 } // buffAlloc
 
@@ -76,76 +77,18 @@ void compareNZ (const size_t u0[], const size_t u1[], const int n)
    }
 } // compareNZ
 
-void symTst (void)
-{
-   U16 s;
-   U8 m[1<<8];
-   U8 s0, t0, n=0;
-
-   for (int i=0; i<256; i++) { m[i]= i; }
-   s= t0= 0x01;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 1;
-   } while (s < 256);
-   s= t0= 0x03;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x05;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x0A;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x0F;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 4;
-   } while (s < 256);
-   for (int i=0; i<256; i++)
-   {
-      if (i != m[i]) { LOG("[%02X]=%02X\n", i, m[i]); n++; }
-   }
-   LOG("n=%u\n", n);
-} // symTst
-
 int main (int argc, char *argv[])
 {
-   const int def[3]= {256,256,256};
+   const int def[3]= {255,256,256}; //256};
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
    Context cux={0};
 
-   symTst();
+   //geomTest(2,2);
+   mkfuTest();
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 4, def, 0.3*def[0] - 0.5);
+      float vr= genPattern(cux.pHF, 4, def, 0.3*midRangeNI(def,3) - 0.5);
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

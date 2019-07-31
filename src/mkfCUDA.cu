@@ -396,7 +396,7 @@ int main (int argc, char *argv[])
 
    if (buffAlloc(&cux, def, 1))
    {
-      const size_t nC= prodSumA1VN(def,-1,3);
+      const size_t nC= prodOffsetNI(def,3,-1);
       LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
       //sanityTest(&cux);
       if (0)

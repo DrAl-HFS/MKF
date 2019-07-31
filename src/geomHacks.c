@@ -86,30 +86,31 @@ int measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
    return(t);
 } // measureScaled
 
-void testHack (float rA, float rB)
-{
-   Ball3D b[2]={0};
-   VA3D m;
-   int t;
-
-   b[0].r= rA; b[1].r= rB;
-
-   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
-   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
-   for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
-   {
-      b[1].c[0]= sAB;
-      t= measureScaled(&m, b, 1);
-      LOG("%G -> t=%d A=%G V=%G\n", sAB, t, m.a, m.v);
-   }
-} // testHack
-
 /***/
 
-I64 prodSumA1VN (const int v[], const int a, const int n)
+int rangeNI (int mm[], const int x[], const int n)
+{  //if (n > 0)
+   mm[0]= mm[1]= x[0];
+   for (int i=1; i<n; i++)
+   {
+      mm[0]= MIN(mm[0], x[i]);
+      mm[1]= MAX(mm[1], x[i]);
+   }
+   return(mm[1] != mm[0]);
+} // rangeNI
+
+int midRangeNI (const int x[], const int n)
 {
-   I64 r= v[0] + a;
-   for (int i=1; i<n; i++) { r*= v[i] + a; }
+   int mm[2];
+   rangeNI(mm, x, n);
+   return((mm[0] + mm[1]) >>1);
+} // midRangeNI
+
+//I64 prodSumA1VN (const int v[], const int a, const int n)
+I64 prodOffsetNI (const int x[], const int n, const int o)
+{
+   I64 r= x[0] + o;
+   for (int i=1; i<n; i++) { r*= x[i] + o; }
    return(r);
 } // prodSumA1VN
 
@@ -184,8 +185,6 @@ float genPattern (float f[], int id, const int def[3], const float param)
    VA3D m={0,0};
    int t=0;
 
-   testHack(2,2);
-
    n= nF;
    switch(id)
    {
@@ -221,3 +220,22 @@ float genPattern (float f[], int id, const int def[3], const float param)
    LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, m.v);
    return(m.v);
 } // genPattern
+
+
+void geomTest (float rA, float rB)
+{
+   Ball3D b[2]={0};
+   VA3D m;
+   int t;
+
+   b[0].r= rA; b[1].r= rB;
+
+   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
+   LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
+   for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
+   {
+      b[1].c[0]= sAB;
+      t= measureScaled(&m, b, 1);
+      LOG("%G -> t=%d A=%G V=%G\n", sAB, t, m.a, m.v);
+   }
+} // geomTest
