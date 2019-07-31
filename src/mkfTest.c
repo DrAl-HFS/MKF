@@ -1,9 +1,6 @@
 
-//#include "mkfTools.h"
-#include "binMapAcc.h"
-#include "mkfAcc.h"
+#include "mkfACC.h"
 #include "mkfCUDA.h"
-#include "mkfUtil.h"
 #include "geomHacks.h"
 #ifdef __PGI
 #include "openacc.h" // -> /opt/pgi/linux86-64/2019/include/openacc.h
@@ -79,16 +76,16 @@ void compareNZ (const size_t u0[], const size_t u1[], const int n)
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {255,256,256}; //256};
+   const int def[3]= {256,256,256}; //256};
    BinMapF32 bmc;
    size_t aBPFD[256]={0,};
    Context cux={0};
 
    //geomTest(2,2);
-   mkfuTest();
+   //mkfuTest();
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 4, def, 0.3*midRangeNI(def,3) - 0.5);
+      float vr= genPattern(cux.pHF, 4, def, 0.5*midRangeNI(def,3));
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

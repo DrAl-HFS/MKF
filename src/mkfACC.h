@@ -5,7 +5,7 @@
 #ifndef MKF_ACC_H
 #define MKF_ACC_H
 
-#include "binMapAcc.h"
+#include "binMapACC.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -191,7 +191,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
       case 4 :
          b[0].r= 0.55 * param;
          b[1].r= 0.45 * param;
-         for (int d=0; d<3; d++) { b[0].c[d]= 0.45 * def[d]; b[1].c[d]= 0.55 * def[d]; }
+         for (int d=0; d<3; d++) { b[0].c[d]= 0.40 * def[d]; b[1].c[d]= 0.60 * def[d]; }
          t= measureScaled(&m, b, scale);
          n= genNBall(f, def, b, 2);
          break;
@@ -206,9 +206,9 @@ float genPattern (float f[], int id, const int def[3], const float param)
          memset(f, -1, sizeof(f[0])*nF);
          break;
       case 1 :
-         m.a= sphereArea(param*scale);
-         m.v= sphereVol(param*scale);
-         b[0].r= param;
+         b[0].r= 0.5 * param;
+         m.a= sphereArea(b[0].r*scale);
+         m.v= sphereVol(b[0].r*scale);
          for (int d=0; d<3; d++) { b[0].c[d]= 0.5 * def[d]; }
          n= genNBall(f, def, b, 1);
          break;

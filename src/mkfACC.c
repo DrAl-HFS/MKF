@@ -2,7 +2,7 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#include "mkfAcc.h"
+#include "mkfACC.h"
 
 #ifndef ACC_INLINE
 #define ACC_INLINE
@@ -122,7 +122,7 @@ ACC_INLINE void addRowBPFD
 
    // First chunk of n bits yields n-1 patterns
    loadChunkSh0(bufChunk, pRow[0]+0, pRow[1]+0, rowStride);
-   addPattern(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
+   addPatternOM(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    //k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    //for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    // Subsequent whole chunks yield n patterns
@@ -131,7 +131,7 @@ ACC_INLINE void addRowBPFD
    while (++i < m)
    {
       loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
-      addPattern(rBPFD, bufChunk, CHUNK_SIZE);
+      addPatternOM(rBPFD, bufChunk, CHUNK_SIZE);
       //k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }
@@ -140,7 +140,7 @@ ACC_INLINE void addRowBPFD
    if (k > 0)
    {
       loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
-      addPattern(rBPFD, bufChunk, k);
+      addPatternOM(rBPFD, bufChunk, k);
       //k= buildPattern(bufPatt, bufChunk, k);
       //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
    }

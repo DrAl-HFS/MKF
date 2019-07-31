@@ -2,7 +2,7 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June 2019
 
-#include "binMapAcc.h"
+#include "binMapACC.h"
 
 #ifndef ACC_INLINE
 #define ACC_INLINE
