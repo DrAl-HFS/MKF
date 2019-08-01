@@ -45,16 +45,23 @@ typedef uint   U16P; // ushort2 ???
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
+//__device__ static int gBrkCount=0;
+//__device__ void brk (void) { gBrkCount++; }
+__device__ void logErr (ULL x) { printf("%016X\n", x); }
+
 class ChunkBuf
 {
    ULL u00, u01, u10, u11;
 
+   //friend logErr (ChunkBuf&);
    __device__ uint buildNext (void)
    {
-      uint bp=  ( u00 & 0x3); u00 >>= 1;
-      bp|= ((u01 & 0x3) << 2); u01 >>= 1;
-      bp|= ((u10 & 0x3) << 4); u10 >>= 1;
-      bp|= ((u11 & 0x3) << 6); u11 >>= 1;
+      uint bp=  ( u00 & 0x3);
+      bp|= ((u01 & 0x3) << 2);
+      bp|= ((u10 & 0x3) << 4);
+      bp|= ((u11 & 0x3) << 6);
+      //if (bp < 0xFF) { logErr(u00); }
+      u00 >>= 1; u01 >>= 1; u10 >>= 1; u11 >>= 1;
       return(bp);
    }
 
@@ -95,30 +102,29 @@ public:
 
 __device__ void addRowBPFD
 (
-   uint         bpfd[], // result pattern distribution
-   const uint  * __restrict__ pRow[2], // restrict relevant to const ?
-   const int   rowStride,
-   const int   n    // Number of single bit elements packed in row
+   uint          bpfd[], // result pattern distribution
+   const uint * pRow[2],
+   const int    rowStride,
+   const int    n    // Number of single bit elements packed in row
 )
 {  // seq
-   int m, k, i;
+   const int m= n>>CHUNK_SHIFT;
+   int i= 0, k= MIN(CHUNK_SIZE, n);
    ChunkBuf  cb(pRow[0]+0, pRow[1]+0, rowStride);
-   k= MIN(CHUNK_SIZE-1, n-1); //dbg[0]+= k;
-   cb.add(bpfd, k);
+
+   cb.add(bpfd, k-1);
    // Subsequent whole chunks yield n patterns
-   i= 0;
-   m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
       cb.loadSh1(pRow[0]+i, pRow[1]+i, rowStride);
-      cb.add(bpfd, CHUNK_SIZE);
+      cb.add(bpfd, k);
    }
    // Check for residual bits < CHUNK_SIZE
    k= n & CHUNK_MASK;
    if (k > 0)
    {
-      cb.loadSh1(pRow[0]+i, pRow[1]+i, rowStride); // ensure LSB aligned?
-      cb.add(bpfd, k); //dbg[2]+= k;
+      cb.loadSh1(pRow[0]+m, pRow[1]+m, rowStride); // ensure LSB aligned?
+      cb.add(bpfd, k);
    }
 } // addRowBPFD
 
@@ -188,7 +194,7 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uin
 extern "C"
 int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM)
 {
-   const int rowStride= def[0] / 32;
+   const int rowStride= BITS_TO_WRDSH(def[0],5);
    const int nRowPairs= def[1]-1;
    const int nPlanePairs= def[2]-1;
    const int planeStride= def[1] * rowStride;
@@ -201,6 +207,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM)
    {
       const U32 *pP0= pBM + i * planeStride;
       const U32 *pP1= pBM + (i+1) * planeStride;
+      LOG(" RP: 0x%08X, %p, 0x%08X, %p \n", rowStride, pP0, planeStride, pP1);
       addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
@@ -238,7 +245,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         binMapCudaRowsF32(pC->pDU, pC->pDF, def[0], (def[0]+31)/32, def[1] * def[2], pMC);
+         binMapCudaRowsF32(pC->pDU, pC->pDF, def[0], BITS_TO_WRDSH(def[0],5), def[1] * def[2], pMC);
 
          if (pC->pHU)
          {
@@ -273,33 +280,6 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
 
 #ifdef MKF_CUDA_MAIN
 
-#if 0
-__global__ void vAddB (float r[], const float a[], const float b[], const int n)
-{
-   int i= blockIdx.x * blockDim.x + threadIdx.x;
-   if (i < n) { r[i]= a[i] + b[i]; }
-} // vAddB
-
-void sanityTest (Context *pC)
-{
-   const int n= 1024;
-   int i, e=0;
-   for (i=0; i<n; i++) { pC->pHF[i]= i; pC->pHF[2*n - (1+i)]= 1+i; }
-   cudaMemcpy(pC->pDF, pC->pHF, 2*n*sizeof(pC->pHF[0]), cudaMemcpyHostToDevice); ctuErr(NULL, "cudaMemcpy 1");
-   vAddB<<<8,128>>>(pC->pDF+2*n, pC->pDF+0, pC->pDF+n, n);
-   cudaMemcpy(pC->pHF+2*n, pC->pDF+2*n, n*sizeof(pC->pHF[0]), cudaMemcpyDeviceToHost); ctuErr(NULL, "cudaMemcpy 2");
-
-   i= 2 * n;
-   LOG("sanityTest() - vAddB() - [%d]=%G", i, pC->pHF[i]);
-   for ( ; i < (3*n)-1; i++)
-   {
-      if (pC->pHF[i] != n) { ++e; LOG(" [%d]=%G", i, pC->pHF[i]); }
-   }
-   LOG(" [%d]=%G\n", i, pC->pHF[i]);
-
-   printf("*e=%d*\n", e);
-} // sanityTest();
-#endif
 
 #include "geomHacks.h"
 #include "mkfUtil.h"
@@ -354,16 +334,9 @@ size_t bitCountNU32 (U32 u[], const int n)
    return(t);
 } // bitCountNU32
 
-size_t mkft (Context *pC, const int def[3])
-{
-   cudaError_t r;
-   size_t sum= 0;
-
-   r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
-   r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
-   mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, pC->pDU);
-   r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 #if 0
+checkHU ()
+{
    size_t t= bitCountNU32(pC->pHU, pC->bytesU>>2);
    LOG("bitCountNU32() -> %zu\n", t);
    LOG("%p[%u]:\n",pC->pHU,pC->nU);
@@ -374,24 +347,32 @@ size_t mkft (Context *pC, const int def[3])
    dumpUX(pC->pHU+2*n, n, m);
    LOG("%s\n","-");
    dumpUX(pC->pHU+3*n, n, m);
+}
 #endif
-   if (pC->pHZ)
-   {
-      const size_t *pBPFD= (size_t*)pC->pHZ;
-      LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
+size_t mkft (Context *pC, const int def[3])
+{
+   cudaError_t r;
+   size_t sum= 0;
 
-      for (int i= 0; i<MKF_BINS; i++)
-      {
-         sum+= pBPFD[i];
-         if (pBPFD[i] > 0) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
-      }
+   r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
+   r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
+   mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, pC->pDU);
+   r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
+
+   const size_t *pBPFD= (size_t*)pC->pHZ;
+   LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
+
+   for (int i= 0; i<MKF_BINS; i++)
+   {
+      sum+= pBPFD[i];
+      if (pBPFD[i] > 0) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
    }
    return(sum);
 } // mkft
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {256,256,2};
+   const int def[3]= {265,4,2};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))
@@ -407,22 +388,30 @@ int main (int argc, char *argv[])
       else
       {
          Context t= cux;
-         const int wDef= def[0] >> 5;
+         const int wDef= BITS_TO_WRDSH(def[0],5);
          const int lDef= def[1] * def[2];
          t.pHF= t.pDF= NULL;
-
+         LOG("mkfCUDA - main() - [%d,%d,%d] -> [%d,%d]\n", def[0], def[1], def[2], wDef, lDef);
+         for (int i= 0; i < lDef; i++)
+         {  // NB: L to R order -> bits 0 to 31
+            for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
+            //t.pHU[wDef * (i+1) - 1]= 0x1; //0x80000000; //0x7FFFFFFF;
+         }
          for (int i= 0; i < lDef; i++)
          {
-            for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
-            t.pHU[wDef * i]= 0x7FFFFFFF; // NB: L to R order -> bits 0 to 31
+            int j= 0;
+            for ( ; j<wDef-1; j++) { LOG("%08X ", t.pHU[wDef * i + j]); }
+            LOG("%08X\n", t.pHU[wDef * i + j]);
          }
          mkft(&t,def);
+#if 0
          for (int i= 0; i < lDef; i++)
          {
             for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
             t.pHU[wDef * i+1]= 0xFFFFFFFE;
          }
          mkft(&t,def);
+#endif
       }
       cuBuffRelease(&cux);
    }

@@ -97,7 +97,7 @@ void binMapCudaRowsF32
    }
    else
    {
-      int rowStride= (rowLenF + 31) / 32;
+      int rowStride= BITS_TO_WRDSH(rowLenF,5); //(rowLenF + 31) / 32;
       int nBlk= (rowLenF + blkD-1) / blkD;
       for (int i=0; i<nRows; i++)
       {

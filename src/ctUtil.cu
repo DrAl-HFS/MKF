@@ -105,3 +105,32 @@ cudaError_t ctuErr (cudaError_t *pE, const char *s)
    return(e);
 } // ctuErr
 #endif
+
+#if 0
+__global__ void vAddB (float r[], const float a[], const float b[], const int n)
+{
+   int i= blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < n) { r[i]= a[i] + b[i]; }
+} // vAddB
+
+void sanityTest (Context *pC)
+{
+   const int n= 1024;
+   int i, e=0;
+   for (i=0; i<n; i++) { pC->pHF[i]= i; pC->pHF[2*n - (1+i)]= 1+i; }
+   cudaMemcpy(pC->pDF, pC->pHF, 2*n*sizeof(pC->pHF[0]), cudaMemcpyHostToDevice); ctuErr(NULL, "cudaMemcpy 1");
+   vAddB<<<8,128>>>(pC->pDF+2*n, pC->pDF+0, pC->pDF+n, n);
+   cudaMemcpy(pC->pHF+2*n, pC->pDF+2*n, n*sizeof(pC->pHF[0]), cudaMemcpyDeviceToHost); ctuErr(NULL, "cudaMemcpy 2");
+
+   i= 2 * n;
+   LOG("sanityTest() - vAddB() - [%d]=%G", i, pC->pHF[i]);
+   for ( ; i < (3*n)-1; i++)
+   {
+      if (pC->pHF[i] != n) { ++e; LOG(" [%d]=%G", i, pC->pHF[i]); }
+   }
+   LOG(" [%d]=%G\n", i, pC->pHF[i]);
+
+   printf("*e=%d*\n", e);
+} // sanityTest();
+#endif
+
