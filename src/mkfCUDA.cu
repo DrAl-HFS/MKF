@@ -47,23 +47,26 @@ typedef uint   U16P; // ushort2 ???
 
 //__device__ static int gBrkCount=0;
 //__device__ void brk (void) { gBrkCount++; }
-__device__ void logErr (ULL x) { printf("%016X\n", x); }
+__device__ void logErr (ULL c, ULL u00, ULL u01, ULL u10, ULL u11)
+{  // single printf unreliable, not sure this is either...
+   printf("%u:", c);
+   printf(" %016X",u00); printf(" %016X", u01);
+   printf(" %016X", u10); printf(" %016X\n", u11);
+} // logErr
 
 class ChunkBuf
 {
-   ULL u00, u01, u10, u11;
+   ULL u00, u01, u10, u11, c;
 
    //friend logErr (ChunkBuf&);
    __device__ uint buildNext (void)
    {
-      uint bp=  ( u00 & 0x3);
-      bp|= ((u01 & 0x3) << 2);
-      bp|= ((u10 & 0x3) << 4);
-      bp|= ((u11 & 0x3) << 6);
-      //if (bp < 0xFF) { logErr(u00); }
-      u00 >>= 1; u01 >>= 1; u10 >>= 1; u11 >>= 1;
+      uint bp=  ( u00 & 0x3); u00 >>= 1;
+      bp|= ((u01 & 0x3) << 2); u01 >>= 1;
+      bp|= ((u10 & 0x3) << 4); u10 >>= 1;
+      bp|= ((u11 & 0x3) << 6); u11 >>= 1;
       return(bp);
-   }
+   } // buildNext
 
 public:
    __device__ ChunkBuf (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
@@ -72,19 +75,23 @@ public:
       u01= pR0[rowStride];
       u10= pR1[0];
       u11= pR1[rowStride];
-   }
+      c= 0;
+   } // ChunkBuf
+
    __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
    {
+      if (0 == pR1[rowStride]) { printf("%p+%x\n",pR1,rowStride); }
       u00|= ( (ULL) pR0[0] ) << 1;
       u01|= ( (ULL) pR0[rowStride] ) << 1;
       u10|= ( (ULL) pR1[0] ) << 1;
       u11|= ( (ULL) pR1[rowStride] ) << 1;
-   }
+   } // loadSh1
+
 #ifndef PACK16
    __device__ void add (uint bpfd[], const int n)
    {
       for (int i= 0; i < n; i++) { bpfd[ buildNext() ]++; }
-   } // add
+   } // add (uint)
 #else
    __device__ void add (U16P bpfd[], const int n)
    {
@@ -94,9 +101,10 @@ public:
       for (int i= 0; i < n; i++)
       {
          const uint bp= buildNext();
+         c++; if (bp < 0xFF) { logErr(c, u00,u01,u10,u11); } // DBG
          bpfd[ bp >> 1 ]+= lh[bp & 1];
       }
-   } // add16P
+   } // add (U16P)
 #endif
 }; // class ChunkBuf
 
@@ -199,15 +207,16 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM)
    const int nPlanePairs= def[2]-1;
    const int planeStride= def[1] * rowStride;
 
+   const U32 *pP0= pBM;// + i * planeStride;
+   const U32 *pP1= pP0 + planeStride; //pBM + (i+1) * planeStride;
+
    //if (nRowPairs <= blkD) {
    int blkD= BPFD_BLKD;
    int nBlk= (nRowPairs + blkD-1) / blkD;
 
    for (int i= 0; i < nPlanePairs; i++)
    {
-      const U32 *pP0= pBM + i * planeStride;
-      const U32 *pP1= pBM + (i+1) * planeStride;
-      LOG(" RP: 0x%08X, %p, 0x%08X, %p \n", rowStride, pP0, planeStride, pP1);
+      LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
       addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
@@ -372,7 +381,7 @@ size_t mkft (Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {265,4,2};
+   const int def[3]= {257,3,3};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))
@@ -395,7 +404,7 @@ int main (int argc, char *argv[])
          for (int i= 0; i < lDef; i++)
          {  // NB: L to R order -> bits 0 to 31
             for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
-            //t.pHU[wDef * (i+1) - 1]= 0x1; //0x80000000; //0x7FFFFFFF;
+            t.pHU[wDef * (i+1) - 1]= 0x1; //0x80000000; //0x7FFFFFFF;
          }
          for (int i= 0; i < lDef; i++)
          {
