@@ -23,7 +23,7 @@ ACC := -Mautoinline -acc=verystrict -ta=multicore
 else # Default compiler gcc / clang, assume no ACC
 BUILD := FLLSRC
 CC := gcc
-OPT := -Wall -g -O0
+OPT := -Wall -g -O0 -march=native
 # full debug...
 #OPT := -Wall -g -O0
 # problematic...
