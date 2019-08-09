@@ -6,6 +6,7 @@
 #define CT_UTIL_H
 
 #include "util.h"
+#include "binMapUtil.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -19,6 +20,7 @@ typedef struct
    float *pDF, *pHF;  // Device / Host ptrs
    uint  *pDU, *pHU;
    void *pDZ, *pHZ;
+   BMStrideDesc   sd;
 } Context;
 
 extern int cuBuffAlloc (Context *pC, uint n);

@@ -21,13 +21,13 @@ void setupAcc (void)
 
 Bool32 buffAlloc (Context *pC, const int def[3])
 {
-   const int nC= prodOffsetNI(def, 3, 0);
-   const int lines= def[1]*def[2];
+   //const int nC= prodOffsetNI(def, 3, -1);
+   //const int lines= def[1]*def[2];
    int r=0;
 
-   pC->nF= def[0] * lines;
+   pC->nF= prodOffsetNI(def,3,0);
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= BITS_TO_WRDSH(def[0],5) * lines;
+   pC->nU= setBMSD(&(pC->sd), def, 0);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))
@@ -91,7 +91,7 @@ int main (int argc, char *argv[])
    //mkfuTest();
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 2, def, 0.5*midRangeNI(def,3));
+      float vr= genPattern(cux.pHF, 1, def, 0.5*midRangeNI(def,3));
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

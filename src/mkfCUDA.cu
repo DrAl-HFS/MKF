@@ -200,37 +200,34 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uin
 /***/
 
 extern "C"
-int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM)
+int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, const U32 * pBM)
 {
-   const int rowStride= BITS_TO_WRDSH(def[0],5);
    const int nRowPairs= def[1]-1;
    const int nPlanePairs= def[2]-1;
-   const int planeStride= def[1] * rowStride;
 
    const int blkD= BPFD_BLKD;
    const int nBlk= (nRowPairs + blkD-1) / blkD;
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
-      const U32 *pP0= pBM + i * planeStride;
-      const U32 *pP1= pBM + (i+1) * planeStride;
+      const U32 *pP0= pBM + i * pSD->plane;
+      const U32 *pP1= pBM + (i+1) * pSD->plane;
       //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
+      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-      pP0= pP1; pP1+= planeStride;
    }
 #else
-   const U32 *pP0= pBM;// + i * planeStride;
-   const U32 *pP1= pP0 + planeStride; //pBM + (i+1) * planeStride;
+   const U32 *pP0= pBM;
+   const U32 *pP1= pP0 + pSD->plane;
 
    for (int i= 0; i < nPlanePairs; i++)
    {
       //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
+      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-      pP0= pP1; pP1+= planeStride;
+      pP0= pP1; pP1+= pSD->plane;
    }
 #endif
    cudaDeviceSynchronize();
@@ -266,7 +263,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         binMapCudaRowsF32(pC->pDU, pC->pDF, def[0], BITS_TO_WRDSH(def[0],5), def[1] * def[2], pMC);
+         binMapCudaRowsF32(pC->pDU, pC->pDF, def[0], pC->sd.row, def[1] * def[2], pMC);
 
          if (pC->pHU)
          {
@@ -288,7 +285,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
    if (pC->pDU && pC->pDZ)
    {
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, pC->pDU);
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, &(pC->sd), pC->pDU);
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
@@ -307,11 +304,9 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
 
 int buffAlloc (Context *pC, const int def[3], const int blkZ)
 {
-   const int lines= def[1] * def[2];
-
-   pC->nF= def[0] * lines;
+   pC->nF= prodOffsetNI(def,3,0);
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= BITS_TO_WRDSH(def[0],5) * lines;
+   pC->nU= setBMSD(&(pC->sd), def, 0);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))
@@ -320,7 +315,6 @@ int buffAlloc (Context *pC, const int def[3], const int blkZ)
 
    return cuBuffAlloc(pC,0);
 } // buffAlloc
-
 
 static const char gSepCh[2]={' ','\n'};
 
@@ -377,7 +371,7 @@ size_t mkft (Context *pC, const int def[3])
 
    r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
    r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
-   mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, pC->pDU);
+   mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, &(pC->sd), pC->pDU);
    r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
@@ -393,7 +387,7 @@ size_t mkft (Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {259,2,2};
+   const int def[3]= {259,3,3};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))

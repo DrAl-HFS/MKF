@@ -35,11 +35,18 @@ typedef struct
 #define BMC_NV (0x0)
 #define BMC_AL (0x7)
 
+typedef struct
+{
+   uint row, plane;
+} BMStrideDesc;
+
 
 /***/
 
 // Define map (comparison operator) using a string
 extern void setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t);
+
+extern size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID);
 
 #ifdef __cplusplus
 } // extern "C"

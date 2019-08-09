@@ -56,6 +56,23 @@ void setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
    //LOG_CALL("(%p, %s, %G) - m=0x%X\n", pC, relopChars, t, pC->m);
 } // setBinMapF32
 
+size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID)
+{
+   BMStrideDesc sd;
+   uint maxPlane= def[2];
+
+   if (NULL == pSD) { pSD= &sd; }
+   sd.row= BITS_TO_WRDSH(def[0],5);  // Packed 32bit words
+   switch (profID)
+   {
+      default :
+          sd.plane= sd.row * def[1];
+          break;
+   }
+   if (pSD) { *pSD= sd; }
+   return((size_t)sd.plane * maxPlane);
+} // setBMSD
+
 #if 0
 testBMC (const float f0, const float fs, const int n, const BinMapF32 *pC)
 {
