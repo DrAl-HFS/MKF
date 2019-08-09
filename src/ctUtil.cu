@@ -53,15 +53,8 @@ extern "C" int cuBuffAlloc (Context *pC, uint n)
 {
    cudaError_t r;
    int sE=0;
+
    //cudaSetDevice, cudaChooseDevice
-#if 0
-   pC->nF= n;
-   pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= BITS_TO_WRDSH(n,5);
-   pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
-   pC->nZ= 256;
-   pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
-#endif
    //pHV= (float*) malloc(bytes);
    //r= cudaHostAlloc(&pHV, bytes, cudaHostAllocMapped);
 

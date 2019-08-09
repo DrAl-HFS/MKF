@@ -80,7 +80,7 @@ public:
 
    __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
    {
-      if (0 == pR1[rowStride]) { printf("%p+%x\n",pR1,rowStride); }
+      //if (0 == pR1[rowStride]) { printf("%p+%x\n",pR1,rowStride); }
       u00|= ( (ULL) pR0[0] ) << 1;
       u01|= ( (ULL) pR0[rowStride] ) << 1;
       u10|= ( (ULL) pR1[0] ) << 1;
@@ -101,7 +101,7 @@ public:
       for (int i= 0; i < n; i++)
       {
          const uint bp= buildNext();
-         c++; if (bp < 0xFF) { logErr(c, u00,u01,u10,u11); } // DBG
+         //c++; if (bp < 0xFF) { logErr(c, u00,u01,u10,u11); } // DBG
          bpfd[ bp >> 1 ]+= lh[bp & 1];
       }
    } // add (U16P)
@@ -207,20 +207,32 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const U32 * pBM)
    const int nPlanePairs= def[2]-1;
    const int planeStride= def[1] * rowStride;
 
-   const U32 *pP0= pBM;// + i * planeStride;
-   const U32 *pP1= pP0 + planeStride; //pBM + (i+1) * planeStride;
-
-   //if (nRowPairs <= blkD) {
-   int blkD= BPFD_BLKD;
-   int nBlk= (nRowPairs + blkD-1) / blkD;
-
+   const int blkD= BPFD_BLKD;
+   const int nBlk= (nRowPairs + blkD-1) / blkD;
+#if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
-      LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
+      const U32 *pP0= pBM + i * planeStride;
+      const U32 *pP1= pBM + (i+1) * planeStride;
+      //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
       addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+      pP0= pP1; pP1+= planeStride;
    }
+#else
+   const U32 *pP0= pBM;// + i * planeStride;
+   const U32 *pP1= pP0 + planeStride; //pBM + (i+1) * planeStride;
+
+   for (int i= 0; i < nPlanePairs; i++)
+   {
+      //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
+      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, rowStride, def[0], nRowPairs); //, pBPFD+256);
+      if (0 != ctuErr(NULL, "addPlaneBPFD"))
+      { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+      pP0= pP1; pP1+= planeStride;
+   }
+#endif
    cudaDeviceSynchronize();
    return(MKF_BINS);
 } // mkfCUDAGetBPFD
@@ -295,18 +307,18 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
 
 int buffAlloc (Context *pC, const int def[3], const int blkZ)
 {
-   int vol= def[0] * def[1] * def[2];
+   const int lines= def[1] * def[2];
 
-   pC->nF= vol;
+   pC->nF= def[0] * lines;
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= BITS_TO_WRDSH(vol,5);
+   pC->nU= BITS_TO_WRDSH(def[0],5) * lines;
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
-   pC->nZ= BPFD_BLKD + blkZ * 256;
-   pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
+   pC->nZ= MKF_BINS;
+   pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))
 
    LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
 
-   return cuBuffAlloc(pC,vol);
+   return cuBuffAlloc(pC,0);
 } // buffAlloc
 
 
@@ -381,7 +393,7 @@ size_t mkft (Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {257,3,3};
+   const int def[3]= {259,2,2};
    Context cux={0};
 
    if (buffAlloc(&cux, def, 1))
@@ -399,12 +411,13 @@ int main (int argc, char *argv[])
          Context t= cux;
          const int wDef= BITS_TO_WRDSH(def[0],5);
          const int lDef= def[1] * def[2];
+         const uint m= BIT_MASK(def[0] & 0x1F);
          t.pHF= t.pDF= NULL;
          LOG("mkfCUDA - main() - [%d,%d,%d] -> [%d,%d]\n", def[0], def[1], def[2], wDef, lDef);
          for (int i= 0; i < lDef; i++)
          {  // NB: L to R order -> bits 0 to 31
             for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
-            t.pHU[wDef * (i+1) - 1]= 0x1; //0x80000000; //0x7FFFFFFF;
+            if (m) { t.pHU[wDef * (i+1) - 1]= m; }
          }
          for (int i= 0; i < lDef; i++)
          {

@@ -21,19 +21,21 @@ void setupAcc (void)
 
 Bool32 buffAlloc (Context *pC, const int def[3])
 {
-   int r=0, vol= prodOffsetNI(def, 3, 0);
+   const int nC= prodOffsetNI(def, 3, 0);
+   const int lines= def[1]*def[2];
+   int r=0;
 
-   pC->nF= vol;
+   pC->nF= def[0] * lines;
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= BITS_TO_WRDSH(def[0],5) * def[1] * def[2];
+   pC->nU= BITS_TO_WRDSH(def[0],5) * lines;
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
-   pC->nZ= 256;
-   pC->bytesZ= 8 * pC->nZ; // void * sizeof(*(pC->pHZ))
+   pC->nZ= MKF_BINS;
+   pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))
 
    LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
 
 #ifdef MKF_CUDA
-   if (cuBuffAlloc(pC,vol)) { r= 2; }
+   if (cuBuffAlloc(pC,0)) { r= 2; }
 #else
    pC->pHF= malloc(pC->bytesF);
    pC->pHU= malloc(pC->bytesU);
@@ -66,12 +68,16 @@ void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
    LOG_CALL("(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
 } // checkNZ
 
-void compareNZ (const size_t u0[], const size_t u1[], const int n)
+int compareNZ (const size_t u0[], const size_t u1[], const int n)
 {
+   int d, sDiff=0, nDiff= 0;
    for (int i= 0; i < n; i++)
    {
-      if (u0[i] != u1[i]) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); }
+      d= (int)(u1[i] - u0[i]);
+      if (d) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); sDiff+= d; nDiff++; }
    }
+   LOG("compareNZ() - sDiff=%d, nDiff=%d\n", sDiff, nDiff);
+   return(nDiff);
 } // compareNZ
 
 int main (int argc, char *argv[])
@@ -85,7 +91,7 @@ int main (int argc, char *argv[])
    //mkfuTest();
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 4, def, 0.5*midRangeNI(def,3));
+      float vr= genPattern(cux.pHF, 2, def, 0.5*midRangeNI(def,3));
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

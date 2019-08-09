@@ -87,7 +87,7 @@ void binMapCudaRowsF32
 )
 {
    int blkD= VT_BLKD;
-   LOG("***\binMapCudaRowsF32() - bmc: %f,0x%X\n",pMC->t[0], pMC->m);
+   LOG("***\nbinMapCudaRowsF32() - bmc: %f,0x%X\n",pMC->t[0], pMC->m);
    if (0 == (rowLenF & 0x1F))
    {
       size_t nF= rowLenF * nRows;

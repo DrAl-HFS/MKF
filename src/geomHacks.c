@@ -56,7 +56,7 @@ typedef struct
    float v, a;
 } VA3D;
 
-int measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
+int measureScaledBB (VA3D m[1], const Ball3D b[2], const float mScale)
 {
    const float r0= b[0].r * mScale;
    const float r1= b[1].r * mScale;
@@ -84,7 +84,7 @@ int measureScaled (VA3D m[1], const Ball3D b[2], const float mScale)
       }
    }
    return(t);
-} // measureScaled
+} // measureScaledBB
 
 /***/
 
@@ -192,7 +192,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
          b[0].r= 0.55 * param;
          b[1].r= 0.45 * param;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.40 * def[d]; b[1].c[d]= 0.60 * def[d]; }
-         t= measureScaled(&m, b, scale);
+         t= measureScaledBB(&m, b, scale);
          n= genNBall(f, def, b, 2);
          break;
       case 3 :
@@ -217,7 +217,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
          memset(f, 0, sizeof(f[0])*nF);
          break;
    }
-   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G, ref=%G)\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, m.v);
+   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, m.v);
    return(m.v);
 } // genPattern
 
@@ -235,7 +235,7 @@ void geomTest (float rA, float rB)
    for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
    {
       b[1].c[0]= sAB;
-      t= measureScaled(&m, b, 1);
+      t= measureScaledBB(&m, b, 1);
       LOG("%G -> t=%d A=%G V=%G\n", sAB, t, m.a, m.v);
    }
 } // geomTest
