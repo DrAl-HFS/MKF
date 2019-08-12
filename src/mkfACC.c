@@ -103,6 +103,9 @@ ACC_INLINE void addPatternOM (size_t rBPFD[256], U64 bufChunk[4], const int n)
    }
 } // addPatternOM
 
+#define ADD_PATTERN addPattern
+//OM
+
 // Add a single row of 8bit/3D patterns (defined by four adjacent rows of
 // elements) to the result distribution array. Efficient parallel execution
 // seems unlikely due to memory access patterns:-
@@ -122,27 +125,21 @@ ACC_INLINE void addRowBPFD
 
    // First chunk of n bits yields n-1 patterns
    loadChunkSh0(bufChunk, pRow[0]+0, pRow[1]+0, rowStride);
-   addPatternOM(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
-   //k= buildPattern(bufPatt, bufChunk, MIN(CHUNK_SIZE-1, n-1));
-   //for (j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+   ADD_PATTERN(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    // Subsequent whole chunks yield n patterns
    i= 0;
    m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
       loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
-      addPatternOM(rBPFD, bufChunk, CHUNK_SIZE);
-      //k= buildPattern(bufPatt, bufChunk, CHUNK_SIZE);
-      //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+      ADD_PATTERN(rBPFD, bufChunk, CHUNK_SIZE);
    }
    // Check for residual bits < CHUNK_SIZE
    k= n & CHUNK_MASK;
    if (k > 0)
    {
       loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
-      addPatternOM(rBPFD, bufChunk, k);
-      //k= buildPattern(bufPatt, bufChunk, k);
-      //for (int j=0; j<k; j++) { rBPD[ bufPatt[j] ]++; }
+      ADD_PATTERN(rBPFD, bufChunk, k);
    }
 } // addRowBPFD
 
