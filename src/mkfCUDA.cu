@@ -302,14 +302,14 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
 #include "geomHacks.h"
 #include "mkfUtil.h"
 
-int buffAlloc (Context *pC, const int def[3], const int blkZ)
+int buffAlloc (Context *pC, const int def[3])
 {
-   pC->nF= prodOffsetNI(def,3,0);
-   pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
+   pC->nF= 0;
+   pC->bytesF= 0;
    pC->nU= setBMSD(&(pC->sd), def, 0);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    pC->nZ= MKF_BINS;
-   pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))
+   pC->bytesZ= sizeof(size_t) * pC->nZ;
 
    LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
 
@@ -364,7 +364,7 @@ checkHU ()
    dumpUX(pC->pHU+3*n, n, m);
 }
 #endif
-size_t mkft (Context *pC, const int def[3])
+size_t mkft (const Context *pC, const int def[3])
 {
    cudaError_t r;
    size_t sum= 0;
@@ -387,10 +387,10 @@ size_t mkft (Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {259,3,3};
+   const int def[3]= {96,9,9};
    Context cux={0};
 
-   if (buffAlloc(&cux, def, 1))
+   if (buffAlloc(&cux, def))
    {
       const size_t nC= prodOffsetNI(def,3,-1);
       LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
@@ -402,32 +402,31 @@ int main (int argc, char *argv[])
       }
       else
       {
-         Context t= cux;
-         const int wDef= BITS_TO_WRDSH(def[0],5);
+         const int wDef= cux.sd.row;
          const int lDef= def[1] * def[2];
          const uint m= BIT_MASK(def[0] & 0x1F);
-         t.pHF= t.pDF= NULL;
          LOG("mkfCUDA - main() - [%d,%d,%d] -> [%d,%d]\n", def[0], def[1], def[2], wDef, lDef);
          for (int i= 0; i < lDef; i++)
          {  // NB: L to R order -> bits 0 to 31
-            for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
-            if (m) { t.pHU[wDef * (i+1) - 1]= m; }
+            for (int j=0; j<wDef; j++) { cux.pHU[wDef * i + j]= 0xFFFFFFFF; }
+            if (m) { cux.pHU[wDef * (i+1) - 1]= m; }
          }
+         mkft(&cux,def);
+
+         int j= wDef/2;
          for (int i= 0; i < lDef; i++)
          {
-            int j= 0;
-            for ( ; j<wDef-1; j++) { LOG("%08X ", t.pHU[wDef * i + j]); }
-            LOG("%08X\n", t.pHU[wDef * i + j]);
+            cux.pHU[wDef * i + j]= 0xFFF7FFFF;
          }
-         mkft(&t,def);
 #if 0
          for (int i= 0; i < lDef; i++)
          {
-            for (int j=0; j<wDef; j++) { t.pHU[wDef * i + j]= 0xFFFFFFFF; }
-            t.pHU[wDef * i+1]= 0xFFFFFFFE;
+            int j= 0;
+            for ( ; j<wDef-1; j++) { LOG("%08X ", cux.pHU[wDef * i + j]); }
+            LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
-         mkft(&t,def);
 #endif
+         mkft(&cux,def);
       }
       cuBuffRelease(&cux);
    }

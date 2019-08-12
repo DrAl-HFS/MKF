@@ -168,7 +168,7 @@ size_t genBlock (float f[], const int def[3], const float r[3])
       {
          for (int l= 0; l<def[0]; l++)
          {
-            if ( (abs(j-c[2]) <= r[0]) && (abs(k-c[1]) <= r[1]) && (abs(l-c[0]) <= r[2]) ) { f[i]= 1.0; ++n; }
+            if ( (abs(j-c[2]) <= r[2]) && (abs(k-c[1]) <= r[1]) && (abs(l-c[0]) <= r[0]) ) { f[i]= 1.0; ++n; }
             ++i;
          }
       }
@@ -199,7 +199,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
          repNF(r,3,param*scale);
          m.a= blockArea(r);
          m.v= blockVol(r);
-         n= genBlock(repNF(r,3,param), def, r);
+         n= genBlock(f, def, repNF(r,3,param));
          break;
       case 2 :
          m.v= 1;
