@@ -26,6 +26,6 @@ OpenACC for GPU target so far produces nothing useful, hence CUDA implementation
 
 CUDA version performing correctly after init/reduce operations in pattern assembly were move outside memory access range
 check. Now using 16bit for temp. (per-thread) pattern frequency counts to allow multiple warp execution (constrained by
-shared/register memory per SM). Allocation/alignment problem for non-multiple of 32 row size now resolved.
+shared/register memory per SM). Allocation/alignment problem for non-multiple of 32 row size now resolved. CUDA version 
+producing identical results to OpenACC/multicore version.
 
-Still differences between host & GPU computation for non-trivial patterns...
