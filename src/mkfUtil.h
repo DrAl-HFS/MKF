@@ -15,7 +15,15 @@ extern "C" {
 
 typedef double MKMeasureVal;
 
-//typedef struct { MKMeasureVal v, k; } MKVK;
+// typedef unsigned char MTBits; // SSMMEEAA
+// S,M,E bits refer to dimensionality
+// S: space 0..3
+// M: measure 0..3
+// E: estimator 0..3 (punctual, lineal, areal, volumetric)
+// A: algorithm used
+
+//typedef struct { double m[4]; MTBits t[4]; } MKMeasureTuple;
+
 
 
 /***/
@@ -23,6 +31,8 @@ typedef double MKMeasureVal;
 
 // Volume fraction
 extern MKMeasureVal volFrac (const size_t hBPD[MKF_BINS]);
+
+extern MKMeasureVal volFrac8 (const size_t hBPD[MKF_BINS]);
 
 // Euler-Poincare Chi for 3D
 extern MKMeasureVal chiEP3 (const size_t hBPD[MKF_BINS]);

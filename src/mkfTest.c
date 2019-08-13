@@ -19,7 +19,7 @@ void setupAcc (void)
 #endif
 } // setupAcc
 
-Bool32 buffAlloc (Context *pC, const int def[3])
+B32 buffAlloc (Context *pC, const int def[3])
 {
    //const int nC= prodOffsetNI(def, 3, -1);
    //const int lines= def[1]*def[2];
@@ -91,13 +91,13 @@ int main (int argc, char *argv[])
    //mkfuTest();
    if (buffAlloc(&cux,def))
    {
-      float vr= genPattern(cux.pHF, 4, def, 0.5*midRangeNI(def,3)-3);
+      float vfR= genPattern(cux.pHF, 4, def, 0.5*midRangeNI(def,3)-3);
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();
       LOG("%smkfAccGetBPFDSimple() - \n", "***\n");
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
-      LOG("\tvolFrac=%G (ref=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vr, chiEP3(aBPFD), 4 * M_PI);
+      LOG("\tvolFrac=%G (ref=%G, vf8=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vfR, volFrac8(aBPFD), chiEP3(aBPFD), 4 * M_PI);
 
 #ifdef MKF_CUDA
       LOG("mkfCUDAGetBPFDautoCtx() - %G\n", bmc.t[0]);

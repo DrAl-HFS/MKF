@@ -123,7 +123,7 @@ float *repNF (float f[], const int n, const float k)
 
 /***/
 
-Bool32 inBall (const float x[3], const Ball3D *pB)
+B32 inBall (const float x[3], const Ball3D *pB)
 {
    return( sqrMag3D(x[0]-pB->c[0], x[1]-pB->c[1], x[2]-pB->c[2]) <= (pB->r * pB->r) );
 } // inBall

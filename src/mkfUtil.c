@@ -24,6 +24,19 @@ MKMeasureVal volFrac (const size_t aBPFD[MKF_BINS])
    return( s[1] / (MKMeasureVal)(s[0] + s[1]) );
 } // volFrac
 
+MKMeasureVal volFrac8 (const size_t aBPFD[MKF_BINS])
+{
+   size_t s[2]={0,0};
+   for (int i= 0; i<MKF_BINS; i++)
+   {
+      s[0]+= aBPFD[i] * bitCountZ(i);
+      s[1]+= aBPFD[i];
+   }
+   s[1]*= 8;
+   LOG_CALL("() - s[]={%zu, %zu}\n", s[0], s[1]);
+   return( s[0] / (MKMeasureVal)s[1] );
+} // volFrac
+
 MKMeasureVal chiEP3 (const size_t aBPFD[MKF_BINS])
 {
    I64 k=0;
