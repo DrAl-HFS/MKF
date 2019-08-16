@@ -8,29 +8,31 @@ CULBPATH := $(PGI_PATH)/cuda/10.1/lib64
 
 ifdef NVCCPATH
 NVCC := nvcc
-NVOPT := -g -G -arch=sm_50 -ccbin=pgc++
+NVOPT := -arch=sm_50 -ccbin=pgc++ -O3
+#-g -G 
 endif
 
 ifdef PGCCPATH
 BUILD := NCRMNTL
 CC := pgcc
-OPT := -g
-#-O2
+OPT := -O3
+# -g -O0
 ACC := -Mautoinline -acc=verystrict -ta=multicore
 # -Minfo=all
 # multicore,tesla
 
 else # Default compiler gcc / clang, assume no ACC
 BUILD := FLLSRC
-CC := gcc
-OPT := -Wall -g -O0 -march=native
-# full debug...
-#OPT := -Wall -g -O0
+CC := gcc -Wall
+OPT := -march=native -O3
+# -g -O0 FLL_DBG
+# -g -Og STD_DBG
+# -Os O2_MN_SZ
 # problematic...
 # -std=c11 -D__USE_MISC -pedantic
 # defaults
-#CC := clang  # Code gen errors ?
-#OPT := -Wall -Oz
+#CC := clang -Wall # Code gen errors ?
+#OPT := -Oz SIZE
 endif
 ACC ?= 
 

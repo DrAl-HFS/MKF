@@ -8,11 +8,31 @@
 /***/
 
 #include "weighting.inc"
+#include "volfrac.c"
+#include "specsurf.c"
+#include "specimc.c"
+#include "specitc.c"
 
 
 /***/
 
-MKMeasureVal volFrac (const size_t aBPFD[MKF_BINS])
+int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s)
+{
+   if (sizeof(long int) == sizeof(size_t))
+   {
+      long int *pI= aBPFD;
+      double res[3]={s,s,s};
+      m[0]= specitc(pI, res);
+      m[1]= specimc(pI, res);
+      m[2]= specsurf(pI, res);
+      m[3]= volfrac(pI);
+      return(4);
+   }
+   //else
+   return(0);
+} // refMeasures
+
+float volFrac (const size_t aBPFD[MKF_BINS])
 {
    size_t s[2]={0,0};
    for (int i= 0; i<MKF_BINS; i+= 2)
@@ -21,10 +41,10 @@ MKMeasureVal volFrac (const size_t aBPFD[MKF_BINS])
       s[1]+= aBPFD[i+1];
    }
    LOG_CALL("() - s[]={%zu, %zu} (%zu)\n", s[0], s[1], s[0]+s[1]);
-   return( s[1] / (MKMeasureVal)(s[0] + s[1]) );
+   return( s[1] / (float)(s[0] + s[1]) );
 } // volFrac
 
-MKMeasureVal volFrac8 (const size_t aBPFD[MKF_BINS])
+float volFrac8 (const size_t aBPFD[MKF_BINS])
 {
    size_t s[2]={0,0};
    for (int i= 0; i<MKF_BINS; i++)
@@ -34,15 +54,15 @@ MKMeasureVal volFrac8 (const size_t aBPFD[MKF_BINS])
    }
    s[1]*= 8;
    LOG_CALL("() - s[]={%zu, %zu}\n", s[0], s[1]);
-   return( s[0] / (MKMeasureVal)s[1] );
+   return( s[0] / (float)s[1] );
 } // volFrac
 
-MKMeasureVal chiEP3 (const size_t aBPFD[MKF_BINS])
+float chiEP3 (const size_t aBPFD[MKF_BINS])
 {
    I64 k=0;
    for (int i= 0; i<MKF_BINS; i++) { k+= (I64)gWEP3[i] * (signed)aBPFD[i]; }
    //LOG_CALL("() - k[]={%i, %i}\n", k[0], k[1]);
-   return( (MKMeasureVal) k * M_PI / 6 );
+   return( (float) k * M_PI / 6 );
 } // chiEP3
 
 

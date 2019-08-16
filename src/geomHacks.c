@@ -96,7 +96,7 @@ int rangeNI (int mm[], const int x[], const int n)
       mm[0]= MIN(mm[0], x[i]);
       mm[1]= MAX(mm[1], x[i]);
    }
-   return(mm[1] != mm[0]);
+   return(mm[1] - mm[0]);
 } // rangeNI
 
 int midRangeNI (const int x[], const int n)
@@ -104,6 +104,21 @@ int midRangeNI (const int x[], const int n)
    int mm[2];
    rangeNI(mm, x, n);
    return((mm[0] + mm[1]) >>1);
+} // midRangeNI
+
+float divF32 (float n, float d) { if (0 != d) return(n / d); else return(0); }
+float sumRcpNI32 (const int d[], const int n)
+{
+   float s= divF32(1.0, d[0]);
+   for (int i=1; i<n; i++) { s+= divF32(1.0, d[i]); }
+   return(s);
+} // sumRcpNI32
+
+float midRangeHNI (const int x[], const int n)
+{
+   int mm[2];
+   rangeNI(mm, x, n);
+   return divF32(2, sumRcpNI32(mm, 2) );
 } // midRangeNI
 
 //I64 prodSumA1VN (const int v[], const int a, const int n)
@@ -180,18 +195,19 @@ float genPattern (float f[], int id, const int def[3], const float param)
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nF= def[0] * def[1] * def[2];
-   float r[3], scale= 1.0 / def[1];
+   float r[3], scale= 1.0 / midRangeNI(def,3);
    Ball3D b[2];
    VA3D m={0,0};
    int t=0;
 
    n= nF;
+   memset(f, 0, nF * sizeof(f[0]) );
    switch(id)
    {
       case 4 :
-         b[0].r= 0.55 * param;
-         b[1].r= 0.45 * param;
-         for (int d=0; d<3; d++) { b[0].c[d]= 0.40 * def[d]; b[1].c[d]= 0.60 * def[d]; }
+         b[0].r= 0.2 * param;
+         b[1].r= 0.3 * param;
+         for (int d=0; d<3; d++) { b[0].c[d]= 0.4 * def[d]; b[1].c[d]= 0.6 * def[d]; }
          t= measureScaledBB(&m, b, scale);
          n= genNBall(f, def, b, 2);
          break;

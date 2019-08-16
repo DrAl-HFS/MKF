@@ -49,6 +49,7 @@ extern int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const 
 extern int rangeNI (int mm[], const int x[], const int n);
 
 extern int midRangeNI (const int x[], const int n);
+extern float midRangeHNI (const int x[], const int n);
 
 // PRODUCT(v[i] + a) Used for image definition: (X-1)(Y-1)(Z-1) point elements -> cells
 extern I64 prodOffsetNI (const int x[], const int n, const int o); //*pO);

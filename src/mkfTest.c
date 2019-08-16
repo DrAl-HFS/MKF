@@ -68,13 +68,15 @@ void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
    LOG_CALL("(.. %d ..) - bitcounts: dist=%zu /8= %zu, raw=%zu\n", n, t[0], t[0]>>3, t[1]);
 } // checkNZ
 
-int compareNZ (const size_t u0[], const size_t u1[], const int n)
+int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flags)
 {
    int d, sDiff=0, nDiff= 0;
    for (int i= 0; i < n; i++)
    {
       d= (int)(u1[i] - u0[i]);
-      if (d) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); sDiff+= d; nDiff++; }
+      sDiff+= d;
+      nDiff+= 0 != d;
+      if (flags && d) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); }
    }
    LOG("compareNZ() - sDiff=%d, nDiff=%d\n", sDiff, nDiff);
    return(nDiff);
@@ -82,22 +84,38 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n)
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {257,256,256}; //256};
+   int id=1, def[3]= {256,256-32,256}; //256};
    BinMapF32 bmc;
-   size_t aBPFD[256]={0,};
+   size_t aBPFD[256]={0,}, aBPFD2[256]={0,};
    Context cux={0};
 
    //geomTest(2,2);
    //mkfuTest();
    if (buffAlloc(&cux,def))
    {
-      float vfR= genPattern(cux.pHF, 4, def, 0.5*midRangeNI(def,3)-3);
+      const float param= 256-64; //midRangeHNI(def,3)-3;
+      float vfR= genPattern(cux.pHF, id, def, param);
+      float m[4];
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();
       LOG("%smkfAccGetBPFDSimple() - \n", "***\n");
       mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
-      LOG("\tvolFrac=%G (ref=%G, vf8=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vfR, volFrac8(aBPFD), chiEP3(aBPFD), 4 * M_PI);
+      if (refMeasures(m, aBPFD, 1.0/257))
+      {
+         LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+      }
+      //LOG("\tvolFrac=%G (ref=%G, vf8=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vfR, volFrac8(aBPFD), chiEP3(aBPFD), 4 * M_PI);
+
+
+      SWAP(int,def[1],def[2]);
+      vfR= genPattern(cux.pHF, id, def, param);
+      mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
+      if (refMeasures(m, aBPFD2, 1.0/257))
+      {
+         LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+      }
+      compareNZ(aBPFD, aBPFD2, MKF_BINS, 0);
 
 #ifdef MKF_CUDA
       LOG("mkfCUDAGetBPFDautoCtx() - %G\n", bmc.t[0]);
@@ -109,7 +127,7 @@ int main (int argc, char *argv[])
          LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
          //checkNZ(pBPFD, 256, "[%d]=%zu\n");
          //checkNZ(cux.pHU, cux.nU, NULL); // "[%d]: 0x%04X\n"
-         compareNZ(aBPFD, pBPFD, MKF_BINS);
+         compareNZ(aBPFD, pBPFD, MKF_BINS, 1);
       }
 #else
       //checkNZ(aBPFD, MKF_BINS, "[%d]=%zu\n");

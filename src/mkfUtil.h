@@ -13,7 +13,7 @@ extern "C" {
 
 #define MKF_BINS (1<<8)
 
-typedef double MKMeasureVal;
+//typedef double MKMeasureVal;
 
 // typedef unsigned char MTBits; // SSMMEEAA
 // S,M,E bits refer to dimensionality
@@ -29,13 +29,15 @@ typedef double MKMeasureVal;
 /***/
 // Compute measures on previously obtained Binary Pattern Distributions.
 
-// Volume fraction
-extern MKMeasureVal volFrac (const size_t hBPD[MKF_BINS]);
+extern int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s);
 
-extern MKMeasureVal volFrac8 (const size_t hBPD[MKF_BINS]);
+// Volume fraction
+extern float volFrac (const size_t hBPD[MKF_BINS]);
+
+extern float volFrac8 (const size_t hBPD[MKF_BINS]);
 
 // Euler-Poincare Chi for 3D
-extern MKMeasureVal chiEP3 (const size_t hBPD[MKF_BINS]);
+extern float chiEP3 (const size_t hBPD[MKF_BINS]);
 
 extern void mkfuTest (void);
 
