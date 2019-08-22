@@ -26,7 +26,7 @@ extern float sphereCapVol (const float a, const float h); // pi/6.h.(3.a^2+h^2))
 extern float blockArea (const float r[3]); // 4.(r0.r1+r1.r2+r0.r2)
 extern float blockVol (const float r[3]);  // 8.r0.r1.r2
 
-extern float sqrMag3 (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
+extern float sqrMag3D (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
 
 
 /***/

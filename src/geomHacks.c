@@ -12,7 +12,7 @@ float sphereVol (const float r) { return((4 * M_PI / 3) * r*r*r); }
 float sphereCapArea (const float a, const float h) { return(M_PI * (a*a + h*h)); }
 float sphereCapVol (const float a, const float h) { return((M_PI / 6) * h * (3*a*a + h*h)); }
 
-float blockArea (const float r[3]) { return(4 * (r[0]*r[1] + r[1]*r[2] + r[0]*r[2])); }
+float blockArea (const float r[3]) { return(8 * (r[0]*r[1] + r[1]*r[2] + r[0]*r[2])); }
 float blockVol (const float r[3]) { return(8 * r[0]*r[1]*r[2]); }
 
 float sqrMag3D (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
@@ -148,11 +148,11 @@ size_t genNBall (float f[], const int def[3], const Ball3D *pB, const int nB)
    size_t i= 0, n= 0;
    int c[3];
 
-   for (c[0]= 0; c[0]<def[0]; c[0]++)
+   for (c[2]= 0; c[2]<def[2]; c[2]++)
    {
       for (c[1]= 0; c[1]<def[1]; c[1]++)
       {
-         for (c[2]= 0; c[2]<def[2]; c[2]++)
+         for (c[0]= 0; c[0]<def[0]; c[0]++)
          {
             float d[3]={c[0],c[1],c[2]};
             for (int b= 0; b < nB; b++)

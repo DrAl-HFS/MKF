@@ -84,7 +84,7 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flag
 
 int main (int argc, char *argv[])
 {
-   int id=1, def[3]= {256,256-32,256}; //256};
+   int id=1, def[3]= {256+1,256, 256}; //256};
    BinMapF32 bmc;
    size_t aBPFD[256]={0,}, aBPFD2[256]={0,};
    Context cux={0};
@@ -108,7 +108,7 @@ int main (int argc, char *argv[])
       //LOG("\tvolFrac=%G (ref=%G, vf8=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vfR, volFrac8(aBPFD), chiEP3(aBPFD), 4 * M_PI);
 
 
-      SWAP(int,def[1],def[2]);
+      SWAP(int,def[0],def[2]);
       vfR= genPattern(cux.pHF, id, def, param);
       mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
       if (refMeasures(m, aBPFD2, 1.0/257))
