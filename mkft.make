@@ -9,12 +9,13 @@ CULBPATH := $(PGI_PATH)/cuda/10.1/lib64
 ifdef NVCCPATH
 NVCC := nvcc
 NVOPT := -arch=sm_50 -ccbin=pgc++ -O3
-#-g -G 
+#-g -G
 endif
 
 ifdef PGCCPATH
 BUILD := NCRMNTL
 CC := pgcc
+CCPP := pgc++
 OPT := -O3
 # -g -O0
 ACC := -Mautoinline -acc=verystrict -ta=multicore
@@ -24,6 +25,7 @@ ACC := -Mautoinline -acc=verystrict -ta=multicore
 else # Default compiler gcc / clang, assume no ACC
 BUILD := FLLSRC
 CC := gcc -Wall
+CCPP := g++
 OPT := -march=native -O3
 # -g -O0 FLL_DBG
 # -g -Og STD_DBG
@@ -34,7 +36,7 @@ OPT := -march=native -O3
 #CC := clang -Wall # Code gen errors ?
 #OPT := -Oz SIZE
 endif
-ACC ?= 
+ACC ?=
 
 TARGET := mkft
 MAKEFILE := $(TARGET).make
@@ -49,8 +51,12 @@ INC_DIR := inc
 C_SRC := $(shell ls $(SRC_DIR)/*.c)
 CU_SRC := $(shell ls $(SRC_DIR)/*.cu)
 HDR := $(shell ls $(SRC_DIR)/*.h)
+CPP_SRC := $(shell ls $(SRC_DIR)/*.cpp)
+CPP_HDR := $(shell ls $(SRC_DIR)/*.hpp)
+
 C_OBJ := $(C_SRC:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 CU_OBJ := $(CU_SRC:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.o)
+CPP_OBJ := $(CPP_SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 CMN_SRC := $(shell ls $(CMN_DIR)/*.c)
 CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
@@ -76,16 +82,27 @@ INCDEF += -DMKF_CUDA
 
 endif
 
+#ifdef $(CPP_OBJ)
+
+OBJ +=  $(CPP_OBJ)
+
+%.o : $(SRC_DIR)/%.cpp $(HDR_DIR)/%.hpp
+	$(CCPP) $(OPT) $(INCDEF) $< -c
+
+#endif
+
 ifeq ($(BUILD),FLLSRC)
-# Full build from source every time : not reliable with pgcc+nvcc multi-compiler...
-$(TARGET) : $(C_SRC) $(CMN_SRC) $(HDR) $(MAKEFILE)
-	$(CC) $(OPT) $(ACC) $(INCDEF) $(C_SRC) $(CMN_SRC) $(LIBDEF) -o $@
+# Full build from source every time : not workable with multiple compilers
+# reliable with pgcc+nvcc multi-compiler...
+
+$(TARGET) : $(C_SRC) $(CMN_SRC) $(HDR) $(MAKEFILE) $(CPP_OBJ)
+	$(CC) $(OPT) $(ACC) $(INCDEF) $(C_SRC) $(CMN_SRC) $(LIBDEF) $(CPP_OBJ) -o $@
 	#$(CUCC) $(OPT) $(INCDEF) $(CU_SRC) -c
 
 else # Build incrementally if necessary
 
 %.o : $(SRC_DIR)/%.c $(HDR_DIR)/%.h
-	$(CC) $(OPT) $(ACC) $(INCDEF) $(DEFS) $< -c
+	$(CC) $(OPT) $(ACC) $(INCDEF) $< -c
 
 %.o : $(CMN_DIR)/%.c $(CMN_DIR)/%.h
 	$(CC) $(OPT) $(INCDEF) $< -c
