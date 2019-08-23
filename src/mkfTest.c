@@ -89,7 +89,7 @@ int main (int argc, char *argv[])
    size_t aBPFD[256]={0,}, aBPFD2[256]={0,};
    Context cux={0};
 
-   //geomTest(2,2);
+   geomTest(2,2);
    //mkfuTest();
    if (buffAlloc(&cux,def))
    {

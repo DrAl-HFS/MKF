@@ -1,11 +1,11 @@
 // geomHacks.h - basic 3D geometry hacks.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June-July 2019
+// (c) Project Contributors June-August 2019
 
 #ifndef GEOM_HACKS_H
 #define GEOM_HACKS_H
 
-#include "report.h"
+#include "geomSVU.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,8 +26,6 @@ extern float sphereCapVol (const float a, const float h); // pi/6.h.(3.a^2+h^2))
 extern float blockArea (const float r[3]); // 4.(r0.r1+r1.r2+r0.r2)
 extern float blockVol (const float r[3]);  // 8.r0.r1.r2
 
-extern float sqrMag3D (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
-
 
 /***/
 
@@ -40,7 +38,7 @@ typedef struct
 {  // Circle of intersection -
    float dA, a; // - distance from centre A, radius
 } IntersectSS;
-// Intersection formulae
+// Intersection formulae - sphere-sphere collapsed 1D test
 extern int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float sAB);
 
 

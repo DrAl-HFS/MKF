@@ -1,6 +1,6 @@
 // geomHacks.c - basic 3D geometry hacks.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June-July 2019
+// (c) Project Contributors June-August 2019
 
 #include "geomHacks.h"
 
@@ -15,14 +15,6 @@ float sphereCapVol (const float a, const float h) { return((M_PI / 6) * h * (3*a
 float blockArea (const float r[3]) { return(8 * (r[0]*r[1] + r[1]*r[2] + r[0]*r[2])); }
 float blockVol (const float r[3]) { return(8 * r[0]*r[1]*r[2]); }
 
-float sqrMag3D (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
-float sep3D (const float a[3], const float b[3])
-{
-   float s2= sqrMag3D(a[0]-b[0],a[1]-b[1],a[2]-b[2]);
-   if (s2 > 0) { return sqrtf(s2); }
-   //else
-   return(0);
-} // sep3D
 
 int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float sAB)
 {
@@ -129,12 +121,6 @@ I64 prodOffsetNI (const int x[], const int n, const int o)
    return(r);
 } // prodSumA1VN
 
-float *repNF (float f[], const int n, const float k)
-{
-   for (int i=0; i<n; i++) { f[i]= k; }
-   return(f);
-} // repNF
-
 
 /***/
 
@@ -237,12 +223,15 @@ float genPattern (float f[], int id, const int def[3], const float param)
    return(m.v);
 } // genPattern
 
+extern void geomObjTest (void);
 
 void geomTest (float rA, float rB)
 {
    Ball3D b[2]={0};
    VA3D m;
    int t;
+
+geomObjTest();
 
    b[0].r= rA; b[1].r= rB;
 
