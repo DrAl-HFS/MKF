@@ -198,10 +198,10 @@ float genPattern (float f[], int id, const int def[3], const float param)
          n= genNBall(f, def, b, 2);
          break;
       case 3 :
-         repNF(r,3,param*scale);
+         setKNF(r,3,param*scale);
          m.a= blockArea(r);
          m.v= blockVol(r);
-         n= genBlock(f, def, repNF(r,3,param));
+         n= genBlock(f, def, setKNF(r,3,param));
          break;
       case 2 :
          m.v= 1;

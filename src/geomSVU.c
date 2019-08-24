@@ -4,11 +4,46 @@
 
 #include "geomSVU.h"
 
-float *repNF (float f[], const int n, const float k)
+
+int *setKNI (int r[], const int n, const int k)
 {
-   for (int i=0; i<n; i++) { f[i]= k; }
-   return(f);
-} // repNF
+   for (int i=0; i<n; i++) { r[i]= k; }
+   return(r);
+} // setKNI
+
+int *copyNI (int r[], const int n, const int v[])
+{
+   for (int i=0; i<n; i++) { r[i]= v[i]; }
+   return(r);
+} // copyNI
+
+int *addKNI (int r[], const int a[], const int n, const int k)
+{
+   for (int i=0; i<n; i++) { r[i]= a[i]+k; }
+   return(r);
+} // addKNI
+
+int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n)
+{
+   int d=0;
+   for (int i=0; i<n; i++) { rMin[i]= MIN(minA[i], minB[i]); rMax[i]= MAX(maxA[i], maxB[i]); d+= rMax[i] > rMin[i]; }
+   return(d);
+} // mergeMinMaxNI
+
+
+/***/
+
+float *setKNF (float r[], const int n, const float k)
+{
+   for (int i=0; i<n; i++) { r[i]= k; }
+   return(r);
+} // setKNF
+
+float *copyNF (float r[], const int n, const float v[])
+{
+   for (int i=0; i<n; i++) { r[i]= v[i]; }
+   return(r);
+} // cpyNF
 
 float sqrMag3D (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
 

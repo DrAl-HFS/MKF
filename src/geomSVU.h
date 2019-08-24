@@ -12,8 +12,20 @@ extern "C" {
 #endif
 
 //typedef float GeomScalar;
+extern int *setKNI (int r[], const int n, const int k);
 
-extern float *repNF (float f[], const int n, const float k);
+extern int *copyNI (int r[], const int n, const int v[]);
+
+extern int *addKNI (int r[], const int a[], const int n, const int k);
+
+extern int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n);
+
+/***/
+
+//extern float *repNF (float f[], const int n, const float k);
+extern float *setKNF (float r[], const int n, const float k);
+
+extern float *copyNF (float r[], const int n, const float v[]);
 
 extern float sqrMag3D (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
 
