@@ -45,6 +45,18 @@ float *copyNF (float r[], const int n, const float v[])
    return(r);
 } // cpyNF
 
+float *absNF (float r[], const int n, const float v[])
+{
+   for (int i=0; i<n; i++) { r[i]= fabs(v[i]); }
+   return(r);
+} // absNF
+
+float *sqrNF (float r[], const int n, const float v[])
+{
+   for (int i=0; i<n; i++) { r[i]= v[i] * v[i]; }
+   return(r);
+} // sqrNF
+
 float sqrMag3D (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
 
 float sep3D (const float a[3], const float b[3])

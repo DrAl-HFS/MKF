@@ -27,6 +27,10 @@ extern float *setKNF (float r[], const int n, const float k);
 
 extern float *copyNF (float r[], const int n, const float v[]);
 
+extern float *absNF (float r[], const int n, const float v[]);
+
+extern float *sqrNF (float r[], const int n, const float v[]);
+
 extern float sqrMag3D (const float dx, const float dy, const float dz); // { return(dx*dx + dy*dy + dz*dz); }
 
 extern float sep3D (const float a[3], const float b[3]);
