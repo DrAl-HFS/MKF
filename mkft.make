@@ -6,6 +6,8 @@ NVCCPATH := $(shell command -v nvcc 2>/dev/null)
 PGI_PATH ?= /opt/pgi/linux86-64/2019
 CULBPATH := $(PGI_PATH)/cuda/10.1/lib64
 
+LIBDEF := -lm
+
 ifdef NVCCPATH
 NVCC := nvcc
 NVOPT := -arch=sm_50 -ccbin=pgc++ -O3
@@ -26,6 +28,8 @@ else # Default compiler gcc / clang, assume no ACC
 BUILD := FLLSRC
 CC := gcc -Wall
 CCPP := g++
+LIBDEF += -lstdc++
+#--enable-libstdcxx-allocator BULLSHIT
 OPT := -march=native -O3
 # -g -O0 FLL_DBG
 # -g -Og STD_DBG
@@ -60,7 +64,6 @@ CPP_OBJ := $(CPP_SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 CMN_SRC := $(shell ls $(CMN_DIR)/*.c)
 CMN_OBJ := $(CMN_SRC:$(CMN_DIR)/%.c=$(OBJ_DIR)/%.o)
-LIBDEF := -lm
 INCDEF := -I$(CMN_DIR) -I$(INC_DIR)
 
 OBJ := $(C_OBJ) $(CMN_OBJ)
