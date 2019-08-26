@@ -194,7 +194,10 @@ float genPattern (float f[], int id, const int def[3], const float param)
    gp.nF= 4;
 
    n= nF;
-   if (0 == (rp.flags & RAS_FLAG_WRAL)) { memset(f, 0, nF * sizeof(f[0]) ); }
+   if (0 == (rp.flags & RAS_FLAG_WRAL))
+   {  // Lazy write needs clean buffer...
+      memset(f, 0, nF * sizeof(f[0]) );
+   }
    switch(id)
    {
       case 4 :
