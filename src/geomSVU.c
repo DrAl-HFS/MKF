@@ -30,6 +30,14 @@ int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], c
    return(d);
 } // mergeMinMaxNI
 
+/***/
+
+float *scaleFNI (float r[], const int n, const int v[], const float s)
+{
+   for (int i=0; i<n; i++) { r[i]= v[i] * s; }
+   return(r);
+} // scaleFNI
+
 
 /***/
 

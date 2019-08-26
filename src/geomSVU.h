@@ -11,6 +11,8 @@
 extern "C" {
 #endif
 
+/* Integer */
+
 //typedef float GeomScalar;
 extern int *setKNI (int r[], const int n, const int k);
 
@@ -20,7 +22,11 @@ extern int *addKNI (int r[], const int a[], const int n, const int k);
 
 extern int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n);
 
-/***/
+/* Hybrid */
+
+extern float *scaleFNI (float r[], const int n, const int v[], const float s);
+
+/* Float */
 
 //extern float *repNF (float f[], const int n, const float k);
 extern float *setKNF (float r[], const int n, const float k);

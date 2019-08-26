@@ -43,7 +43,8 @@ protected :
    float r2[2], c[3];
 
 public :
-   CGeomSphere (const GeomSV3& ar=GeomSV3(1,0,0), const GeomSV3& lc=GeomSV3()) { ar.assignSqr(r2,2); lc.assign(c); }
+   CGeomSphere (const GeomSV3& ar=GeomSV3(1,0,0), const GeomSV3& lc=GeomSV3()) { ar.assignSqr(r2,2); lc.assign(c);
+      printf("CGeomSphere: R2=%G,%G, C=%G,%G,%G\n", r2[0], r2[1], c[0], c[1], c[2]); }
 
    bool inI (const int i[]) const override { return inF3(i[0], i[1], i[2]); }
    bool inF (const float f[]) const override { return inF3(f[0], f[1], f[2]); }
@@ -105,7 +106,7 @@ public :
 /***/
 
 // Unscoped enum equivalent to macro definition
-enum GeomID { GEOM_NONE, GEOM_SPHERE, GEOM_BOX };
+enum GeomID { GEOM_NONE, GEOM_SPHERE, GEOM_SPHERE_SHELL, GEOM_BALL, GEOM_CUBE, GEOM_BOX };
 
 class CGeomFactory
 {
@@ -121,18 +122,25 @@ public:
 
       if (nParam > 0)
       {
-         int nR;
+         int nR= MIN(1,nParam);
 
          switch(id)
          {
             case GEOM_SPHERE :
-               nR= nParam - 3;
-               nR= MAX(0, nR);
-               pI= new CGeomSphere(GeomSV3(param, nR, 0), GeomSV3(param+1, nParam-1, 0));
+               pI= new CGeomSphere(GeomSV3(param[0], param[0], 0), GeomSV3(param+nR, nParam-nR, 0));
+               break;
+            case GEOM_SPHERE_SHELL :
+               nR= MIN(2,nParam);
+               pI= new CGeomSphere(GeomSV3(param, nR, 0), GeomSV3(param+nR, nParam-nR, 0));
+               break;
+            case GEOM_BALL :
+               pI= new CGeomSphere(GeomSV3(param, nR, 0), GeomSV3(param+nR, nParam-nR, 0));
+               break;
+            case GEOM_CUBE :
+               pI= new CGeomBox(GeomSV3(param, nR, 1), GeomSV3(param+nR, nParam-nR, 0));
                break;
             case GEOM_BOX :
-               nR= nParam - 3;
-               nR= MAX(0, nR);
+               nR= MIN(3,nParam);
                pI= new CGeomBox(GeomSV3(param, nR, 1), GeomSV3(param+nR, nParam-nR, 0));
                break;
          }

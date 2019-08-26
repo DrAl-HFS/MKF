@@ -115,7 +115,7 @@ int main (int argc, char *argv[])
       {
          LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
       }
-      compareNZ(aBPFD, aBPFD2, MKF_BINS, 0);
+      compareNZ(aBPFD, aBPFD2, MKF_BINS, 0x0);
 
 #ifdef MKF_CUDA
       LOG("mkfCUDAGetBPFDautoCtx() - %G\n", bmc.t[0]);

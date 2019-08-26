@@ -189,11 +189,8 @@ float genPattern (float f[], int id, const int def[3], const float param)
    VA3D m={0,0};
    int t=0;
 
-   gp.vF[0]= 0.5 * param; // {r,c(x,y,z)}
-   for (int d=0; d<3; d++) { gp.vF[1+d]= 0.5 * def[d]; }
-   gp.nF= 4;
-
    n= nF;
+   memset(&gp, 0, sizeof(gp));
    if (0 == (rp.flags & RAS_FLAG_WRAL))
    {  // Lazy write needs clean buffer...
       memset(f, 0, nF * sizeof(f[0]) );
@@ -221,16 +218,16 @@ float genPattern (float f[], int id, const int def[3], const float param)
          b[0].r= 0.5 * param;
          m.a= sphereArea(b[0].r*scale);
          m.v= sphereVol(b[0].r*scale);
-         for (int d=0; d<3; d++) { b[0].c[d]= 0.5 * def[d]; }
 #if 0
+         scaleFNI(b[0].c, 3, def, 0.5);
          n= genNBall(f, def, b, 1);
 #else
-         {
-            //GeomParam gp={0x1, {b[0].r, b[0].c[0], b[0].c[1], b[0].c[2]}, 4};
-
-            gp.id= 0x1;
-            n= rasterise((void*)f, def, &gp, &rp);
-         }
+         gp.vF[gp.nF++]= 0.5 * param; // {r,c(x,y,z)}
+         //gp.vF[gp.nF++]= 0.25 * param; // {r,c(x,y,z)}
+         scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
+         gp.id= 0x3; //2;
+         LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
+         n= rasterise((void*)f, def, &gp, &rp);
 #endif
          break;
       default :
