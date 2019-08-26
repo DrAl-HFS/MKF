@@ -3,6 +3,7 @@
 // (c) Project Contributors June-August 2019
 
 #include "geomHacks.h"
+#include "geomRaster.hpp"
 
 /***/
 
@@ -183,11 +184,17 @@ float genPattern (float f[], int id, const int def[3], const float param)
    size_t n, nF= def[0] * def[1] * def[2];
    float r[3], scale= 1.0 / midRangeNI(def,3);
    Ball3D b[2];
+   GeomParam gp; // ={0x1, {b[0].r, b[0].c[0], b[0].c[1], b[0].c[2]}, 4};
+   RasParam rp={{{0.0, 1.0}},RAS_FLAG_FLOAT|32};
    VA3D m={0,0};
    int t=0;
 
+   gp.vF[0]= 0.5 * param; // {r,c(x,y,z)}
+   for (int d=0; d<3; d++) { gp.vF[1+d]= 0.5 * def[d]; }
+   gp.nF= 4;
+
    n= nF;
-   memset(f, 0, nF * sizeof(f[0]) );
+   if (0 == (rp.flags & RAS_FLAG_WRAL)) { memset(f, 0, nF * sizeof(f[0]) ); }
    switch(id)
    {
       case 4 :
@@ -212,7 +219,16 @@ float genPattern (float f[], int id, const int def[3], const float param)
          m.a= sphereArea(b[0].r*scale);
          m.v= sphereVol(b[0].r*scale);
          for (int d=0; d<3; d++) { b[0].c[d]= 0.5 * def[d]; }
+#if 0
          n= genNBall(f, def, b, 1);
+#else
+         {
+            //GeomParam gp={0x1, {b[0].r, b[0].c[0], b[0].c[1], b[0].c[2]}, 4};
+
+            gp.id= 0x1;
+            n= rasterise((void*)f, def, &gp, &rp);
+         }
+#endif
          break;
       default :
          id= 0;
@@ -222,8 +238,6 @@ float genPattern (float f[], int id, const int def[3], const float param)
    LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, m.v);
    return(m.v);
 } // genPattern
-
-extern void geomObjTest (void);
 
 void geomTest (float rA, float rB)
 {
@@ -235,7 +249,7 @@ geomObjTest();
 
    b[0].r= rA; b[1].r= rB;
 
-   LOG("testHack() / intersectSS1(%G, %G, ..)\n", rA, rB);
+   LOG("\n***\ngeomTest() / intersectSS1(%G, %G, ..)\n", rA, rB);
    LOG("Area: %G %G\n", sphereArea(rA), sphereArea(rB));
    for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
    {
