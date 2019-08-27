@@ -19,7 +19,7 @@ BUILD := NCRMNTL
 CC := pgcc
 CCPP := pgc++
 OPT := -O3
-# -g -O0
+#OPT := -g -O0
 ACC := -Mautoinline -acc=verystrict -ta=multicore
 # -Minfo=all
 # multicore,tesla
@@ -29,10 +29,9 @@ BUILD := FLLSRC
 CC := gcc -Wall
 CCPP := g++
 LIBDEF += -lstdc++
-#--enable-libstdcxx-allocator BULLSHIT
-OPT := -march=native -O3
+OPT := -march=native -g -Og
+# -O3
 # -g -O0 FLL_DBG
-# -g -Og STD_DBG
 # -Os O2_MN_SZ
 # problematic...
 # -std=c11 -D__USE_MISC -pedantic
@@ -89,7 +88,8 @@ endif
 
 OBJ +=  $(CPP_OBJ)
 
-%.o : $(SRC_DIR)/%.cpp $(HDR_DIR)/%.hpp
+# $(HDR_DIR)/%.hpp
+%.o : $(SRC_DIR)/%.cpp $(CPP_HDR)
 	$(CCPP) $(OPT) $(INCDEF) $< -c
 
 #endif
