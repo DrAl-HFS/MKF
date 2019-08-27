@@ -14,6 +14,7 @@ extern "C" {
 typedef struct
 {
    int   id;
+   int   nObj;
    float vF[GEOM_PARAM_MAXV];
    int   nF;
 } GeomParam;

@@ -6,13 +6,6 @@
 #include "packedBFA.hpp"
 #include "geomRaster.hpp"
 
-class IReadWriteF
-{
-   virtual void operator () (size_t idx, const float fVal) = 0;
-   //virtual void operator () (size_t idx, const double fVal) = 0;
-   virtual float& operator [] (size_t idx) = 0;
-}; // IReadWriteF
-
 size_t dot3I (const int i[3], const int j[3]) { return( (long int)i[0]*j[0] + i[1]*j[1] + i[2]*j[2] ); }
 
 struct Trav3Inf
@@ -29,7 +22,7 @@ struct Trav3Inf
       addKNI(ub, def, 3, -1);
    }
    size_t index (const int idx[3]) const { return dot3I(idx, stride); }
-};
+}; // struct Trav3Inf
 
 //void operator () (size_t idx, const float fVal) { pF32[idx]= fVal; }
 
@@ -82,11 +75,11 @@ extern "C" size_t rasterise (void *pB, const int def[3], const GeomParam *pGP, c
    if (bits > 0)
    {
       CGeomFactory fG;
-      IGeomObj *pG= fG.create(GeomID(pGP->id & 0x3), pGP->vF, pGP->nF);
+      IGeomObj *pG= fG.createN(GeomID(pGP->id & 0x7), pGP->nObj, pGP->vF, pGP->nF);
       if (pG)
       {
          Trav3Inf t(def);
-         if (0 == pRP->flags & RAS_FLAG_WRAL) { pG->safeBoundsI(t.lb, t.ub); }
+         if (0 == pRP->flags & RAS_FLAG_WRAL) { pG->safeBoundsI(t.lb, t.ub, 3); LOG("safeBoundsI: l=%d %d %d u=%d %d %d", t.lb[0],t.lb[1],t.lb[2], t.ub[0],t.ub[1],t.ub[2]); }
          if (pRP->flags & RAS_FLAG_FLOAT)
          {
             //if (bits != 32) { WARN_CALL(); }
@@ -97,13 +90,11 @@ extern "C" size_t rasterise (void *pB, const int def[3], const GeomParam *pGP, c
             CWriteRL32P2B wr(pB, bits);
             n= traverseI(wr, pG, t, pRP->wI, pRP->flags & RAS_FLAG_WRAL);
          }
-         fG.release(pG);
+         pG= fG.release(pG); // no auto
       }
    }
    return(n);
 } // rasterise
-
-//extern "C" void rasteriseObj (const int def[3]) {?}
 
 extern "C" void geomObjTest (void)
 {

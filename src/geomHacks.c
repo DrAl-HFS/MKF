@@ -184,7 +184,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
    size_t n, nF= def[0] * def[1] * def[2];
    float r[3], scale= 1.0 / midRangeNI(def,3);
    Ball3D b[2];
-   GeomParam gp; // ={0x1, {b[0].r, b[0].c[0], b[0].c[1], b[0].c[2]}, 4};
+   GeomParam gp;
    RasParam rp={{{0.0, 1.0}},RAS_FLAG_FLOAT|32};
    VA3D m={0,0};
    int t=0;
@@ -202,7 +202,18 @@ float genPattern (float f[], int id, const int def[3], const float param)
          b[1].r= 0.3 * param;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.4 * def[d]; b[1].c[d]= 0.6 * def[d]; }
          t= measureScaledBB(&m, b, scale);
+#if 0
          n= genNBall(f, def, b, 2);
+#else
+         gp.vF[gp.nF++]= b[0].r; // {r,c(x,y,z)}
+         copyNF(gp.vF+gp.nF, 3, b[0].c); gp.nF+= 3;
+         gp.vF[gp.nF++]= b[1].r; // {r,c(x,y,z)}
+         copyNF(gp.vF+gp.nF, 3, b[1].c); gp.nF+= 3;
+         gp.nObj= 2;
+         gp.id= 0x3; //2;
+         LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
+         n= rasterise((void*)f, def, &gp, &rp);
+#endif
          break;
       case 3 :
          setKNF(r,3,param*scale);
@@ -225,6 +236,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
          gp.vF[gp.nF++]= 0.5 * param; // {r,c(x,y,z)}
          //gp.vF[gp.nF++]= 0.25 * param; // {r,c(x,y,z)}
          scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
+         gp.nObj= 1;
          gp.id= 0x3; //2;
          LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
          n= rasterise((void*)f, def, &gp, &rp);

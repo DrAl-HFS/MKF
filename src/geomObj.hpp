@@ -26,43 +26,47 @@ struct GeomSV3
 
 /***/
 
+enum GeomBoundsID { GB_OUT, GB_IN };
+
 // Interface (abstract base) is dimensionally agnostic...
 struct IGeomObj
 {
-   virtual bool inI (const int i[]) const = 0; // { return inF(i[0], i[1], i[2]); }
-   virtual bool inF (const float f[]) const = 0; // { return inF(f[0], f[1], f[2]); }
-   virtual int boundsI (int l[], int u[]) const = 0;
-   virtual int safeBoundsI (int l[], int u[]) const = 0;
+   virtual bool inI (const int vI[]) const = 0;
+   virtual bool inF (const float vF[]) const = 0;
+   virtual int boundsI (int l[], int u[], int m) const = 0;
+   virtual int mergeBoundsI (int l[], int u[], int m, const GeomBoundsID b) const = 0;
+   virtual int safeBoundsI (int l[], int u[], int m) const = 0;
 }; // IGeomObj
 
-// Implementations have implicit dimensionality...
+// Explicit dimensional derivation allows some factoring of common features
+struct IGeom3DObj : public IGeomObj
+{
+   bool inI (const int vI[3]) const override { return inF3(vI[0], vI[1], vI[2]); }
+   bool inF (const float vF[3]) const override { return inF3(vF[0], vF[1], vF[2]); }
+   //virtual int boundsI (int l[], int u[]) const = 0;
+   int mergeBoundsI (int l[], int u[], int m, const GeomBoundsID b) const override;
+   int safeBoundsI (int l[], int u[], int m) const override { return mergeBoundsI(l, u, m, GB_IN); }
+   virtual bool inF3 (float, float, float) const = 0;
+}; // IGeom3DObj
 
-class CGeomSphere : public IGeomObj
+
+class CGeomSphere : public IGeom3DObj
 {
 protected :
    float r2[2], c[3];
 
 public :
-   CGeomSphere (const GeomSV3& ar=GeomSV3(1,0,0), const GeomSV3& lc=GeomSV3()) { ar.assignSqr(r2,2); lc.assign(c);
-      printf("CGeomSphere: R2=%G,%G, C=%G,%G,%G\n", r2[0], r2[1], c[0], c[1], c[2]); }
+   CGeomSphere (const GeomSV3& ar=GeomSV3(1,0,0), const GeomSV3& lc=GeomSV3()) { ar.assignSqr(r2,2); lc.assign(c); }
+   //   printf("CGeomSphere: R2=%G,%G, C=%G,%G,%G\n", r2[0], r2[1], c[0], c[1], c[2]); }
 
-   bool inI (const int i[]) const override { return inF3(i[0], i[1], i[2]); }
-   bool inF (const float f[]) const override { return inF3(f[0], f[1], f[2]); }
-
-   int boundsI (int l[], int u[]) const override
+   int boundsI (int l[3], int u[3], int m) const override
    {
       float r= sqrt(r2[0]); // + eps ?
       int d=0;
-      for (int i=0; i<3; i++) { l[i]= c[i]-r; u[i]= c[i]+r; d+= (u[i] > l[i]); }
+      m= MIN(3,m);
+      for (int i=0; i<m; i++) { l[i]= c[i]-r; u[i]= c[i]+r; d+= (u[i] > l[i]); }
       return(d);
    } // boundsI
-
-   int safeBoundsI (int l[], int u[]) const override
-   {
-      int lt[3], ut[3];
-      boundsI(lt,ut);
-      return mergeMinMaxNI(u, l, u, l, ut, lt, 3);
-   } // safeBoundsI
 
    bool inF3 (float x, float y, float z) const
    {
@@ -72,7 +76,7 @@ public :
 }; // CGeomSphere
 
 
-class CGeomBox : public IGeomObj
+class CGeomBox : public IGeom3DObj
 {
 protected :
    float r[3], c[3];
@@ -80,28 +84,47 @@ protected :
 public :
    CGeomBox (const GeomSV3& ar=GeomSV3(1), const GeomSV3& lc=GeomSV3()) { ar.assignAbs(r); lc.assign(c); }
 
-   bool inI (const int i[]) const override { return inF3(i[0], i[1], i[2]); }
-   bool inF (const float f[]) const override { return inF3(f[0], f[1], f[2]); }
-
-   int boundsI (int l[], int u[]) const override
+   int boundsI (int l[3], int u[3], int m) const override
    {
       int d=0;
-      for (int i=0; i<3; i++) { l[i]= c[i]-r[i]; u[i]= c[i]+r[i]; d+= (u[i] > l[i]); }
+      m= MIN(3,m);
+      for (int i=0; i<m; i++) { l[i]= c[i]-r[i]; u[i]= c[i]+r[i]; d+= (u[i] > l[i]); }
       return(d);
    } // boundsI
-
-   int safeBoundsI (int l[], int u[]) const override
-   {
-      int lt[3], ut[3];
-      boundsI(lt,ut);
-      return mergeMinMaxNI(u, l, u, l, ut, lt, 3);
-   } // safeBoundsI
 
    bool inF3 (float x, float y, float z) const
    {
       return( (fabs(x-c[0]) <= r[0]) && (fabs(y-c[1]) <= r[1]) && (fabs(z-c[2]) <= r[2]) );
    }
 }; // CGeomBox
+
+/***/
+
+#define GEOM_DMAX (3)
+
+class CGeomAgg : public IGeomObj
+{
+   friend class CGeomFactory;
+protected :
+   IGeomObj **aIGOPtr;
+   int nIGO;
+
+public :
+   CGeomAgg (int n=0);
+   ~CGeomAgg ();
+
+   bool inI (const int vI[]) const override;
+
+   bool inF (const float vF[]) const override;
+
+   int boundsI (int l[], int u[], int m) const override;
+
+   int mergeBoundsI (int l[], int u[], int m, const GeomBoundsID b) const override;
+
+   int safeBoundsI (int l[], int u[], int m) const override { return mergeBoundsI(l, u, m, GB_IN); }
+
+}; // CGeomAgg
+
 
 /***/
 
@@ -112,47 +135,14 @@ class CGeomFactory
 {
 protected :
 
-public:
+public :
    CGeomFactory () { ; }
    ~CGeomFactory () { ; }
 
-   IGeomObj *create (GeomID id, const float param[], const int nParam)
-   {
-      IGeomObj *pI= NULL;
 
-      if (nParam > 0)
-      {
-         int nR= MIN(1,nParam);
-
-         switch(id)
-         {
-            case GEOM_SPHERE :
-               pI= new CGeomSphere(GeomSV3(param[0], param[0], 0), GeomSV3(param+nR, nParam-nR, 0));
-               break;
-            case GEOM_SPHERE_SHELL :
-               nR= MIN(2,nParam);
-               pI= new CGeomSphere(GeomSV3(param, nR, 0), GeomSV3(param+nR, nParam-nR, 0));
-               break;
-            case GEOM_BALL :
-               pI= new CGeomSphere(GeomSV3(param, nR, 0), GeomSV3(param+nR, nParam-nR, 0));
-               break;
-            case GEOM_CUBE :
-               pI= new CGeomBox(GeomSV3(param, nR, 1), GeomSV3(param+nR, nParam-nR, 0));
-               break;
-            case GEOM_BOX :
-               nR= MIN(3,nParam);
-               pI= new CGeomBox(GeomSV3(param, nR, 1), GeomSV3(param+nR, nParam-nR, 0));
-               break;
-         }
-      }
-      return(pI);
-   } // create
-
-   IGeomObj *release (IGeomObj *p)
-   {
-      if (p) { delete p; p= NULL; }
-      return(p);
-   } // release
+   IGeomObj *create1 (GeomID id, const float fParam[], const int nFP);
+   IGeomObj *createN (GeomID id, const int nObj, const float fParam[], const int nFP);
+   IGeomObj *release (IGeomObj *p);
 
 }; // CGeomFactory
 
