@@ -7,7 +7,7 @@ int IGeom3DObj::mergeBoundsI (int l[], int u[], int m, const GeomBoundsID b) con
    //if (t > 3) ERROR
    if (GB_OUT == b) { return mergeMinMaxNI(l, u, l, u, lt, ut, m); }
    else { return mergeMinMaxNI(u, l, u, l, ut, lt, m); }
-   return(-1);
+   //return(-1);
 } // IGeom3DObj::mergeBoundsI
 
 CGeomAgg::CGeomAgg (int n)

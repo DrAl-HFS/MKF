@@ -17,7 +17,8 @@ endif
 ifdef PGCCPATH
 BUILD := NCRMNTL
 CC := pgcc
-CCPP := pgc++
+CCPP := pgc++ -std=c++11
+LIBDEF += -lstdc++
 OPT := -O3
 #OPT := -g -O0
 ACC := -Mautoinline -acc=verystrict -ta=multicore
