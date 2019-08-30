@@ -89,13 +89,17 @@ int main (int argc, char *argv[])
    size_t aBPFD[256]={0,}, aBPFD2[256]={0,};
    Context cux={0};
 
-   geomTest(2,2);
+   c8sTest();
+   //geomTest(2,2);
    //mkfuTest();
+   //printf("long int = %dbytes\n", sizeof(long int));
    if (buffAlloc(&cux,def))
    {
       const float param= 256-64; //midRangeHNI(def,3)-3;
       float vfR= genPattern(cux.pHF, id, def, param);
       float m[4];
+
+      if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();

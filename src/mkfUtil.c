@@ -3,34 +3,17 @@
 // (c) Project Contributors June 2019
 
 #include "mkfUtil.h"
+//#include "cell8Sym.h"
 
 
 /***/
 
 #include "weighting.inc"
-#include "volfrac.c"
-#include "specsurf.c"
-#include "specimc.c"
-#include "specitc.c"
+#include "refMeasures.inc"
 
+//int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s) { ... }
 
 /***/
-
-int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s)
-{
-   if (sizeof(long int) == sizeof(size_t))
-   {
-      long int *pI= aBPFD;
-      double res[3]={s,s,s};
-      m[0]= specitc(pI, res);
-      m[1]= specimc(pI, res);
-      m[2]= specsurf(pI, res);
-      m[3]= volfrac(pI);
-      return(4);
-   }
-   //else
-   return(0);
-} // refMeasures
 
 float volFrac (const size_t aBPFD[MKF_BINS])
 {
