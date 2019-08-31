@@ -201,6 +201,7 @@ int permPatGeom (uint8_t v[], uint8_t u)
    v[n++]= u;
    dump(v, n, "\nP");
    r= rotatePatternNoID(v+n, v[n-1]);
+   // when nB = 3,4 need composite rotation .?.
    dump(v+n,r," R");
    t= n + r;
    for (int i=0; i < r; i++)
@@ -214,12 +215,12 @@ int permPatGeom (uint8_t v[], uint8_t u)
 } // permPatGeom
 
 
-static const uint8_t gBasePat[]=
-{  // 0x00, 0x01
+static const uint8_t gBasePat234[]=
+{  // 0x00, 0x01 trivial base patterns
    0x03,0x09,0x81, // 2E (R1, R2, R3)
-   0x07,0x43,0x83,  // 3E "L"
-   0x0F,0xC3       // 4E
-};
+   0x07,0x43,0x83, // 3E "L"
+   0x0F,0xC3,0x66,0x69  // 4E
+}; // Remaining patterns (5E-8E) are complements of 3E-0E
 
 void c8sTest (void)
 {
@@ -236,15 +237,16 @@ void c8sTest (void)
    for (n= 0; n < 8; n++) { patBuf[t+n]= 1 << n; } dump(patBuf+t, n, "G");
    t+= n;
 
-   nBP= sizeof(gBasePat);
+   nBP= sizeof(gBasePat234);
    for (int iBP= 0; iBP < nBP; iBP++)
    {
-      n= permPatGeom(patBuf+t, gBasePat[iBP]);
+      n= permPatGeom(patBuf+t, gBasePat234[iBP]);
       dump(patBuf+t, n, "G");
       t+= n;
    }
+   n= copyPatternUnique(patBuf, t, patBuf, t);
 
-   LOG("\nt=%d\n***\n", t);
+   LOG("\nt=%d n=%d\n***\n", t, n);
    //simpleTests();
 } // c8sTest
 
