@@ -5,11 +5,20 @@
 #ifndef CELL8SYM_H
 #define CELL8SYM_H
 
-#include "report.h"
+#include "util.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef struct
+{
+   uint8_t bits, count;
+} GroupInf;
+
+extern int c8sGetPattern (uint8_t patBuf[256], GroupInf inf[32]);
+
+extern int c8sGetMap (uint8_t map[256]);
 
 extern void c8sTest (void);
 

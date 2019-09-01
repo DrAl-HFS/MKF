@@ -89,9 +89,9 @@ int main (int argc, char *argv[])
    size_t aBPFD[256]={0,}, aBPFD2[256]={0,};
    Context cux={0};
 
-   c8sTest();
+   //c8sTest();
    //geomTest(2,2);
-   //mkfuTest();
+   mkfuTest();
    //printf("long int = %dbytes\n", sizeof(long int));
    if (buffAlloc(&cux,def))
    {

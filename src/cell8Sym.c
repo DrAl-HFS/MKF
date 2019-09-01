@@ -18,6 +18,7 @@
 
 typedef uint32_t PackV;
 
+// Displace ?
 // Args: basic mask, number of repetitions, alignment
 uint32_t repBits (uint32_t m, const int nR, const int aR)
 {
@@ -31,7 +32,7 @@ uint32_t repBits (uint32_t m, const int nR, const int aR)
    return(r);
 } // repBits
 
-int genRotMasks (uint32_t m[3], const int nR, const int aR)
+static int genRotMasks (uint32_t m[3], const int nR, const int aR)
 {
    int r=0;
    m[r++]= repBits(0x1, nR, aR);
@@ -40,7 +41,7 @@ int genRotMasks (uint32_t m[3], const int nR, const int aR)
    return(r);
 } // genRotMasks
 
-int genMirMasks (uint32_t m[7], const int nR, const int aR)
+static int genMirMasks (uint32_t m[7], const int nR, const int aR)
 {
    int r= genRotMasks(m, nR, aR);
    //if (nM >= 6)
@@ -89,7 +90,7 @@ PackV rotateNRPackV (PackV r[], PackV v, int cmdSeq, const int nCmd, const uint3
    return(nCmd);
 } // rotateNRPackV
 
-int patternToPackV (PackV r[1], uint8_t pattern, const int a)
+static int patternToPackV (PackV r[1], uint8_t pattern, const int a)
 {
    int i= 0, n= 0, s= 0;
    uint32_t packV= 0;
@@ -103,7 +104,7 @@ int patternToPackV (PackV r[1], uint8_t pattern, const int a)
    return(n);
 } // patternToPackV
 
-uint8_t packVToPattern (const PackV v[1], const int n, const int a)
+static uint8_t packVToPattern (const PackV v[1], const int n, const int a)
 {
    const int mA= BIT_MASK(a);
    uint8_t pattern=0;
@@ -118,13 +119,13 @@ uint8_t packVToPattern (const PackV v[1], const int n, const int a)
 
 /***/
 
-int mirrorPackVN (PackV r[], const PackV v, const uint32_t m[], const int nM)
+static int mirrorPackVN (PackV r[], const PackV v, const uint32_t m[], const int nM)
 {
    for (int i= 0; i < nM; i++) { r[i]= v ^ m[i]; }
    return(nM);
 } // mirrorPackVN
 
-int mirrorPatternNoID (uint8_t r[], const uint8_t pattern)
+static int mirrorPatternNoID (uint8_t r[], const uint8_t pattern)
 {
    const int align= 4;
    PackV v0;
@@ -145,7 +146,7 @@ int mirrorPatternNoID (uint8_t r[], const uint8_t pattern)
    return(nR);
 } // mirrorPatternNoID
 
-int rotatePatternNoID (uint8_t r[], const uint8_t pattern)
+static int rotatePatternNoID (uint8_t r[], const uint8_t pattern)
 {
    const int align= 4;
    PackV v0;
@@ -163,7 +164,10 @@ int rotatePatternNoID (uint8_t r[], const uint8_t pattern)
          r[nR]= packVToPattern(vR+nR, nB, align);
          nR+= (r[nR] != pattern);
       }
-      if (nB > 4) // unnecessary ???
+   }
+   return(nR);
+} // rotatePatternNoID
+/*    if (nB > 4) // unnecessary
       {  // Up to 9 composite rotations
          int nR0= nR;
          for (int i= 0; i<nR0; i++)
@@ -175,12 +179,9 @@ int rotatePatternNoID (uint8_t r[], const uint8_t pattern)
                nR+= (r[nR] != pattern);
             }
          }
-      }
-   }
-   return(nR);
-} // rotatePatternNoID
+      }*/
 
-int findPattern (const uint8_t v[], int n, const uint8_t pattern)
+static int findPattern (const uint8_t v[], int n, const uint8_t pattern)
 {
    for (int i= 0; i < n; i++)
    {
@@ -189,7 +190,7 @@ int findPattern (const uint8_t v[], int n, const uint8_t pattern)
    return(-1);
 } // findPattern
 
-int copyPatternUnique (uint8_t r[], int nR, const uint8_t v[], int n)
+static int copyPatternUnique (uint8_t r[], int nR, const uint8_t v[], int n)
 {
    for (int i= 0; i < n; i++)
    {
@@ -201,14 +202,13 @@ int copyPatternUnique (uint8_t r[], int nR, const uint8_t v[], int n)
    return(nR);
 } // copyPatternUnique
 
-
-void dump (uint8_t pat[], int n, const char *id, const char *fmt)
+static void dump (uint8_t pat[], int n, const char *id, const char *fmt)
 {
    LOG("%s[%d]=", id, n); for (int i=0; i < n; i++) { LOG(fmt, pat[i]); } LOG("%s", "\n");
 } // dump
 
 // Permute pattern geometry
-int permPatGeom (uint8_t v[], uint8_t u)
+static int permPatGeom (uint8_t v[], uint8_t u)
 {
    int r, m, t, n= 0;
 
@@ -231,7 +231,6 @@ int permPatGeom (uint8_t v[], uint8_t u)
    return(n);
 } // permPatGeom
 
-
 static const uint8_t gBasePat234[]=
 {  // 0x00, 0x01 trivial base patterns
    0x03,0x09,0x18, // 2E "I" (d= R1, R2, R3)
@@ -240,24 +239,18 @@ static const uint8_t gBasePat234[]=
    0x3C,0x69,0x87  // 4E "X" "?"
 }; // Remaining patterns (5E-8E) are complements of 3E-0E
 
-typedef struct
-{
-   uint8_t bits, count;
-} GroupInf;
-void setInf (GroupInf *pInf, uint8_t b, uint8_t n) { pInf->bits= b; pInf->count= n; }
+static void setInf (GroupInf *pInf, uint8_t b, uint8_t n) { pInf->bits= b; pInf->count= n; }
 
-void c8sTest (void)
+
+/* Interface */
+int c8sGetPattern (uint8_t patBuf[256], GroupInf inf[32])
 {
-   uint8_t patBuf[256]; //, tmp[16];
-   uint8_t groupMap[256];
-   GroupInf inf[32];
    LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
 
    int tG= 0, n= 0, b, nBP, iG=0, nG, cG, uG, tC=0;
 
    LOG("\n%s\n", "Pattern Groups:");
    memset(patBuf,0x00,256);
-   memset(groupMap,0xFF,256);
 
    patBuf[n++]= 0x00; dump(patBuf+tG, n, "G", "0x%02X ");
    setInf(inf+iG++, 0, n);
@@ -278,31 +271,37 @@ void c8sTest (void)
    cG= 8;   // groups to complement
    nG+=  cG;
    uG= nG-1;
-#if 1
+
    for (int i= 0; i<cG; i++) { setInf(inf+uG-i, 8-inf[i].bits, inf[i].count); tC+= inf[i].count;  }
    tG+= tC;
    for (int i= 0; i<tC; i++) { patBuf[0xFF-i]= patBuf[i] ^ 0xFF; }
-#endif
-   int k=0;
-   for (int iG=0; iG<nG; iG++)
+
+   return(nG);
+} // c8sGetPattern
+
+int c8sGetMap (uint8_t groupMap[256])
+{
+   uint8_t patBuf[256];
+   GroupInf inf[32];
+   int nG= c8sGetPattern(patBuf, inf);
+   if (nG > 0)
    {
-      b= inf[iG].bits;
-      n= inf[iG].count;
-      LOG("[%2d]: {%d,%2d} (k=%d)\n", iG, b, n, k);
-      for (int j=0; j<n; j++)
+      int n, k=0;
+      for (int iG=0; iG<nG; iG++)
       {
-         uint8_t pattern= patBuf[k+j];
-         groupMap[ pattern ]= iG;
+         //b= inf[iG].bits;
+         n= inf[iG].count;
+         //LOG("[%2d]: {%d,%2d} (k=%d)\n", iG, b, n, k);
+         for (int j=0; j<n; j++)
+         {
+            uint8_t pattern= patBuf[k+j];
+            groupMap[ pattern ]= iG;
+         }
+         k+= n;
       }
-      k+= n;
    }
-   dump(groupMap, 256, "groupMap", "%d ");
-
-   n= copyPatternUnique(patBuf, tG, patBuf, tG);
-
-   LOG("\nnG=%d, tG=%d tC=%d n=%d\n***\n", nG, tG, tC, n);
-   //simpleTests();
-} // c8sTest
+   return(nG);
+} // c8sGetMap
 
 
 void simpleTests (void)
@@ -355,3 +354,20 @@ void simpleTests (void)
       LOG("0x%08x 0x%02x\n", packV[i], pattern[i]);
    }
 } // simpleTests
+
+void c8sTest (void)
+{
+   uint8_t groupMap[256];
+
+   memset(groupMap,0xFF,256);
+   c8sGetMap(groupMap);
+   dump(groupMap, 256, "groupMap", "%d ");
+#if 0
+   {
+      uint8_t r[256];
+      //patBuf[0xFF]= patBuf[0x00];
+      n= copyPatternUnique(r, 0, patBuf, 256);
+   }
+#endif
+   //simpleTests();
+} // c8sTest

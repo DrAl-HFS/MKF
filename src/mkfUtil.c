@@ -3,7 +3,7 @@
 // (c) Project Contributors June 2019
 
 #include "mkfUtil.h"
-//#include "cell8Sym.h"
+#include "cell8Sym.h"
 
 
 /***/
@@ -48,69 +48,26 @@ float chiEP3 (const size_t aBPFD[MKF_BINS])
    return( (float) k * M_PI / 6 );
 } // chiEP3
 
-
-void symTst (void)
+void measurePatternTest (void)
 {
-   U16 s;
-   U8 m[1<<8];
-   U8 s0, t0, n=0;
+   uint8_t patBuf[256];
+   GroupInf inf[32];
 
-   for (int i=0; i<256; i++) { m[i]= i; }
-   s= t0= 0x01;
-   do
+   int nG= c8sGetPattern(patBuf, inf);
+   int j= 0, k= 0;
+   for (int iG=0; iG<nG; iG++)
    {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 1;
-   } while (s < 256);
-   s= t0= 0x03;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x05;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x0A;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x0F;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 4;
-   } while (s < 256);
-   for (int i=0; i<256; i++)
-   {
-      if (i != m[i]) { LOG("[%02X]=%02X\n", i, m[i]); n++; }
+      const int n= inf[iG].count;
+      LOG("\n%d: ", n);
+      for (int i=0; i<n; i++) { k= patBuf[j+i]; LOG("%d ", gWEP3[k]); }
+      j+= n;
    }
-   LOG("n=%u\n", n);
-} // symTst
-
+   LOG("%s", "\n***\n");
+} // measurePatternTest
 
 void mkfuTest (void)
 {
+   return measurePatternTest();
    U8 d[33]={0};
    //I8 v[16], nV=0;
    int s=0;
