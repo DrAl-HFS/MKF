@@ -153,14 +153,28 @@ int rotatePatternNoID (uint8_t r[], const uint8_t pattern)
    int nB= patternToPackV(&v0, pattern, align);
    if (nB > 0)
    {
+      PackV vR[3];
       uint32_t m[3];
       genRotMasks(m, nB, align);
 
-      for (int axis= ROT_AXIS_X; axis<= ROT_AXIS_Z; axis++)
+      for (int axis= ROT_AXIS_Z; axis>= ROT_AXIS_X; axis--)
       {
-         PackV vR= rotatePackV(v0, axis, m);
-         r[nR]= packVToPattern(&vR, nB, align);
+         vR[nR]= rotatePackV(v0, axis, m);
+         r[nR]= packVToPattern(vR+nR, nB, align);
          nR+= (r[nR] != pattern);
+      }
+      if (nB > 4) // unnecessary ???
+      {  // Up to 9 composite rotations
+         int nR0= nR;
+         for (int i= 0; i<nR0; i++)
+         {
+            for (int axis= ROT_AXIS_Z; axis>= ROT_AXIS_X; axis--)
+            {
+               PackV tR= rotatePackV(vR[i], axis, m);
+               r[nR]= packVToPattern(&tR, nB, align);
+               nR+= (r[nR] != pattern);
+            }
+         }
       }
    }
    return(nR);
@@ -188,9 +202,9 @@ int copyPatternUnique (uint8_t r[], int nR, const uint8_t v[], int n)
 } // copyPatternUnique
 
 
-void dump (uint8_t pat[], int n, const char *id)
+void dump (uint8_t pat[], int n, const char *id, const char *fmt)
 {
-   LOG("%s[%d]=", id, n); for (int i=0; i < n; i++) { LOG("0x%02X ", pat[i]); } LOG("%s", "\n");
+   LOG("%s[%d]=", id, n); for (int i=0; i < n; i++) { LOG(fmt, pat[i]); } LOG("%s", "\n");
 } // dump
 
 // Permute pattern geometry
@@ -199,15 +213,18 @@ int permPatGeom (uint8_t v[], uint8_t u)
    int r, m, t, n= 0;
 
    v[n++]= u;
-   dump(v, n, "\nP");
+   dump(v, n, "\nP", "0x%02X ");
    r= rotatePatternNoID(v+n, v[n-1]);
    // when nB = 3,4 need composite rotation .?.
-   dump(v+n,r," R");
+   dump(v+n,r," R", "0x%02X ");
    t= n + r;
+   m= mirrorPatternNoID(v+t, u);
+   dump(v+t, m, "  M", "0x%02X ");
+   t+= m;
    for (int i=0; i < r; i++)
    {
       m= mirrorPatternNoID(v+t, v[n+i]);
-      dump(v+t, m, "  M");
+      dump(v+t, m, "  M", "0x%02X ");
       t+= m;
    }
    n= copyPatternUnique(v, n, v+n, t-n);
@@ -217,36 +234,73 @@ int permPatGeom (uint8_t v[], uint8_t u)
 
 static const uint8_t gBasePat234[]=
 {  // 0x00, 0x01 trivial base patterns
-   0x03,0x09,0x81, // 2E (R1, R2, R3)
-   0x07,0x43,0x83, // 3E "L"
-   0x0F,0xC3,0x66,0x69  // 4E
+   0x03,0x09,0x18, // 2E "I" (d= R1, R2, R3)
+   0x07,0x43,0x16, // 3E "L" (d= R1-R1, R1-R2, R2-R2)
+   0x0F,0x17,0x27, // 4E "X" "T" "S" (d= R1*4)
+   0x3C,0x69,0x87  // 4E "X" "?"
 }; // Remaining patterns (5E-8E) are complements of 3E-0E
+
+typedef struct
+{
+   uint8_t bits, count;
+} GroupInf;
+void setInf (GroupInf *pInf, uint8_t b, uint8_t n) { pInf->bits= b; pInf->count= n; }
 
 void c8sTest (void)
 {
    uint8_t patBuf[256]; //, tmp[16];
+   uint8_t groupMap[256];
+   GroupInf inf[32];
    LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
 
-   int t= 0, n= 0, nBP;
+   int tG= 0, n= 0, b, nBP, iG=0, nG, cG, uG, tC=0;
 
    LOG("\n%s\n", "Pattern Groups:");
+   memset(patBuf,0x00,256);
+   memset(groupMap,0xFF,256);
 
-   patBuf[n++]= 0x00; dump(patBuf+t, n, "G");
-   t+= n;
+   patBuf[n++]= 0x00; dump(patBuf+tG, n, "G", "0x%02X ");
+   setInf(inf+iG++, 0, n);
+   tG+= n;
 
-   for (n= 0; n < 8; n++) { patBuf[t+n]= 1 << n; } dump(patBuf+t, n, "G");
-   t+= n;
+   for (n= 0; n < 8; n++) { patBuf[tG+n]= 1 << n; } dump(patBuf+tG, n, "G", "0x%02X ");
+   setInf(inf+iG++, 1, n);
+   tG+= n;
 
    nBP= sizeof(gBasePat234);
    for (int iBP= 0; iBP < nBP; iBP++)
    {
-      n= permPatGeom(patBuf+t, gBasePat234[iBP]);
-      dump(patBuf+t, n, "G");
-      t+= n;
+      n= permPatGeom(patBuf+tG, gBasePat234[iBP]);  dump(patBuf+tG, n, "G", "0x%02X ");
+      setInf(inf+iG++, bitCountZ(gBasePat234[iBP]), n);
+      tG+= n;
    }
-   n= copyPatternUnique(patBuf, t, patBuf, t);
+   nG= iG;
+   cG= 8;   // groups to complement
+   nG+=  cG;
+   uG= nG-1;
+#if 1
+   for (int i= 0; i<cG; i++) { setInf(inf+uG-i, 8-inf[i].bits, inf[i].count); tC+= inf[i].count;  }
+   tG+= tC;
+   for (int i= 0; i<tC; i++) { patBuf[0xFF-i]= patBuf[i] ^ 0xFF; }
+#endif
+   int k=0;
+   for (int iG=0; iG<nG; iG++)
+   {
+      b= inf[iG].bits;
+      n= inf[iG].count;
+      LOG("[%2d]: {%d,%2d} (k=%d)\n", iG, b, n, k);
+      for (int j=0; j<n; j++)
+      {
+         uint8_t pattern= patBuf[k+j];
+         groupMap[ pattern ]= iG;
+      }
+      k+= n;
+   }
+   dump(groupMap, 256, "groupMap", "%d ");
 
-   LOG("\nt=%d n=%d\n***\n", t, n);
+   n= copyPatternUnique(patBuf, tG, patBuf, tG);
+
+   LOG("\nnG=%d, tG=%d tC=%d n=%d\n***\n", nG, tG, tC, n);
    //simpleTests();
 } // c8sTest
 
