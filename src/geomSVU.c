@@ -23,6 +23,14 @@ int *addKNI (int r[], const int a[], const int n, const int k)
    return(r);
 } // addKNI
 
+int sumNI (const int v[], int n)
+{
+   long int s= v[0];
+   for (int i=1; i<n; i++) { s+= v[i]; }
+   if ((int)s != s) { ERROR_CALL("() - overflow (0x%x)\n", s); }
+   return(s);
+} // sumNF
+
 int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n)
 {
    int d=0;
@@ -64,6 +72,13 @@ float *sqrNF (float r[], const int n, const float v[])
    for (int i=0; i<n; i++) { r[i]= v[i] * v[i]; }
    return(r);
 } // sqrNF
+
+float sumNF (const float v[], int n)
+{
+   float s= v[0];
+   for (int i=1; i<n; i++) { s+= v[i]; }
+   return(s);
+} // sumNF
 
 float sqrMag3D (const float dx, const float dy, const float dz) { return(dx*dx + dy*dy + dz*dz); }
 

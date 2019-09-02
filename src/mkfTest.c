@@ -82,56 +82,53 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flag
    return(nDiff);
 } // compareNZ
 
+void reportMeasures (const size_t a[256], const float mScale)
+{
+   float m[4];
+   if (refMeasures(m, a, mScale))
+   {
+      LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+   }
+} // reportMeasures
+
 int main (int argc, char *argv[])
 {
    int id=4, def[3]= {256+1,256, 256}; //256};
    BinMapF32 bmc;
-   size_t aBPFD[256]={0,}, aBPFD2[256]={0,};
+   size_t *pBPFD, aBPFD1[256]={0,}, aBPFD2[256]={0,};
    Context cux={0};
 
-   geomTest(2,2);
+   //geomTest(2,2);
    //mkfuTest();
+   //printf("long int = %dbytes\n", sizeof(long int));
    if (buffAlloc(&cux,def))
    {
       const float param= 256-64; //midRangeHNI(def,3)-3;
+      const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
       float vfR= genPattern(cux.pHF, id, def, param);
       float m[4];
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc();
       LOG("%smkfAccGetBPFDSimple() - \n", "***\n");
-      mkfAccGetBPFDSimple(aBPFD, cux.pHU, cux.pHF, def, &bmc);
-      if (refMeasures(m, aBPFD, 1.0/257))
-      {
-         LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
-      }
+      mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
+      reportMeasures(aBPFD1, mScale);
       //LOG("\tvolFrac=%G (ref=%G, vf8=%G) chiEP=%G (ref=%G)\n", volFrac(aBPFD), vfR, volFrac8(aBPFD), chiEP3(aBPFD), 4 * M_PI);
-
-
-      SWAP(int,def[0],def[2]);
-      vfR= genPattern(cux.pHF, id, def, param);
-      mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
-      if (refMeasures(m, aBPFD2, 1.0/257))
-      {
-         LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
-      }
-      compareNZ(aBPFD, aBPFD2, MKF_BINS, 0x0);
 
 #ifdef MKF_CUDA
       LOG("mkfCUDAGetBPFDautoCtx() - %G\n", bmc.t[0]);
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
-      {
-         size_t *pBPFD= cux.pHZ;
-
-         //pBPFD[0xFF]= aBPFD[0xFF]; // HAAACK!
-         LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
-         //checkNZ(pBPFD, 256, "[%d]=%zu\n");
-         //checkNZ(cux.pHU, cux.nU, NULL); // "[%d]: 0x%04X\n"
-         compareNZ(aBPFD, pBPFD, MKF_BINS, 1);
+      {  pBPFD= cux.pHZ;
+         reportMeasures(pBPFD, mScale);
+         compareNZ(aBPFD1, pBPFD, MKF_BINS, 1);
       }
-#else
-      //checkNZ(aBPFD, MKF_BINS, "[%d]=%zu\n");
 #endif
+
+      SWAP(int,def[0],def[2]);
+      vfR= genPattern(cux.pHF, id, def, param);
+      mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
+      reportMeasures(aBPFD2, mScale);
+      compareNZ(aBPFD1, aBPFD2, MKF_BINS, 0x0);
    }
    buffRelease(&cux);
 	return(0);
