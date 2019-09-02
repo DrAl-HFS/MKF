@@ -19,9 +19,9 @@ BUILD := NCRMNTL
 CC := pgcc
 CCPP := pgc++ -std=c++11
 LIBDEF += -lstdc++
-OPT := -O3
-#OPT := -g -O0
-ACC := -Mautoinline -acc=verystrict -ta=multicore
+#OPT := -O3
+OPT := -g -O0
+ACC := -Mautoinline -acc=verystrict -ta=multicore,tesla
 # -Minfo=all
 # multicore,tesla
 
@@ -79,6 +79,7 @@ OBJ += $(CU_OBJ)
 LIBDEF += -L$(CULBPATH) -lcudart
 
 INCDEF += -DMKF_CUDA
+INCDEF += -DMKF_ACC_CUDA_INTEROP
 
 %.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
 	$(NVCC) $(NVOPT) $(INCDEF) $< -c
