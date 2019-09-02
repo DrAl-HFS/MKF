@@ -97,7 +97,7 @@ int main (int argc, char *argv[])
 {
    int id=4, def[3]= {256+1,256, 256}; //256};
    BinMapF32 bmc;
-   size_t *pBPFD, aBPFD1[256]={0,}, aBPFD2[256]={0,};
+   size_t *pBPFD, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
    Context cux={0};
 
    //geomTest(2,2);
@@ -116,7 +116,7 @@ int main (int argc, char *argv[])
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc(0);
-      LOG("%smkfAccGetBPFDSimple(%p) - \n", aBPFD1);
+      LOG("mkfAccGetBPFDSimple(%p) - \n", aBPFD1);
       mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
       reportMeasures(aBPFD1, mScale);
 
