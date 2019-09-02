@@ -6,6 +6,7 @@
 #define MKF_ACC_H
 
 #include "binMapACC.h"
+#include "mkfUtil.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,8 +25,13 @@ typedef double MKMeasureVal;
 //extern int addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int rowStride, const int n);
 
 // Simple version for basic testing
-extern void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 *pBM, const F32 *pF, const int def[3], const BinMapF32 *pC);
+extern int mkfAccGetBPFDSimple (size_t rBPFD[MKF_BINS], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 *pC);
 
+#ifdef MKF_ACC_CUDA_INTEROP
+
+extern int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const int def[3], const BinMapF32 * const pC);
+
+#endif // MKF_ACC_CUDA_INTEROP
 
 #ifdef __cplusplus
 } // extern "C"

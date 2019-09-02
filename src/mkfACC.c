@@ -146,14 +146,23 @@ ACC_INLINE void addRowBPFD
 
 /***/
 
-void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 * const pC)
+int mkfAccGetBPFDSimple
+(
+   size_t   rBPFD[MKF_BINS],
+   U32          * restrict pBM,
+   const F32   * restrict pF,
+   const int   def[3],
+   const BinMapF32   * const pC
+)
 {
    const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
    const int planeStride= rowStride * def[1];
    //const int volStride= planeStride * def[2];
    const int nF= def[0]*def[1]*def[2];
 
-   #pragma acc data present_or_create( pBM[:(planeStride * def[2])] ) present_or_copyin( pF[:nF], def[:3], pC[:1] ) copy( rBPFD[:256] )
+   #pragma acc data  present_or_create( pBM[:(planeStride * def[2])] ) \
+                     present_or_copyin( pF[:nF], def[:3], pC[:1] )  \
+                     copy( rBPFD[:MKF_BINS] )
    {  // #pragma acc parallel vector ???
       if ((rowStride<<5) == def[0])
       {  // Multiple of 32
@@ -179,5 +188,31 @@ void mkfAccGetBPFDSimple (size_t rBPFD[256], U32 * restrict pBM, const F32 * res
          }
       }
    }
+   return(1);
 } // mkfAccGetBPFDSimple
 
+#if 1 //def ACC_CUDA_INTEROP
+
+#include <openacc.h> // -> /opt/pgi/linux86-64/2019/include/openacc.h
+
+#include "mkfCUDA.h"
+//#include "binMapCUDA.h"
+
+int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const int def[3], const BinMapF32 * const pMC)
+{
+   const int nF= def[0]*def[1]*def[2];
+   BMStrideDesc sd;
+   const size_t nBM= setBMSD(&sd, def, 0);
+   //(planeStride * def[2])
+   acc_set_device_num( 0, acc_device_nvidia ); // HACKY
+   #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF], def[:3], sd, pMC[:1] ) copy( rBPFD[:MKF_BINS] )
+   {
+      #pragma acc host_data use_device(pBM, pF, def, sd, pMC)
+      binMapCudaRowsF32(pBM, pF, def[0], sd.row, def[1] * def[2], pMC);
+      #pragma acc host_data use_device(rBPFD, def, sd, pBM)
+      mkfCUDAGetBPFD(rBPFD, def, &sd, pBM);
+   }
+   return(1);
+} // mkfAccCUDAGetBPFD
+
+#endif // ACC_CUDA_INTEROP
