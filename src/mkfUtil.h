@@ -6,6 +6,7 @@
 #define MKF_UTIL_H
 
 #include "util.h"
+#include "cell8Sym.h"
 
 #ifdef __cplusplus
 extern "C" {

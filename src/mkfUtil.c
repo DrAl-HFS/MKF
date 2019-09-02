@@ -3,34 +3,17 @@
 // (c) Project Contributors June 2019
 
 #include "mkfUtil.h"
+#include "cell8Sym.h"
 
 
 /***/
 
 #include "weighting.inc"
-#include "volfrac.c"
-#include "specsurf.c"
-#include "specimc.c"
-#include "specitc.c"
+#include "refMeasures.inc"
 
+//int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s) { ... }
 
 /***/
-
-int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s)
-{
-   if (sizeof(long int) == sizeof(size_t))
-   {
-      long int *pI= aBPFD;
-      double res[3]={s,s,s};
-      m[0]= specitc(pI, res);
-      m[1]= specimc(pI, res);
-      m[2]= specsurf(pI, res);
-      m[3]= volfrac(pI);
-      return(4);
-   }
-   //else
-   return(0);
-} // refMeasures
 
 float volFrac (const size_t aBPFD[MKF_BINS])
 {
@@ -66,100 +49,28 @@ float chiEP3 (const size_t aBPFD[MKF_BINS])
 } // chiEP3
 
 
-void symTst (void)
+/***/
+
+static void measurePatternTest (void)
 {
-   U16 s;
-   U8 m[1<<8];
-   U8 s0, t0, n=0;
+   uint8_t patBuf[CELL8_PATTERNS];
+   GroupInf inf[CELL8_SYMM_GROUPS];
 
-   for (int i=0; i<256; i++) { m[i]= i; }
-   s= t0= 0x01;
-   do
+   LOG_CALL("() [FP=%p] GroupInf=%d\n",__builtin_frame_address(0), sizeof(GroupInf));
+   int nG= c8sGetPattern(patBuf, inf);
+   int j= 0, k= 0;
+   for (int iG=0; iG<nG; iG++)
    {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 1;
-   } while (s < 256);
-   s= t0= 0x03;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x05;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x0A;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 2;
-   } while (s < 256);
-   s= t0= 0x0F;
-   do
-   {
-      s0= s & 0xFF;
-      m[s0]= t0;
-      s0^= 0xFF;
-      m[s0]= t0^0xFF;
-      s<<= 4;
-   } while (s < 256);
-   for (int i=0; i<256; i++)
-   {
-      if (i != m[i]) { LOG("[%02X]=%02X\n", i, m[i]); n++; }
+      const int n= inf[iG].count;
+      LOG("\nG[%d] n=%d: ", iG, n);
+      for (int i=0; i<n; i++) { k= patBuf[j+i]; LOG("%d ", gWEP3[k]); }
+      j+= n;
    }
-   LOG("n=%u\n", n);
-} // symTst
-
+   LOG("%s", "\n***\n");
+} // measurePatternTest
 
 void mkfuTest (void)
 {
-   U8 d[33]={0};
-   //I8 v[16], nV=0;
-   int s=0;
-   //rangeNI(mm,
-   for (int i= 0; i<256; i++)
-   {
-      U8 b= 16+gWEP3[i];
-      d[b]++;
-   }
-   for (int i= -16; i<=16; i++)
-   {
-      U8 z, lz=-1;
-      U8 n= d[16+i];
-      if (0 != n)
-      {
-         //v[nV++]= i;
-         LOG("\n%+d : [%u]= ", i, n);
-         s+= n;
-         for (int j= 0; j<256; j++)
-         {
-            if (gWEP3[j] == i)
-            {
-               LOG("%02X ", j);
-               z= bitCountZ(j);
-               if (z != lz)
-               {
-                  lz= z;
-                  LOG("(z=%u) ", z);
-               }
-            }
-         }
-      }
-   }
-   LOG("\ns=%d\n***\n", s);
+   LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
+   measurePatternTest();
 } // mkfuTest

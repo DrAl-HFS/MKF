@@ -26,7 +26,7 @@ ACC := -Mautoinline -acc=verystrict -ta=multicore
 # multicore,tesla
 
 else # Default compiler gcc / clang, assume no ACC
-BUILD := FLLSRC
+#BUILD := FLLSRC
 CC := gcc -Wall
 CCPP := g++
 LIBDEF += -lstdc++
@@ -44,7 +44,7 @@ ACC ?=
 
 TARGET := mkft
 MAKEFILE := $(TARGET).make
-BUILD ?= FLLSRC
+BUILD ?= INCREMENTAL
 
 SRC_DIR := src
 HDR_DIR := $(SRC_DIR)
