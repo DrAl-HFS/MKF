@@ -7,12 +7,21 @@
 // If the eight vertex locations of a cube are interpreted as a 3-tuple of 1bit coordinates
 // labelled (X,Y,Z) Cartesian fashion then vertex locations correspond to three-bit binary
 // numbers: 000, 001 ... 110, 111 equal to 0, 1 ... 6, 7 in decimal notation.
-// The three rotations: (X,Y,Z) -> (X,Z,Y), (Z,Y,X), (Y,X,Z) and three reflections (one per axis)
-// yield six basic symmetry-preserving transformations. This suggests (2^6)-1 = 63 combinations
-// but does not account for the non-commutativity of 3D rotation. As reflection is commutative
-// and repetitions cancel there are only seven combinations - these are easily dealt with.
-//
-// (In the extreme case !6 = 6!+5!+4!+3!+2!+1! = 873 total patterns.)
+// The three rotations: RX(X,Y,Z) -> (X,Z,-Y), RY(X,Y,Z) -> (Z,Y,-X), RZ(X,Y,Z) -> (Y,X,-Z)
+// and three reflections (one per axis) yield six basic symmetry-preserving transformations.
+// This alone suggests ((2^3)*(2^3))-1 = 63 possible combinations, without considering the non-
+// commutativity of 3D rotation. For any concatenated pair of such rotations (one or both of
+// which may be a zero or null rotation) this suggests at most (3+1)^2=16 possibilities, but
+// there is some redundancy therein (e.g. sequences of rotations about a single common axis).
+// In the extreme case of six non-commutative transformations there would be :
+//    !6 = 6!+5!+4!+3!+2!+1! = 873 total patterns.
+// Happily, it seems that primitive rotations, in conjunction with all possible reflections,
+// are sufficient to obtain the holomorphic group (homomorphs plus enantiomorphs) of a 3D cubic
+// cell vertex pattern. There are at most 24 members of such a group, suggesting three rotation
+// (one of which is null) times eight mirroring operations might be sufficient. However,
+// determining which transformations are superfluous requires a difficult analysis of the
+// starting pattern and so it is easier to evaluate 4*8=32 combined transformations, and then
+// eliminate duplicates.
 
 //const uint32_t gRRMask[]={0x11111111,0x22222222,0x44444444,0x33333333,0x55555555,0x66666666,0x77777777}; // X,Y,Z,XY,XZ,YZ,XYZ
 
@@ -231,6 +240,21 @@ static int permPatGeom (uint8_t v[], uint8_t u)
    return(n);
 } // permPatGeom
 
+int complementGroups (const int nC, const int nG, uint8_t patBuf[], GroupInf inf[])
+{
+   const int lG= nG+nC-1;
+   int tC= 0;
+   for (int i= 0; i<nC; i++)
+   {
+      const int iC= lG-i;
+      inf[iC]= inf[i];
+      inf[iC].bits= 8 - inf[iC].bits;
+      tC+= inf[iC].count;
+   }
+   for (int i= 0; i<tC; i++) { patBuf[0xFF-i]= patBuf[i] ^ 0xFF; }
+   return(nG+nC);
+} // complementGroups
+
 static const uint8_t gBasePat234[]=
 {  // 0x00, 0x01 trivial base patterns
    0x03,0x09,0x18, // 2E "I" (d= R1, R2, R3)
@@ -239,7 +263,8 @@ static const uint8_t gBasePat234[]=
    0x3C,0x69,0x87  // 4E "X" "?"
 }; // Remaining patterns (5E-8E) are complements of 3E-0E
 
-static void setInf (GroupInf *pInf, uint8_t b, uint8_t n) { pInf->bits= b; pInf->count= n; }
+static void setInf (GroupInf *pInf, uint8_t b, uint8_t n, uint8_t f, uint8_t e, uint8_t v)
+   { pInf->bits= b; pInf->count= n; pInf->nF= f; pInf->nE= e; pInf->nV= v; }
 
 
 /* Interface */
@@ -247,36 +272,28 @@ int c8sGetPattern (uint8_t patBuf[256], GroupInf inf[32])
 {
    LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
 
-   int tG= 0, n= 0, b, nBP, iG=0, nG, cG, uG, tC=0;
+   const int nBP= sizeof(gBasePat234);
+   int iG=0, tG= 0, n= 0;
 
    LOG("\n%s\n", "Pattern Groups:");
    memset(patBuf,0x00,256);
 
    patBuf[n++]= 0x00; dump(patBuf+tG, n, "G", "0x%02X ");
-   setInf(inf+iG++, 0, n);
+   setInf(inf+iG++, 0, n, 0, 0, 0);
    tG+= n;
 
    for (n= 0; n < 8; n++) { patBuf[tG+n]= 1 << n; } dump(patBuf+tG, n, "G", "0x%02X ");
-   setInf(inf+iG++, 1, n);
+   setInf(inf+iG++, 1, n, 1, 3, 3);
    tG+= n;
 
-   nBP= sizeof(gBasePat234);
    for (int iBP= 0; iBP < nBP; iBP++)
    {
       n= permPatGeom(patBuf+tG, gBasePat234[iBP]);  dump(patBuf+tG, n, "G", "0x%02X ");
-      setInf(inf+iG++, bitCountZ(gBasePat234[iBP]), n);
+      setInf(inf+iG++, bitCountZ(gBasePat234[iBP]), n, 1, 4, 4);
       tG+= n;
    }
-   nG= iG;
-   cG= 8;   // groups to complement
-   nG+=  cG;
-   uG= nG-1;
 
-   for (int i= 0; i<cG; i++) { setInf(inf+uG-i, 8-inf[i].bits, inf[i].count); tC+= inf[i].count;  }
-   tG+= tC;
-   for (int i= 0; i<tC; i++) { patBuf[0xFF-i]= patBuf[i] ^ 0xFF; }
-
-   return(nG);
+   return complementGroups(8, iG, patBuf, inf);
 } // c8sGetPattern
 
 int c8sGetMap (uint8_t groupMap[256])

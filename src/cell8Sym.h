@@ -13,7 +13,7 @@ extern "C" {
 
 typedef struct
 {
-   uint8_t bits, count;
+   uint8_t bits, count, nF, nE, nV; // pad[3];
 } GroupInf;
 
 extern int c8sGetPattern (uint8_t patBuf[256], GroupInf inf[32]);
