@@ -265,16 +265,23 @@ static const uint8_t gBasePat234[]=
    0x0F,0x17,0x27, // 4E "X" "T" "S" (d= R1*4)
    0x3C,0x69,0x87  // 4E "X" "?"
 }; // Remaining patterns (5E-8E) are complements of 3E-0E
-
-static void setInf (GroupInf *pInf, uint8_t b, uint8_t n, uint8_t f, uint8_t e, uint8_t v)
-   { pInf->bits= b; pInf->count= n; pInf->nF= f; pInf->nE= e; pInf->nV= v; }
+static const TFCounts gFEV234[]=
+{  // HACKS!
+   {1,4,4},{2,6,6},{4,12,8},
+   {2,4,5},{3,7,7},{5,7,7},
+   {4,4,4},{2,6,5},{4,7,5},
+   {8,7,9},{9,8,11},{10,11,12},
+};
+static void setInf (GroupInf *pInf, uint8_t b, uint8_t n, TFCounts t)
+   { pInf->bits= b; pInf->count= n; pInf->tfc= t; }
 
 
 /* Interface */
 int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUPS])
 {
+   TFCounts t={0,0,0};
    const int nBP= sizeof(gBasePat234);
-   int iG=0, n= 0, tG= 0;
+   int iG=0, iPB= 0;
    int verbose= 0;
 
    if (verbose)
@@ -284,22 +291,24 @@ int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUP
       memset(patBuf,0x00,256);
    }
 
-   patBuf[n++]= 0x00;
-   setInf(inf+iG++, 0, n, 0, 0, 0);
-   if (verbose) { dump(patBuf+tG, n, "G", "0x%02X "); }
-   tG+= n;
+   patBuf[0]= 0x00;
+   setInf(inf+iG++, 0, 1, t);
+   if (verbose) { dump(patBuf+0, 1, "G", "0x%02X "); }
+   iPB= 1;
 
-   for (n= 0; n < 8; n++) { patBuf[tG+n]= 1 << n; }
-   setInf(inf+iG++, 1, n, 1, 3, 3);
-   if (verbose) { dump(patBuf+tG, n, "G", "0x%02X "); }
-   tG+= n;
+   for (int n= 0; n < 8; n++) { patBuf[iPB+n]= 1 << n; }
+   setInf(inf+iG++, 1, 8, t);
+   if (verbose) { dump(patBuf+iPB, 8, "G", "0x%02X "); }
+   iPB+= 8;
 
    for (int iBP= 0; iBP < nBP; iBP++)
    {
-      n= permPatGeom(patBuf+tG, gBasePat234[iBP]);
-      setInf(inf+iG++, bitCountZ(gBasePat234[iBP]), n, 1, 4, 4);
-      if (verbose) { dump(patBuf+tG, n, "G", "0x%02X "); }
-      tG+= n;
+      const uint8_t pattern= gBasePat234[iBP];
+      const uint8_t b= bitCountZ(pattern);
+      const uint8_t n= permPatGeom(patBuf+iPB, pattern);
+      setInf(inf+iG++, b, n, gFEV234[iBP]);
+      if (verbose) { dump(patBuf+iPB, n, "G", "0x%02X "); }
+      iPB+= n;
    }
 
    return complementGroups(8, iG, patBuf, inf);

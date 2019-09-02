@@ -56,7 +56,7 @@ static void measurePatternTest (void)
    uint8_t patBuf[CELL8_PATTERNS];
    GroupInf inf[CELL8_SYMM_GROUPS];
 
-   LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
+   LOG_CALL("() [FP=%p] GroupInf=%d\n",__builtin_frame_address(0), sizeof(GroupInf));
    int nG= c8sGetPattern(patBuf, inf);
    int j= 0, k= 0;
    for (int iG=0; iG<nG; iG++)

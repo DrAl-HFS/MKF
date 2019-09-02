@@ -14,10 +14,20 @@ extern "C" {
 #define CELL8_PATTERNS  (256)
 #define CELL8_SYMM_GROUPS (22)
 
+#pragma pack(1)
+typedef struct
+{  // Topological Feature Counts
+   unsigned f : 4;
+   unsigned e : 4;
+   unsigned v : 4;
+} TFCounts;
+
 typedef struct
 {
-   uint8_t bits, count, nF, nE, nV; // pad[3];
+   uint8_t bits, count;
+   TFCounts tfc;
 } GroupInf;
+#pragma pack(4)
 
 extern int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUPS]);
 
