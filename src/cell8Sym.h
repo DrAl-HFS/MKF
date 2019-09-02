@@ -11,14 +11,17 @@
 extern "C" {
 #endif
 
+#define CELL8_PATTERNS  (256)
+#define CELL8_SYMM_GROUPS (22)
+
 typedef struct
 {
    uint8_t bits, count, nF, nE, nV; // pad[3];
 } GroupInf;
 
-extern int c8sGetPattern (uint8_t patBuf[256], GroupInf inf[32]);
+extern int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUPS]);
 
-extern int c8sGetMap (uint8_t map[256]);
+extern int c8sGetMap (uint8_t map[CELL8_PATTERNS]);
 
 extern void c8sTest (void);
 

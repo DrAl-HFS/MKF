@@ -48,17 +48,21 @@ float chiEP3 (const size_t aBPFD[MKF_BINS])
    return( (float) k * M_PI / 6 );
 } // chiEP3
 
-void measurePatternTest (void)
-{
-   uint8_t patBuf[256];
-   GroupInf inf[32];
 
+/***/
+
+static void measurePatternTest (void)
+{
+   uint8_t patBuf[CELL8_PATTERNS];
+   GroupInf inf[CELL8_SYMM_GROUPS];
+
+   LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
    int nG= c8sGetPattern(patBuf, inf);
    int j= 0, k= 0;
    for (int iG=0; iG<nG; iG++)
    {
       const int n= inf[iG].count;
-      LOG("\n%d: ", n);
+      LOG("\nG[%d] n=%d: ", iG, n);
       for (int i=0; i<n; i++) { k= patBuf[j+i]; LOG("%d ", gWEP3[k]); }
       j+= n;
    }
@@ -67,39 +71,6 @@ void measurePatternTest (void)
 
 void mkfuTest (void)
 {
-   return measurePatternTest();
-   U8 d[33]={0};
-   //I8 v[16], nV=0;
-   int s=0;
-   //rangeNI(mm,
-   for (int i= 0; i<256; i++)
-   {
-      U8 b= 16+gWEP3[i];
-      d[b]++;
-   }
-   for (int i= -16; i<=16; i++)
-   {
-      U8 z, lz=-1;
-      U8 n= d[16+i];
-      if (0 != n)
-      {
-         //v[nV++]= i;
-         LOG("\n%+d : [%u]= ", i, n);
-         s+= n;
-         for (int j= 0; j<256; j++)
-         {
-            if (gWEP3[j] == i)
-            {
-               LOG("%02X ", j);
-               z= bitCountZ(j);
-               if (z != lz)
-               {
-                  lz= z;
-                  LOG("(z=%u) ", z);
-               }
-            }
-         }
-      }
-   }
-   LOG("\ns=%d\n***\n", s);
+   LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
+   measurePatternTest();
 } // mkfuTest

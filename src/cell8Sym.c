@@ -220,20 +220,23 @@ static void dump (uint8_t pat[], int n, const char *id, const char *fmt)
 static int permPatGeom (uint8_t v[], uint8_t u)
 {
    int r, m, t, n= 0;
+   int verbose= 0;
 
    v[n++]= u;
-   dump(v, n, "\nP", "0x%02X ");
+   if (verbose) { dump(v, n, "\nP", "0x%02X "); }
+
    r= rotatePatternNoID(v+n, v[n-1]);
-   // when nB = 3,4 need composite rotation .?.
-   dump(v+n,r," R", "0x%02X ");
+   if (verbose) { dump(v+n,r," R", "0x%02X "); }
    t= n + r;
+
    m= mirrorPatternNoID(v+t, u);
-   dump(v+t, m, "  M", "0x%02X ");
+   if (verbose) { dump(v+t, m, "  M", "0x%02X "); }
    t+= m;
+
    for (int i=0; i < r; i++)
    {
       m= mirrorPatternNoID(v+t, v[n+i]);
-      dump(v+t, m, "  M", "0x%02X ");
+      if (verbose) { dump(v+t, m, "  M", "0x%02X "); }
       t+= m;
    }
    n= copyPatternUnique(v, n, v+n, t-n);
@@ -268,38 +271,44 @@ static void setInf (GroupInf *pInf, uint8_t b, uint8_t n, uint8_t f, uint8_t e, 
 
 
 /* Interface */
-int c8sGetPattern (uint8_t patBuf[256], GroupInf inf[32])
+int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUPS])
 {
-   LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
-
    const int nBP= sizeof(gBasePat234);
-   int iG=0, tG= 0, n= 0;
+   int iG=0, n= 0, tG= 0;
+   int verbose= 0;
 
-   LOG("\n%s\n", "Pattern Groups:");
-   memset(patBuf,0x00,256);
+   if (verbose)
+   {
+      LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
+      LOG("\n%s\n", "Pattern Groups:");
+      memset(patBuf,0x00,256);
+   }
 
-   patBuf[n++]= 0x00; dump(patBuf+tG, n, "G", "0x%02X ");
+   patBuf[n++]= 0x00;
    setInf(inf+iG++, 0, n, 0, 0, 0);
+   if (verbose) { dump(patBuf+tG, n, "G", "0x%02X "); }
    tG+= n;
 
-   for (n= 0; n < 8; n++) { patBuf[tG+n]= 1 << n; } dump(patBuf+tG, n, "G", "0x%02X ");
+   for (n= 0; n < 8; n++) { patBuf[tG+n]= 1 << n; }
    setInf(inf+iG++, 1, n, 1, 3, 3);
+   if (verbose) { dump(patBuf+tG, n, "G", "0x%02X "); }
    tG+= n;
 
    for (int iBP= 0; iBP < nBP; iBP++)
    {
-      n= permPatGeom(patBuf+tG, gBasePat234[iBP]);  dump(patBuf+tG, n, "G", "0x%02X ");
+      n= permPatGeom(patBuf+tG, gBasePat234[iBP]);
       setInf(inf+iG++, bitCountZ(gBasePat234[iBP]), n, 1, 4, 4);
+      if (verbose) { dump(patBuf+tG, n, "G", "0x%02X "); }
       tG+= n;
    }
 
    return complementGroups(8, iG, patBuf, inf);
 } // c8sGetPattern
 
-int c8sGetMap (uint8_t groupMap[256])
+int c8sGetMap (uint8_t groupMap[CELL8_PATTERNS])
 {
-   uint8_t patBuf[256];
-   GroupInf inf[32];
+   uint8_t patBuf[CELL8_PATTERNS];
+   GroupInf inf[CELL8_SYMM_GROUPS];
    int nG= c8sGetPattern(patBuf, inf);
    if (nG > 0)
    {
