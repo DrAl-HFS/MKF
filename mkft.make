@@ -23,7 +23,7 @@ LIBDEF += -lstdc++
 OPT := -g -O0
 ACC := -Mautoinline -acc=verystrict -ta=multicore,tesla
 # -Minfo=all
-# multicore,tesla
+# multicore,tesla:cc50
 
 else # Default compiler gcc / clang, assume no ACC
 #BUILD := FLLSRC
@@ -78,7 +78,7 @@ OBJ += $(CU_OBJ)
 
 LIBDEF += -L$(CULBPATH) -lcudart
 
-INCDEF += -DMKF_CUDA
+#INCDEF += -DMKF_CUDA
 INCDEF += -DMKF_ACC_CUDA_INTEROP
 
 %.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
