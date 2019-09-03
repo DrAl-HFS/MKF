@@ -110,7 +110,6 @@ int main (int argc, char *argv[])
       const float param= 256-64; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
       float vfR= genPattern(cux.pHF, id, def, param);
-      float m[4];
 
       if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 
@@ -120,8 +119,6 @@ int main (int argc, char *argv[])
       mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
       reportMeasures(aBPFD1, mScale);
 
-#ifdef MKF_CUDA
-
 #ifdef MKF_ACC_CUDA_INTEROP
       LOG("mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
       if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
@@ -129,8 +126,9 @@ int main (int argc, char *argv[])
          reportMeasures(aBPFD2, mScale);
          compareNZ(aBPFD1, aBPFD2, MKF_BINS, 1);
       }
-#endif
+#endif // MKF_ACC_CUDA_INTEROP
 
+#ifdef MKF_CUDA
       LOG("mkfCUDAGetBPFDautoCtx(%p) - \n", cux.pHZ);
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
       {  pBPFD= cux.pHZ;

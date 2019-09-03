@@ -29,7 +29,7 @@ int sumNI (const int v[], int n)
    for (int i=1; i<n; i++) { s+= v[i]; }
    if ((int)s != s) { ERROR_CALL("() - overflow (0x%x)\n", s); }
    return(s);
-} // sumNF
+} // sumNI
 
 int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n)
 {

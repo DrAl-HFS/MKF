@@ -191,7 +191,7 @@ int mkfAccGetBPFDSimple
    return(1);
 } // mkfAccGetBPFDSimple
 
-#if 1 //def ACC_CUDA_INTEROP
+#ifdef MKF_ACC_CUDA_INTEROP
 
 #include <openacc.h> // -> /opt/pgi/linux86-64/2019/include/openacc.h
 
@@ -215,4 +215,4 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
    return(1);
 } // mkfAccCUDAGetBPFD
 
-#endif // ACC_CUDA_INTEROP
+#endif // MKF_ACC_CUDA_INTEROP
