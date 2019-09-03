@@ -158,7 +158,7 @@ int mkfAccGetBPFDSimple
    const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
    const int planeStride= rowStride * def[1];
    //const int volStride= planeStride * def[2];
-   const int nF= def[0]*def[1]*def[2];
+   const int nF= prodNI(def,3);
 
    #pragma acc data  present_or_create( pBM[:(planeStride * def[2])] ) \
                      present_or_copyin( pF[:nF], def[:3], pC[:1] )  \
@@ -200,19 +200,28 @@ int mkfAccGetBPFDSimple
 
 int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const int def[3], const BinMapF32 * const pMC)
 {
-   const int nF= def[0]*def[1]*def[2];
+   const size_t nF= prodNI(def,3);
    BMStrideDesc sd[1];
-   const size_t nBM= setBMSD(sd, def, 0);
-   //(planeStride * def[2])
-   acc_set_device_num( 0, acc_device_nvidia ); // HACKY
-   #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF], def[:3], sd[:1], pMC[:1] ) copy( rBPFD[:MKF_BINS] )
+   const size_t nBM= setBMSD(sd, def, 0); //(planeStride * def[2])
+   int r= 0;
+
+   acc_set_device_type( acc_device_nvidia ); // HACKY
+   if (acc_device_nvidia == acc_get_device_type())
    {
-      #pragma acc host_data use_device(pBM, pF, def, sd, pMC)
-      binMapCudaRowsF32(pBM, pF, def[0], sd[0].row, def[1] * def[2], pMC);
-      #pragma acc host_data use_device(rBPFD, def, sd, pBM)
-      mkfCUDAGetBPFD(rBPFD, def, sd, pBM);
+      LOG("mkfAccCUDAGetBPFD() -> %p %p %p %p %p\n", pBM, pF, def, sd, pMC);
+      #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF], def[:3], sd[:1], pMC[:1] ) copy( rBPFD[:MKF_BINS] )
+      {
+         //pragma acc host_data use_device(pF) //pD= pF;
+         #pragma acc host_data use_device(pBM, pF, def, sd, pMC)
+         {
+            LOG("acc host_data use_device() -> %p %p %p %p %p\n", pBM, pF, def, sd, pMC);
+            binMapCudaRowsF32(pBM, pF, def[0], sd[0].row, def[1] * def[2], pMC);
+         }
+         #pragma acc host_data use_device(rBPFD, def, sd, pBM)
+         r= mkfCUDAGetBPFD(rBPFD, def, sd, pBM);
+      }
    }
-   return(1);
+   return(r);
 } // mkfAccCUDAGetBPFD
 
 #endif // MKF_ACC_CUDA_INTEROP

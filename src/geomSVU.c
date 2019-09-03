@@ -31,6 +31,14 @@ int sumNI (const int v[], int n)
    return(s);
 } // sumNI
 
+int prodNI (const int v[], int n)
+{
+   long int x= v[0];
+   for (int i=1; i<n; i++) { x*= v[i]; }
+   if ((int)x != x) { ERROR_CALL("() - overflow (0x%x)\n", x); }
+   return(x);
+} // prodNI
+
 int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n)
 {
    int d=0;

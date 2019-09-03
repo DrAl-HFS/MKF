@@ -11,14 +11,16 @@
 
 /***/
 
-void setupAcc (int id)
+int setupAcc (int id)
 {  // Only multicore acceleration works presently: GPU produces garbage...
+   int r=-1;
 #ifdef OPEN_ACC_API
-   int dev= acc_device_host;
-   LOG_CALL("() - %s\n", "acc_set_device_num( 0, acc_device_host )");
-   if (1 == id) { dev= acc_device_nvidia; }
-   acc_set_device_num( 0, dev );
+   if (1 == id) { id= acc_device_nvidia; } else { id= acc_device_host; }
+   acc_set_device_type( id );
+   r= acc_get_device_type();
+   LOG_CALL("() - acc_set_device_type( * ) - %d -> %d\n", "", id, r);
 #endif
+   return(r == id);
 } // setupAcc
 
 B32 buffAlloc (Context *pC, const int def[3])
@@ -97,7 +99,7 @@ int main (int argc, char *argv[])
 {
    int id=4, def[3]= {256+1,256, 256}; //256};
    BinMapF32 bmc;
-   size_t *pBPFD, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
+   size_t *pBPFD=NULL, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
    Context cux={0};
 
    //geomTest(2,2);
@@ -120,7 +122,7 @@ int main (int argc, char *argv[])
       reportMeasures(aBPFD1, mScale);
 
 #ifdef MKF_ACC_CUDA_INTEROP
-      LOG("mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
+      LOG("mkfAccCUDAGetBPFD(%p) - \n", cux.pHF);
       if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
       {
          reportMeasures(aBPFD2, mScale);
@@ -128,10 +130,11 @@ int main (int argc, char *argv[])
       }
 #endif // MKF_ACC_CUDA_INTEROP
 
+      if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
       LOG("mkfCUDAGetBPFDautoCtx(%p) - \n", cux.pHZ);
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
-      {  pBPFD= cux.pHZ;
+      {
          reportMeasures(pBPFD, mScale);
          compareNZ(aBPFD1, pBPFD, MKF_BINS, 1);
       }

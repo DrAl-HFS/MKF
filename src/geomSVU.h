@@ -22,6 +22,7 @@ extern int *addKNI (int r[], const int a[], const int n, const int k);
 
 // reducing
 extern int sumNI (const int v[], int n);
+extern int prodNI (const int v[], int n);
 
 extern int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n);
 
