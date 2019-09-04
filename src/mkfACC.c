@@ -1,6 +1,6 @@
 // mkfAcc.c - tools for calculating Minkowski Functionals on a scalar field (via packed binary map and pattern distribution).
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June 2019
+// (c) Project Contributors June-Sept 2019
 
 #include "mkfACC.h"
 
@@ -208,17 +208,15 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
    acc_set_device_type( acc_device_nvidia ); // HACKY
    if (acc_device_nvidia == acc_get_device_type())
    {
-      LOG("mkfAccCUDAGetBPFD() -> %p %p %p %p %p\n", pBM, pF, def, sd, pMC);
       #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF], def[:3], sd[:1], pMC[:1] ) copy( rBPFD[:MKF_BINS] )
       {
-         //pragma acc host_data use_device(pF) //pD= pF;
-         #pragma acc host_data use_device(pBM, pF, def, sd, pMC)
-         {
-            LOG("acc host_data use_device() -> %p %p %p %p %p\n", pBM, pF, def, sd, pMC);
+         // Do some OpenACC stuff here...
+         // ...then invoke CUDA routines
+         #pragma acc host_data use_device( rBPFD, pBM, pF ) // CUDA needs to access device memory
+         { //  allocated via OpenACC for scalar field data (other args passed by value)
             binMapCudaRowsF32(pBM, pF, def[0], sd[0].row, def[1] * def[2], pMC);
+            r= mkfCUDAGetBPFD(rBPFD, def, sd, pBM);
          }
-         #pragma acc host_data use_device(rBPFD, def, sd, pBM)
-         r= mkfCUDAGetBPFD(rBPFD, def, sd, pBM);
       }
    }
    return(r);

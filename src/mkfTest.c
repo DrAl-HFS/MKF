@@ -122,7 +122,7 @@ int main (int argc, char *argv[])
       reportMeasures(aBPFD1, mScale);
 
 #ifdef MKF_ACC_CUDA_INTEROP
-      LOG("mkfAccCUDAGetBPFD(%p) - \n", cux.pHF);
+      LOG("mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
       if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
       {
          reportMeasures(aBPFD2, mScale);
@@ -132,7 +132,7 @@ int main (int argc, char *argv[])
 
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
-      LOG("mkfCUDAGetBPFDautoCtx(%p) - \n", cux.pHZ);
+      LOG("mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
       {
          reportMeasures(pBPFD, mScale);

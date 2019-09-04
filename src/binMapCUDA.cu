@@ -81,7 +81,7 @@ void binMapCudaRowsF32
    U32 * pBM,
    const F32 * pF,
    const int rowLenF,      // row length ie. "X dimension"
-   const int rowStrideBM,  // 32bit word stride of rows of packed binary map, should be >=
+   const int rowStrideBM,  // 32bit word stride of rows of packed binary map, should be >= rowLenF/32
    const int nRows,        // product of other "dimensions" (Y * Z)
    const BinMapF32 *pMC
 )
