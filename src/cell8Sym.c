@@ -275,6 +275,25 @@ static const TFCounts gFEV234[]=
 static void setInf (GroupInf *pInf, uint8_t b, uint8_t n, TFCounts t)
    { pInf->bits= b; pInf->count= n; pInf->tfc= t; }
 
+static uint edgeDM (const uint pattern, const uint m, const uint s)
+{
+   return((pattern & m) ^ ((pattern >> s) & m));
+} // edgeDM
+
+uint countEdgeV (uint pattern)
+{
+   uint m;
+#if 1
+   m= edgeDM(pattern, 0x0F, 4) << 16 |
+      edgeDM(pattern, 0x33, 2) << 8 |
+      edgeDM(pattern, 0x55, 1); // << 0;
+#else
+   m= (pattern & 0x0F) ^ ((pattern >> 4) & 0x0F) ;
+   m|= ((pattern & 0x33) ^ ((pattern >> 2) & 0x33) ) << 8;
+   m|= ((pattern & 0x55) ^ ((pattern >> 1) & 0x55) ) << 16;
+#endif
+   return bitCountZ(m);
+} // countEdgeV
 
 /* Interface */
 int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUPS])
@@ -291,14 +310,18 @@ int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUP
       memset(patBuf,0x00,256);
    }
 
-   patBuf[0]= 0x00;
+   patBuf[iPB]= 0x00; t.v= countEdgeV(patBuf[iPB]);
    setInf(inf+iG++, 0, 1, t);
-   if (verbose) { dump(patBuf+0, 1, "G", "0x%02X "); }
+   if (verbose) { dump(patBuf+0, 1, "G", "0x%02X "); LOG("v=%d\n", t.v); }
    iPB= 1;
 
+   t.f= 1;
+   t.e= 3;
+   t.v= 3;
    for (int n= 0; n < 8; n++) { patBuf[iPB+n]= 1 << n; }
+   t.v= countEdgeV(patBuf[iPB]);
    setInf(inf+iG++, 1, 8, t);
-   if (verbose) { dump(patBuf+iPB, 8, "G", "0x%02X "); }
+   if (verbose) { dump(patBuf+iPB, 8, "G", "0x%02X "); LOG("v=%d\n", t.v); }
    iPB+= 8;
 
    for (int iBP= 0; iBP < nBP; iBP++)
@@ -306,8 +329,9 @@ int c8sGetPattern (uint8_t patBuf[CELL8_PATTERNS], GroupInf inf[CELL8_SYMM_GROUP
       const uint8_t pattern= gBasePat234[iBP];
       const uint8_t b= bitCountZ(pattern);
       const uint8_t n= permPatGeom(patBuf+iPB, pattern);
+      t.v= countEdgeV(pattern);
       setInf(inf+iG++, b, n, gFEV234[iBP]);
-      if (verbose) { dump(patBuf+iPB, n, "G", "0x%02X "); }
+      if (verbose) { dump(patBuf+iPB, n, "G", "0x%02X "); LOG("v=%d\n", t.v); }
       iPB+= n;
    }
 
