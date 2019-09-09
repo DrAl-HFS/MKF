@@ -54,7 +54,7 @@ void binMapNF32G (U32 * restrict pBM, const F32 * restrict pF, const size_t n, c
 #pragma acc routine vector
 void binMapNF32 (U32 * restrict pBM, const F32 * restrict pF, const size_t nF, const BinMapF32 *pC)
 {
-   const size_t nB= nF>>5; // NB: truncates non multiple of 8!
+   const size_t nB= nF>>5; // NB: truncates non multiple of 32!
    #pragma acc data present( pBM[:nB], pF[:nF], pC[:1] )
    {
       #pragma acc loop vector

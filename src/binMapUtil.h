@@ -40,6 +40,14 @@ typedef struct
    uint row, plane;
 } BMStrideDesc;
 
+#define FIELD_MAX 4
+typedef struct
+{
+   const void *p[FIELD_MAX];
+   uint8_t  nField, elemBits, pad[2];
+   int stride[3];
+} FieldDesc;
+
 
 /***/
 
