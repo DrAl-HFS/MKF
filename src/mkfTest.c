@@ -91,7 +91,7 @@ void reportMeasures (const size_t a[256], const float mScale)
    float m[4];
    if (mkfMeasureBPD(m, a, mScale, 1))
    {
-      LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+      LOG(" V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
    }
 } // reportMeasures
 
