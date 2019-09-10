@@ -37,6 +37,26 @@ static uint8_t c8sMap[CELL8_PATTERNS];
 
 /***/
 
+float symK (const size_t rBPFD[CELL8_SYMM_GROUPS])
+{
+   I64 k=0;
+   for (int i= 0; i<CELL8_SYMM_GROUPS; i++) { k+= gWK[i] * (signed)rBPFD[i]; }
+   return( (float) k * M_PI / 6 );
+} // symK
+
+double sumProdZxF64 (const size_t z[], const double w[], const int n)
+{
+   double s= z[0] * w[0];
+   for (int i= 1; i<n; i++) { s+= z[i] * w[i]; }
+   return(s);
+} // sumProdZxF64
+
+void symMS (float m[2], const size_t rBPFD[CELL8_SYMM_GROUPS])
+{
+   m[1]= sumProdZxF64(rBPFD, gWM, CELL8_SYMM_GROUPS);
+   m[2]= sumProdZxF64(rBPFD, gWS, CELL8_SYMM_GROUPS);
+} // symMS
+
 size_t sumNZ (const size_t a[], const int n)
 {
    size_t s= a[0];   // assumes n>0 !
@@ -53,24 +73,10 @@ static void addZMapU8 (size_t r[], const size_t vA[], const int nA, const uint8_
    }
 } // addZMapU8
 
-float tc (const size_t rBPFD[CELL8_SYMM_GROUPS])
-{
-   I64 k=0;
-   for (int i= 0; i<CELL8_SYMM_GROUPS; i++) { k+= gWK[i] * (signed)rBPFD[i]; }
-   return( (float) k * M_PI / 6 );
-} // tc
-
-double sumProdZxF64 (const size_t z[], const double w[], const int n)
-{
-   double s= z[0] * w[0];
-   for (int i= 1; i<n; i++) { s+= z[i] * w[i]; }
-   return(s);
-} // sumProdZxF64
-
 
 /***/
 
-int mkfMeasureBPD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID)
+int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID)
 {
    switch (profID)
    {
@@ -83,10 +89,8 @@ int mkfMeasureBPD (float m[4], const size_t aBPFD[MKF_BINS], const float s, cons
          t= sumNZ(aBPFD, MKF_BINS);
          if (0x01 != c8sMap[1]) { c8sGetMap(c8sMap); } // Lazy init
          addZMapU8(rBPFD, aBPFD, MKF_BINS, c8sMap);
-         m[0]= tc(rBPFD);
-         m[1]= sumProdZxF64(rBPFD, gWM, CELL8_SYMM_GROUPS) / t;
-         m[2]= sumProdZxF64(rBPFD, gWS, CELL8_SYMM_GROUPS) / t;
-         m[3]= -1;
+         m[0]= symK(rBPFD); // symMS(m+1, rBPFD);
+         m[1]= m[2]= m[3]= -1;
          if ((t == sumNZ(rBPFD, CELL8_SYMM_GROUPS)) && (s > 0))
          {
             float rkV= 1.0 / (s * s * s * t); //sumNZ(rBPFD, CELL8_PATTERNS);
@@ -94,12 +98,11 @@ int mkfMeasureBPD (float m[4], const size_t aBPFD[MKF_BINS], const float s, cons
             //m[1]*= s;
             //m[2]*= s * s;
          }
-         //m[1]= m[2]= m[3]= -1;
          return(1);
       }
    }
    return(0);
-} // mkfMeasureBPD
+} // mkfMeasureBPFD
 
 float volFrac (const size_t aBPFD[MKF_BINS])
 {
@@ -137,7 +140,7 @@ float chiEP3 (const size_t aBPFD[MKF_BINS])
 
 /***/
 
-static void verifyGroups (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf inf[CELL8_SYMM_GROUPS])
+static void verifyGroupK (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf inf[CELL8_SYMM_GROUPS])
 {
    int8_t wK[CELL8_SYMM_GROUPS];
    int j= 0, k= 0;
@@ -147,37 +150,49 @@ static void verifyGroups (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf i
       const int n= inf[iG].count;
       LOG("\nG[%d] n=%d: ", iG, n);
       wK[iG]= gWEP3[ patBuf[j] ];
-      for (int i=0; i<n; i++) { k= patBuf[j+i]; LOG("%d ", gWEP3[k]); }
+      for (int i=0; i<n; i++)
+      {
+         k= patBuf[j+i]; LOG("%d ", gWEP3[k]);
+      }
       j+= n;
    }
    LOG("%s", "\n\n");
    for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++) { LOG("%d, ", wK[iG]); }
-} // verifyGroups
+} // verifyGroupK
 
-static void logMeasureW (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf inf[CELL8_SYMM_GROUPS])
+static void logWeightSM (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf inf[CELL8_SYMM_GROUPS])
 {
    long int d[MKF_BINS]= {0,};
-   float s[CELL8_SYMM_GROUPS];
-   float m[CELL8_SYMM_GROUPS];
+   float s[CELL8_GROUP_MAX];
+   float m[CELL8_GROUP_MAX];
    double res[3]={1,1,1};
    int j= 0;
 
    for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++)
    {
-      int id= patBuf[j];
-      d[id]= 1;
-      s[iG]= specsurf(d, res);
-      m[iG]= specimc(d, res);
-      d[id]= 0;
-      j+= inf[iG].count;
+      const int n= inf[iG].count;
+      LOG("\n-\nG[%d] n=%d", iG, n);
+      for (int i=0; i<n; i++)
+      {
+         int id= patBuf[j+i];
+         d[id]= 1;
+         s[i]= specsurf(d, res);
+         m[i]= specimc(d, res);
+         d[id]= 0;
+      }
+      j+= n;
+      LOG("\n%s", "wS[]= ");
+      for (int i=0; i < n; i++) { LOG("%G, ", s[i]); }
+      LOG("\n%s", "wM[]= ");
+      for (int i=0; i < n; i++) { LOG("%G, ", m[i]); }
    }
-   LOG("%s", "\n\nwS[]= ");
+/*   LOG("%s", "\n\nwS[]= ");
    for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++) { LOG("%G, ", s[iG]); }
    LOG("%s", "\n\nwM[]= ");
-   for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++) { LOG("%G, ", m[iG]); }
-} // logMeasureW
+   for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++) { LOG("%G, ", m[iG]); } */
+} // logWeightSM
 
-static void measurePatternTest (void)
+static void measurePatternTest (int m)
 {
    uint8_t patBuf[CELL8_PATTERNS];
    GroupInf inf[CELL8_SYMM_GROUPS];
@@ -185,16 +200,16 @@ static void measurePatternTest (void)
    LOG_CALL("() [FP=%p] GroupInf=%d\n",__builtin_frame_address(0), sizeof(GroupInf));
    if (CELL8_SYMM_GROUPS == c8sGetPattern(patBuf, inf))
    {
-      //verifyGroups(patBuf, inf);
-      //logMeasureW(patBuf, inf);
+      if (m & 0x01) { verifyGroupK(patBuf, inf); }
+      if (m & 0x02) { logWeightSM(patBuf, inf); }
    }
 
    LOG("%s", "\n***\n");
 } // measurePatternTest
 
-void mkfuTest (void)
+void mkfuTest (int m)
 {
    LOG_CALL("() [FP=%p]\n",__builtin_frame_address(0));
-   //c8sTest();
-   measurePatternTest();
+   if (m & 0x0F) { c8sTest(); }
+   if (m & 0xF0) { measurePatternTest(m >> 4); }
 } // mkfuTest
