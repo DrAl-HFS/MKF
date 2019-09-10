@@ -30,9 +30,7 @@ extern "C" {
 /***/
 // Compute measures on previously obtained Binary Pattern Distributions.
 
-//extern int mkfMeasureRBPD (float m[4], const size_t aBPFD[CELL8_SYMM_GROUPS], const float s, const int profID);
-
-extern int mkfMeasureBPD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID);
+extern int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID);
 
 // Volume fraction
 extern float volFrac (const size_t hBPD[MKF_BINS]);
@@ -42,7 +40,7 @@ extern float volFrac8 (const size_t hBPD[MKF_BINS]);
 // Euler-Poincare Chi for 3D
 extern float chiEP3 (const size_t hBPD[MKF_BINS]);
 
-extern void mkfuTest (void);
+extern void mkfuTest (int m);
 
 #ifdef __cplusplus
 } // extern "C"

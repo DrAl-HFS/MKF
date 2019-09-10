@@ -89,9 +89,9 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flag
 void reportMeasures (const size_t a[256], const float mScale)
 {
    float m[4];
-   if (mkfMeasureBPD(m, a, mScale, 1))
+   if (mkfMeasureBPFD(m, a, mScale, 0))
    {
-      LOG(" refMeasures() - V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+      LOG(" V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
    }
 } // reportMeasures
 
@@ -104,7 +104,7 @@ int main (int argc, char *argv[])
 
    //geomTest(2,2);
    //c8sTest();
-   mkfuTest();
+   mkfuTest(0);
    //printf("long int = %dbytes\n", sizeof(long int));
    if (buffAlloc(&cux,def))
    {

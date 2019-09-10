@@ -11,8 +11,9 @@
 extern "C" {
 #endif
 
-#define CELL8_PATTERNS  (256)
-#define CELL8_SYMM_GROUPS (22)
+#define CELL8_PATTERNS     (1<<8)
+#define CELL8_SYMM_GROUPS  (22)
+#define CELL8_GROUP_MAX    (24)
 
 #pragma pack(1)
 typedef struct
