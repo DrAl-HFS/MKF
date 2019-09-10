@@ -13,11 +13,47 @@
 #undef MKF_CUDA_CU // header glitch supression done
 #endif
 
-// Wide counter for atomicAdd (nvcc dislikes size_t)
-typedef unsigned long long CUACount;
-
-
 /***/
+
+// Util clases - DISPLACE!
+#define CUDA_TIMER_EVENT_BITS 1
+#define CUDA_TIMER_EVENTS    (1<<CUDA_TIMER_EVENT_BITS)
+#define CUDA_EVENT_NUM_MASK  BIT_MASK(CUDA_TIMER_EVENT_BITS)
+
+class Timer
+{
+protected:
+   cudaEvent_t e[TIMER_EVENTS];
+   int n;
+
+public:
+   Timer (void)
+   {  cudaError_t r;
+      n= 0;
+      for (int i=0; i<CUDA_TIMER_EVENTS; i++) { r= cudaEventCreate(e+i); }
+   } // CTor
+
+   ~Timer ()
+   {  cudaError_t r;
+      for (int i=0; i<CUDA_TIMER_EVENTS; i++) { r= cudaEventDestroy(e+i); }
+   } // DTor
+
+   void stampStream (void) { cudaEventRecord( e[ n++ & CUDA_EVENT_NUM_MASK ] ); }
+
+   float elapsedms (bool stamp=true, bool sync=true)
+   {  float ms=0;
+      if (stamp) { stampStream(); }
+      if (n>1)
+      {
+         int i0= (n-2) & CUDA_EVENT_NUM_MASK;
+         int i1= (n-1) & CUDA_EVENT_NUM_MASK;
+         if (sync) { cudaEventSynchronize( e[i1] ); }
+         cudaEventElapsedTime(&ms, e[ i0 ], e[ i1 ]); }
+      }
+      return(ms);
+   } // elapsedms
+}; // Timer
+
 
 // CUDA kernels and wrappers
 
@@ -38,6 +74,7 @@ typedef unsigned long long CUACount;
 #define BPFD_BLKD (1<<BPFD_BLKS)
 #define BPFD_BLKM (BPFD_BLKD-1)
 
+// Wide counter for atomicAdd (nvcc dislikes size_t)
 typedef unsigned long long ULL;
 typedef uint   U16P; // ushort2 ???
 
@@ -202,16 +239,21 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uin
 extern "C"
 int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, const U32 * pBM)
 {
-   cudaEvent_t e[2];
-   cudaEventCreate(e+0);
-   cudaEventCreate(e+1);
-   float ms=0;
    const int nRowPairs= def[1]-1;
    const int nPlanePairs= def[2]-1;
 
    const int blkD= BPFD_BLKD;
    const int nBlk= (nRowPairs + blkD-1) / blkD;
+#if 0
+   cudaEvent_t e[2];
+   cudaEventCreate(e+0);
+   cudaEventCreate(e+1);
+   float ms=0;
    cudaEventRecord(e[0]);
+#else
+   Timer t;
+   t.stampStream();
+#endif
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
@@ -235,10 +277,10 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
       pP0= pP1; pP1+= pSD->plane;
    }
 #endif
-   cudaEventRecord(e[1]);
-   cudaEventSynchronize(e[1]);
-   cudaEventElapsedTime(&ms, e[0], e[1]);
-   LOG("mkfCUDAGetBPFD() %Gms\n", ms);
+//   cudaEventRecord(e[1]);
+//   cudaEventSynchronize(e[1]);
+//   cudaEventElapsedTime(&ms, e[0], e[1]);
+   LOG("mkfCUDAGetBPFD() %Gms\n", t.elapsedms());
    //cudaDeviceSynchronize();
    return(MKF_BINS);
 } // mkfCUDAGetBPFD
