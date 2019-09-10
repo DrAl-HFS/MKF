@@ -37,9 +37,6 @@ extern float volFrac (const size_t hBPD[MKF_BINS]);
 
 extern float volFrac8 (const size_t hBPD[MKF_BINS]);
 
-// Euler-Poincare Chi for 3D
-extern float chiEP3 (const size_t hBPD[MKF_BINS]);
-
 extern void mkfuTest (int m);
 
 #ifdef __cplusplus

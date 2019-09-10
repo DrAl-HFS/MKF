@@ -211,7 +211,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
 
    const int blkD= BPFD_BLKD;
    const int nBlk= (nRowPairs + blkD-1) / blkD;
-   cudaEventRecord(e+0);
+   cudaEventRecord(e[0]);
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
@@ -235,9 +235,9 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
       pP0= pP1; pP1+= pSD->plane;
    }
 #endif
-   cudaEventRecord(e+1);
-   cudaEventSynchronize(e+1);
-   cudaEventElapsedTime(&ms, e+0, e+1);
+   cudaEventRecord(e[1]);
+   cudaEventSynchronize(e[1]);
+   cudaEventElapsedTime(&ms, e[0], e[1]);
    LOG("mkfCUDAGetBPFD() %Gms\n", ms);
    //cudaDeviceSynchronize();
    return(MKF_BINS);

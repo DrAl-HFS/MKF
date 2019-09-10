@@ -12,17 +12,8 @@
 extern "C" {
 #endif
 
-typedef double MKMeasureVal;
-
-//typedef struct { MKMeasureVal v, k; } MKVK;
 
 /***/
-// Generate Binary Pattern Distribution of a 3D scalar field ("volume image") for subsequent measurement.
-// An intermediate packed-binary (in reverse network bit order) image is generated. For row
-// length not a multiple of 8, each row is padded to a whole byte (i.e. every row always starts
-// at a byte address)
-
-//extern int addRowBPD (U32 hBPD[256], const U8 * restrict pRow[2], const int rowStride, const int n);
 
 // Simple version for basic testing
 extern int mkfAccGetBPFDSimple (size_t rBPFD[MKF_BINS], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 *pC);
