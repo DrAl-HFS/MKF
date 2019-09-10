@@ -202,11 +202,16 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uin
 extern "C"
 int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, const U32 * pBM)
 {
+   cudaEvent_t e[2];
+   cudaEventCreate(e+0);
+   cudaEventCreate(e+1);
+   float ms=0;
    const int nRowPairs= def[1]-1;
    const int nPlanePairs= def[2]-1;
 
    const int blkD= BPFD_BLKD;
    const int nBlk= (nRowPairs + blkD-1) / blkD;
+   cudaEventRecord(e+0);
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
@@ -230,7 +235,11 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
       pP0= pP1; pP1+= pSD->plane;
    }
 #endif
-   cudaDeviceSynchronize();
+   cudaEventRecord(e+1);
+   cudaEventSynchronize(e+1);
+   cudaEventElapsedTime(&ms, e+0, e+1);
+   LOG("mkfCUDAGetBPFD() %Gms\n", ms);
+   //cudaDeviceSynchronize();
    return(MKF_BINS);
 } // mkfCUDAGetBPFD
 
