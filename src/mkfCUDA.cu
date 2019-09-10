@@ -1,62 +1,13 @@
-// mkf.cu - Minkowski Functional pattern processing using CUDA NB: .cu assumes c++ style compilation
+// mkfCUDA.cu - Minkowski Functional pattern processing using CUDA NB: .cu assumes c++ style compilation
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Jan-June 2019
-
-#ifndef MKF_CUDA_CU
-#define MKF_CUDA_CU // supress header "multiple definition" glitch
-#endif
+// (c) Project Contributors Jan-Sept 2019
 
 #include "mkfCUDA.h"
-//include "binMapCUDA.h"
-
-#ifdef MKF_CUDA_CU
-#undef MKF_CUDA_CU // header glitch supression done
-#endif
+#include "utilCUDA.hpp"
 
 /***/
 
-// Util clases - DISPLACE!
-#define CUDA_TIMER_EVENT_BITS 1
-#define CUDA_TIMER_EVENTS    (1<<CUDA_TIMER_EVENT_BITS)
-#define CUDA_EVENT_NUM_MASK  BIT_MASK(CUDA_TIMER_EVENT_BITS)
-
-class Timer
-{
-protected:
-   cudaEvent_t e[TIMER_EVENTS];
-   int n;
-
-public:
-   Timer (void)
-   {  cudaError_t r;
-      n= 0;
-      for (int i=0; i<CUDA_TIMER_EVENTS; i++) { r= cudaEventCreate(e+i); }
-   } // CTor
-
-   ~Timer ()
-   {  cudaError_t r;
-      for (int i=0; i<CUDA_TIMER_EVENTS; i++) { r= cudaEventDestroy(e+i); }
-   } // DTor
-
-   void stampStream (void) { cudaEventRecord( e[ n++ & CUDA_EVENT_NUM_MASK ] ); }
-
-   float elapsedms (bool stamp=true, bool sync=true)
-   {  float ms=0;
-      if (stamp) { stampStream(); }
-      if (n>1)
-      {
-         int i0= (n-2) & CUDA_EVENT_NUM_MASK;
-         int i1= (n-1) & CUDA_EVENT_NUM_MASK;
-         if (sync) { cudaEventSynchronize( e[i1] ); }
-         cudaEventElapsedTime(&ms, e[ i0 ], e[ i1 ]); }
-      }
-      return(ms);
-   } // elapsedms
-}; // Timer
-
-
 // CUDA kernels and wrappers
-
 
 #define PACK16
 
@@ -244,16 +195,10 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
 
    const int blkD= BPFD_BLKD;
    const int nBlk= (nRowPairs + blkD-1) / blkD;
-#if 0
-   cudaEvent_t e[2];
-   cudaEventCreate(e+0);
-   cudaEventCreate(e+1);
-   float ms=0;
-   cudaEventRecord(e[0]);
-#else
-   Timer t;
+
+   CTimerCUDA t;
    t.stampStream();
-#endif
+
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
@@ -277,10 +222,8 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
       pP0= pP1; pP1+= pSD->plane;
    }
 #endif
-//   cudaEventRecord(e[1]);
-//   cudaEventSynchronize(e[1]);
-//   cudaEventElapsedTime(&ms, e[0], e[1]);
-   LOG("mkfCUDAGetBPFD() %Gms\n", t.elapsedms());
+
+   LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms());
    //cudaDeviceSynchronize();
    return(MKF_BINS);
 } // mkfCUDAGetBPFD

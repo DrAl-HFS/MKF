@@ -1,6 +1,6 @@
 // mkfUtil.c - tools for calculating Minkowski Functionals from pattern distribution.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June 2019
+// (c) Project Contributors June-Sept 2019
 
 #ifndef MKF_UTIL_H
 #define MKF_UTIL_H

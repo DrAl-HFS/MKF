@@ -97,7 +97,7 @@ void reportMeasures (const size_t a[256], const float mScale)
 
 int main (int argc, char *argv[])
 {
-   int id=4, def[3]= {256+1,256, 256}; //256};
+   int id=4, def[3]= {256+1, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
    BinMapF32 bmc;
    size_t *pBPFD=NULL, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
    Context cux={0};
@@ -116,12 +116,12 @@ int main (int argc, char *argv[])
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc(0);
-      LOG("mkfAccGetBPFDSimple(%p) - \n", aBPFD1);
+      LOG("***\nmkfAccGetBPFDSimple(%p) - \n", aBPFD1);
       mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
       reportMeasures(aBPFD1, mScale);
 
 #ifdef MKF_ACC_CUDA_INTEROP
-      LOG("mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
+      LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
       if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
       {
          reportMeasures(aBPFD2, mScale);
@@ -131,7 +131,7 @@ int main (int argc, char *argv[])
 
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
-      LOG("mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
+      LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
       {
          reportMeasures(pBPFD, mScale);
@@ -139,6 +139,7 @@ int main (int argc, char *argv[])
       }
 #endif // MKF_CUDA
 
+      LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", aBPFD2);
       SWAP(int,def[0],def[2]);
       vfR= genPattern(cux.pHF, id, def, param);
       mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);

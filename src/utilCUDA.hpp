@@ -1,6 +1,6 @@
-// utilCUDA.h - CUDA API utils
+// utilCUDA.hpp - CUDA API utils
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Jan-June 2019
+// (c) Project Contributors Sept 2019
 
 #ifndef CUDA_UTIL_HPP
 #define CUDA_UTIL_HPP
@@ -34,14 +34,14 @@ public:
 
    void stampStream (void) { r= cudaEventRecord( e[ n++ & CUDA_EVENT_NUM_MASK ] ); }
 
-   float elapsedms (bool stamp=true, bool sync=true)
+   float elapsedms (bool stampNow=true, bool syncNow=true)
    {  float ms=0;
-      if (stamp) { stampStream(); }
+      if (stampNow) { stampStream(); }
       if (n>1)
       {
          int i0= (n-2) & CUDA_EVENT_NUM_MASK;
          int i1= (n-1) & CUDA_EVENT_NUM_MASK;
-         if (sync) { r= cudaEventSynchronize( e[i1] ); }
+         if (syncNow) { r= cudaEventSynchronize( e[i1] ); }
          r= cudaEventElapsedTime(&ms, e[ i0 ], e[ i1 ]);
       }
       return(ms);

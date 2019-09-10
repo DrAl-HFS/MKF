@@ -1,8 +1,9 @@
 // binMapCUDA.h - packed binary map generation from scalar fields
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Jan-June 2019
+// (c) Project Contributors Jan-Sept 2019
 
 #include "binMapCUDA.h"
+#include "utilCUDA.hpp"
 
 
 #define VT_BLKS 5
@@ -87,7 +88,10 @@ void binMapCudaRowsF32
 )
 {
    int blkD= VT_BLKD;
-   LOG("***\nbinMapCudaRowsF32() - bmc: %f,0x%X\n",pMC->t[0], pMC->m);
+
+   CTimerCUDA t;
+   t.stampStream();
+
    if (0 == (rowLenF & 0x1F))
    {
       size_t nF= rowLenF * nRows;
@@ -104,7 +108,8 @@ void binMapCudaRowsF32
          vThresh32<<<nBlk,blkD>>>(pBM + i * rowStride, pF + i * rowLenF, rowLenF, *pMC);
       }
    }
-   ctuErr(NULL, "vThresh32()");
-   cudaDeviceSynchronize();
+   LOG("binMapCudaRowsF32(.., rowLen=%d, BM(%f,0x%X) ) - dt= %Gms\n", rowLenF, pMC->t[0], pMC->m, t.elapsedms());
+   //ctuErr(NULL, "vThresh32()");
+   //cudaDeviceSynchronize();
 } // binMapCudaRowsF32
 
