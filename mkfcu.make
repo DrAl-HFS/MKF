@@ -24,7 +24,7 @@ INC_DIR := inc
 
 SRC := $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/binMapCUDA.cu $(SRC_DIR)/ctUtil.cu
 HDR := $(HDR_DIR)/mkfCUDA.h $(SRC_DIR)/binMapCUDA.h $(HDR_DIR)/ctUtil.h
-OBJ := $(OBJ_DIR)/mkfUtil.o $(OBJ_DIR)/binMapUtil.o $(OBJ_DIR)/geomHacks.o $(OBJ_DIR)/util.o $(OBJ_DIR)/report.o
+OBJ := $(OBJ_DIR)/mkfUtil.o $(OBJ_DIR)/mkfHacks.o $(OBJ_DIR)/cell8Sym.o $(OBJ_DIR)/binMapUtil.o $(OBJ_DIR)/geomHacks.o $(OBJ_DIR)/geomRaster.o $(OBJ_DIR)/geomObj.o $(OBJ_DIR)/geomSVU.o $(OBJ_DIR)/util.o $(OBJ_DIR)/report.o
 
 
 LIBDEF := -lm -L$(CULBPATH) -lcudart
