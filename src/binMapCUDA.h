@@ -23,6 +23,14 @@ void binMapCudaRowsF32
    const BinMapF32 *pC
 );
 
+BMStrideDesc *binMapCUDA
+(
+   uint           * pBM,
+   BMStrideDesc  * pBMSD,
+   const MultiFieldInfo * pMFI,
+   const BinMapF32       * pMC
+);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -369,8 +369,11 @@ size_t mkft (const Context *pC, const int def[3])
    r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
-   LOG("\tvolFrac=%G chiEP=%G\n", volFrac(pBPFD), chiEP3(pBPFD));
-
+   float m[4];
+   if (mkfMeasureBPFD(m, pBPFD, 1, 0))
+   {
+      LOG(" V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+   }
    for (int i= 0; i<MKF_BINS; i++)
    {
       sum+= pBPFD[i];
@@ -381,7 +384,7 @@ size_t mkft (const Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {96,9,9};
+   const int def[3]= {256,256,256}; //{96,9,9};
    Context cux={0};
 
    if (buffAlloc(&cux, def))
@@ -389,7 +392,7 @@ int main (int argc, char *argv[])
       const size_t nC= prodOffsetNI(def,3,-1);
       LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
       //sanityTest(&cux);
-      if (0)
+      if (1)
       {
          genPattern(cux.pHF, 1, def, 0.5*def[1] - 0.5);
          mkft(&cux,def);

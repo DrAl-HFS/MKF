@@ -40,13 +40,23 @@ typedef struct
    uint row, plane;
 } BMStrideDesc;
 
-#define FIELD_MAX 4
+#define MFC_FIELD_MAX 4
 typedef struct
 {
-   const void *p[FIELD_MAX];
-   uint8_t  nField, elemBits, pad[2];
-   int stride[3];
-} FieldDesc;
+   long int     stride[3]; // Entire field, possibly interleaved
+   union { // NB: always DEVICE mem ptrs!
+      const void * p[MFC_FIELD_MAX];
+      const float  * pF32[MFC_FIELD_MAX];
+      const double * pF64[MFC_FIELD_MAX];
+   };
+} MultiFieldDesc;
+
+typedef struct
+{  struct { // anon structs - influence packing ?
+      struct { uint8_t  nField, elemBits, opr, flags; };
+      int       def[3]; }; // Def to process, possibly sub region of larger field
+   MultiFieldDesc mfd;
+} MultiFieldInfo;
 
 
 /***/
