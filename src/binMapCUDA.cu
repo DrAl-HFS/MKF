@@ -138,17 +138,15 @@ __global__ void vThreshVSum32
    uint rBM[],
    const MultiFieldDesc mfd,
    const int nS,
-   const int defX,
    const BMStrideDesc sBM,
-   const Stride3 sF,
    const BinMapF32 bm
 )
 {
    const int x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
-   if (x < defX)// && (y < defY))
+   if (x < mfd.def[0])// && (y < defY))
    {
-      size_t i= x * sF.s[0] + blockIdx.y * sF.s[1] + blockIdx.z * sF.s[2];
+      size_t i= x * mfd.stride.s[0] + blockIdx.y * mfd.stride.s[1] + blockIdx.z * mfd.stride.s[2];
       const int j= i & VT_BLKM;
 
       float s= (mfd.field[0].pF32)[i];
@@ -252,9 +250,11 @@ BMStrideDesc *binMapCUDA
    }
    else
    {
-      //vThreshSum<<<nBlk,VT_BLKN>>>(pBM, pMFI->mfd, pMFI->nField, nF, *pMC);
-
-      //return(pBMSD);
+      const int nBlkRow= (pMFI->def[0] + VT_BLKM) / VT_BLKN;
+      const dim3 grd(nBlkRow, pMFI->def[1], pMFI->def[2]);
+      const dim3 blk(VT_BLKN,1,1);
+      vThreshVSum32<<<grd,blk>>>(pBM, pMFI->mfd, pMFI->nField, *pBMSD, *pMC);
+      if (0 == ctuErr(NULL, "vThreshVSum32()")) { return(pBMSD); }
    }
    return(NULL);
 } // binMapCUDA
