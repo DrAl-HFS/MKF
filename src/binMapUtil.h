@@ -53,15 +53,18 @@ typedef struct
 } Stride3;
 
 #define MFC_FIELD_MAX 4
+
+typedef union { void *p; float *pF32; double *pF64; size_t w; } ScalarPtr;
 typedef struct
 {
    Stride3 stride;
     // Entire field, possibly interleaved
-   union { // NB: always DEVICE mem ptrs!
+   ScalarPtr field[MFC_FIELD_MAX];
+/*   union { // NB: always DEVICE mem ptrs!
       const void * p[MFC_FIELD_MAX];
       const float  * pF32[MFC_FIELD_MAX];
       const double * pF64[MFC_FIELD_MAX];
-   };
+   };*/
 } MultiFieldDesc;
 
 typedef struct

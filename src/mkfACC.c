@@ -227,7 +227,7 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
          // ...then invoke CUDA routines
          #pragma acc host_data use_device( rBPFD, pBM, pF ) // CUDA needs to access device memory
          { //  allocated via OpenACC for scalar field data (other args passed by value)
-            mfi.mfd.pF32[0]= pF;
+            mfi.mfd.field[0].pF32= pF;
             if (binMapCUDA(pBM, &sd, &mfi, pMC))
             //if (binMapCudaRowsF32(pBM, pF, def[0], sd.row, def[1] * def[2], pMC))
                { r= mkfCUDAGetBPFD(rBPFD, mfi.def, &sd, pBM); }

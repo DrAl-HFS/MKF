@@ -151,8 +151,8 @@ __global__ void vThreshVSum32
       size_t i= x * sF.s[0] + blockIdx.y * sF.s[1] + blockIdx.z * sF.s[2];
       const int j= i & VT_BLKM;
 
-      float s= (mfd.pF32[0])[i];
-      for (int k=1; k<nS; k++) { s+= (mfd.pF32[k])[i]; }
+      float s= (mfd.field[0].pF32)[i];
+      for (int k=1; k<nS; k++) { s+= (mfd.field[k].pF32)[i]; }
 
       u[j]= bm1f32(s,bm) << j;
 
@@ -221,19 +221,33 @@ BMStrideDesc *binMapCUDA
 
    if (1 == pMFI->nField)
    {
-       if ((0 == (pMFI->def[0] & 0x1F)) &&
-            (3 == planarity(pMFI->def, pMFI->mfd.stride.s)))
-      {  // Treat as 1D - probably fastest?
-         const size_t nF= prodNI(pMFI->def,3);
-         vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pBM, pMFI->mfd.pF32[0], nF, *pMC);
-         if (0 == ctuErr(NULL, "vThreshL32()")) { return(pBMSD); }
+      if (0 != (pMFI->def[0] & 0x1F))
+      {
+         const int nBlkRow= (pMFI->def[0] + VT_BLKM) / VT_BLKN;
+         const int rowStride= BITS_TO_WRDSH(pMFI->def[0], VT_WRDS);
+         const int nRows= prodNI(pMFI->def+1,2);
+         for (int i=0; i<nRows; i++)
+         {
+            vThreshL32<<<nBlkRow,VT_BLKN>>>(pBM + i * rowStride, pMFI->mfd.field[0].pF32 + i * pMFI->def[0], pMFI->def[0], *pMC);
+         }
+         if (0 == ctuErr(NULL, "nRows*vThreshL32()")) { return(pBMSD); }
       }
       else
       {
-         int nBlkRow= (pMFI->def[0] + VT_BLKM) / VT_BLKN;
-         dim3 grid(nBlkRow, pMFI->def[1], pMFI->def[2]);
-         vThreshV32<<<grid,dim3(VT_BLKN,1,1)>>>(pBM, pMFI->mfd.pF32[0], pMFI->def[0], *pBMSD, pMFI->mfd.stride, *pMC);
-         if (0 == ctuErr(NULL, "vThreshV32()")) { return(pBMSD); }
+         if (3 == planarity(pMFI->def, pMFI->mfd.stride.s))
+         {  // Treat as 1D - probably fastest?
+            const size_t nF= prodNI(pMFI->def,3);
+            vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pBM, pMFI->mfd.field[0].pF32, nF, *pMC);
+            if (0 == ctuErr(NULL, "vThreshL32()")) { return(pBMSD); }
+         }
+         else
+         {  // expect this to work with any size, but seems to require *32
+            const int nBlkRow= (pMFI->def[0] + VT_BLKM) / VT_BLKN;
+            const dim3 grd(nBlkRow, pMFI->def[1], pMFI->def[2]);
+            const dim3 blk(VT_BLKN,1,1);
+            vThreshV32<<<grd,blk>>>(pBM, pMFI->mfd.field[0].pF32, pMFI->def[0], *pBMSD, pMFI->mfd.stride, *pMC);
+            if (0 == ctuErr(NULL, "vThreshV32()")) { return(pBMSD); }
+         }
       }
    }
    else
