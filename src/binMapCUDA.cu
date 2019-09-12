@@ -6,9 +6,14 @@
 #include "utilCUDA.hpp"
 
 
+#define VT_WRDS 5
+#define VT_WRDN (1<<VT_WRDS)
+#define VT_WRDM (VT_WRDN-1)
+
 #define VT_BLKS 5
 #define VT_BLKN (1<<VT_BLKS)
 #define VT_BLKM (VT_BLKN-1)
+
 
 /***/
 
@@ -84,7 +89,7 @@ __global__ void vThreshL32 (uint r[], const float f[], const size_t n, const Bin
       z[j]= bm1f32(f[i],bm) << j;
 
       merge32(z, j);
-      if (0 == j) { r[i>>VT_BLKS]= z[0] | z[16]; }
+      if (0 == j) { r[i>>VT_WRDS]= z[0] | z[16]; }
 /*
       __syncthreads();
 
@@ -108,39 +113,57 @@ __global__ void vThreshL32 (uint r[], const float f[], const size_t n, const Bin
    }
 } // vThreshL32
 
-__global__ void vThreshV32 (uint r[], const float f[], const size_t defX, const Stride3 sF, const BinMapF32 bm)
+__global__ void vThreshV32 (uint rBM[], const float f[], const int defX, const BMStrideDesc sBM, const Stride3 sF, const BinMapF32 bm)
 {
-   const size_t x= blockIdx.x * blockDim.x + threadIdx.x;
+   const int x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
-   if (x < defX)// && (y < defY))
+   if (x < defX)
    {
-      const size_t i= x * sF.s[0] + blockIdx.y * sF.s[1] + blockIdx.z * sF.s[2];
+      size_t i= x * sF.s[0] + blockIdx.y * sF.s[1] + blockIdx.z * sF.s[2];
       const int j= i & VT_BLKM;
 
-      u[j]= bm1f32(f[i],bm) << j;
+      u[j]= bm1f32(f[i],bm) << j; // (j & VT_WRDM)
 
       merge32(u, j);
-      if (0 == j) { r[i>>VT_BLKS]= u[0] | u[16]; }
+      if (0 == j) // & VT_WRDM) if BLKS > WRDS !
+      {  // (x >> VT_WRDS)
+         i= blockIdx.x + blockIdx.y * sBM.row + blockIdx.z * sBM.plane;
+         rBM[i]= u[0] | u[16];
+      }
    }
 } // vThreshV32
 
-__global__ void vThreshSum (uint r[], const MultiFieldDesc mfd, const int nS, const size_t n, const BinMapF32 bm)
+__global__ void vThreshVSum32
+(
+   uint rBM[],
+   const MultiFieldDesc mfd,
+   const int nS,
+   const int defX,
+   const BMStrideDesc sBM,
+   const Stride3 sF,
+   const BinMapF32 bm
+)
 {
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-//   const size_t j= blockIdx.y * blockDim.y + threadIdx.y;
-//   const size_t k= blockIdx.z * blockDim.z + threadIdx.z;
+   const int x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
-   if (i < n)
+   if (x < defX)// && (y < defY))
    {
+      size_t i= x * sF.s[0] + blockIdx.y * sF.s[1] + blockIdx.z * sF.s[2];
       const int j= i & VT_BLKM;
+
       float s= (mfd.pF32[0])[i];
       for (int k=1; k<nS; k++) { s+= (mfd.pF32[k])[i]; }
+
       u[j]= bm1f32(s,bm) << j;
 
       merge32(u, j);
-      if (0 == j) { r[i>>VT_BLKS]= u[0] | u[16]; }
+      if (0 == j)
+      {
+         i= (x >> VT_WRDS) + blockIdx.y * sBM.row + blockIdx.z * sBM.plane;
+         rBM[i]= u[0] | u[16];
+      }
    }
-} // vThreshSum
+} // vThreshVSum32
 
 
 /* INTERFACE */
@@ -209,8 +232,8 @@ BMStrideDesc *binMapCUDA
       {
          int nBlkRow= (pMFI->def[0] + VT_BLKM) / VT_BLKN;
          dim3 grid(nBlkRow, pMFI->def[1], pMFI->def[2]);
-         vThreshV32<<<grid,dim3(VT_BLKN,1,1)>>>(pBM, pMFI->mfd.pF32[0], pMFI->def[0], pMFI->mfd.stride, *pMC);
-
+         vThreshV32<<<grid,dim3(VT_BLKN,1,1)>>>(pBM, pMFI->mfd.pF32[0], pMFI->def[0], *pBMSD, pMFI->mfd.stride, *pMC);
+         if (0 == ctuErr(NULL, "vThreshV32()")) { return(pBMSD); }
       }
    }
    else

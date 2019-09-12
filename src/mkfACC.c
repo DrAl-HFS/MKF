@@ -220,6 +220,7 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
          mfi.mfd.stride.s[i]= k;
          k*= def[i];
       }
+      LOG("* row, plane = %u, %u\n", sd.row, sd.plane);
       #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF] ) copy( rBPFD[:MKF_BINS] )
       {
          // Do some OpenACC stuff here...
