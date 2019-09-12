@@ -108,14 +108,13 @@ __global__ void vThreshL32 (uint r[], const float f[], const size_t n, const Bin
    }
 } // vThreshL32
 
-__global__ void vThreshP32 (uint r[], const float f[], const size_t nX, const size_t nY, const BinMapF32 bm)
+__global__ void vThreshV32 (uint r[], const float f[], const size_t defX, const Stride3 sF, const BinMapF32 bm)
 {
    const size_t x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
-   if (x < nX)// && (y < nY))
+   if (x < defX)// && (y < defY))
    {
-      //const size_t y= blockIdx.y * blockDim.y + threadIdx.y;
-      const size_t i= x + nX * threadIdx.y;
+      const size_t i= x * sF.s[0] + blockIdx.y * sF.s[1] + blockIdx.z * sF.s[2];
       const int j= i & VT_BLKM;
 
       u[j]= bm1f32(f[i],bm) << j;
@@ -123,7 +122,7 @@ __global__ void vThreshP32 (uint r[], const float f[], const size_t nX, const si
       merge32(u, j);
       if (0 == j) { r[i>>VT_BLKS]= u[0] | u[16]; }
    }
-} // vThreshP32
+} // vThreshV32
 
 __global__ void vThreshSum (uint r[], const MultiFieldDesc mfd, const int nS, const size_t n, const BinMapF32 bm)
 {
@@ -147,7 +146,7 @@ __global__ void vThreshSum (uint r[], const MultiFieldDesc mfd, const int nS, co
 /* INTERFACE */
 
 extern "C"
-void binMapCudaRowsF32
+int binMapCudaRowsF32
 (
    U32 * pBM,
    const F32 * pF,
@@ -157,31 +156,34 @@ void binMapCudaRowsF32
    const BinMapF32 *pMC
 )
 {
+   int r= 0;
    CTimerCUDA t;
-   //t.stampStream();
 
    if (0 == (rowLenF & VT_BLKM))
    {  // Treat as 1D
       size_t nF= rowLenF * nRows;
       vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pBM, pF, nF, *pMC);
+      r= (0 == ctuErr(NULL, "vThreshL32()"));
    }
    else
    {  // Hacky 2D - needs proper implementation
       int nBlkRow= (rowLenF + VT_BLKM) / VT_BLKN;
-#if 1
       int rowStride= BITS_TO_WRDSH(rowLenF,5); //(rowLenF + 31) / 32;
       for (int i=0; i<nRows; i++)
       {
          vThreshL32<<<nBlkRow,VT_BLKN>>>(pBM + i * rowStride, pF + i * rowLenF, rowLenF, *pMC);
       }
-#else
-      vThreshP32<<<dim3(nBlkRow,nRows),dim3(VT_BLKN)>>>(pBM, pF, rowLenF, nRows, *pMC);
-#endif
+      r= (0 == ctuErr(NULL, "nRows*vThreshL32()"));
    }
    LOG("binMapCudaRowsF32(.., rowLen=%d, BM(%f,0x%X) ) - dt= %Gms\n", rowLenF, pMC->t[0], pMC->m, t.elapsedms());
-   //ctuErr(NULL, "vThresh32()");
    //cudaDeviceSynchronize(); // stream sync provided by timer
+   return(r);
 } // binMapCudaRowsF32
+
+static int planarity (const int def[3], const Stride s[3])
+{  // Only works for full image def, not sub region!
+   return((1 == s[0]) + (def[0] == s[1]) + (def[0] * def[1] == s[2]));
+} // planar
 
 extern "C"
 BMStrideDesc *binMapCUDA
@@ -192,7 +194,26 @@ BMStrideDesc *binMapCUDA
    const BinMapF32      * pMC
 )
 {
-   if (0 == (pMFI->def[0] & 0x1F))
+   const size_t nBM= setBMSD(pBMSD, pMFI->def, pMFI->profile); //(planeStride * def[2])
+
+   if (1 == pMFI->nField)
+   {
+       if ((0 == (pMFI->def[0] & 0x1F)) &&
+            (3 == planarity(pMFI->def, pMFI->mfd.stride.s)))
+      {  // Treat as 1D - probably fastest?
+         const size_t nF= prodNI(pMFI->def,3);
+         vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pBM, pMFI->mfd.pF32[0], nF, *pMC);
+         if (0 == ctuErr(NULL, "vThreshL32()")) { return(pBMSD); }
+      }
+      else
+      {
+         int nBlkRow= (pMFI->def[0] + VT_BLKM) / VT_BLKN;
+         dim3 grid(nBlkRow, pMFI->def[1], pMFI->def[2]);
+         vThreshV32<<<grid,dim3(VT_BLKN,1,1)>>>(pBM, pMFI->mfd.pF32[0], pMFI->def[0], pMFI->mfd.stride, *pMC);
+
+      }
+   }
+   else
    {
       //vThreshSum<<<nBlk,VT_BLKN>>>(pBM, pMFI->mfd, pMFI->nField, nF, *pMC);
 

@@ -5,7 +5,8 @@
 #ifndef BIN_MAP_UTIL_H
 #define BIN_MAP_UTIL_H
 
-#include "report.h"
+#include "geomSVU.h"
+//#include "report.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -40,10 +41,22 @@ typedef struct
    uint row, plane;
 } BMStrideDesc;
 
+typedef long int Stride;
+typedef struct
+{
+   Stride s[2];
+} Stride2;
+
+typedef struct
+{
+   Stride s[3];
+} Stride3;
+
 #define MFC_FIELD_MAX 4
 typedef struct
 {
-   long int     stride[3]; // Entire field, possibly interleaved
+   Stride3 stride;
+    // Entire field, possibly interleaved
    union { // NB: always DEVICE mem ptrs!
       const void * p[MFC_FIELD_MAX];
       const float  * pF32[MFC_FIELD_MAX];
@@ -53,7 +66,7 @@ typedef struct
 
 typedef struct
 {  struct { // anon structs - influence packing ?
-      struct { uint8_t  nField, elemBits, opr, flags; };
+      struct { uint8_t  nField, elemBits, opr, profile; };
       int       def[3]; }; // Def to process, possibly sub region of larger field
    MultiFieldDesc mfd;
 } MultiFieldInfo;

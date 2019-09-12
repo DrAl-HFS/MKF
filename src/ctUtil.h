@@ -23,6 +23,8 @@ typedef struct
    BMStrideDesc   sd;
 } Context;
 
+extern void ctuInfo (void);
+
 extern int cuBuffAlloc (Context *pC, uint n);
 extern int cuBuffRelease (Context *pC);
 

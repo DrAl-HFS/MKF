@@ -200,22 +200,36 @@ int mkfAccGetBPFDSimple
 
 int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const int def[3], const BinMapF32 * const pMC)
 {
-   const size_t nF= prodNI(def,3);
-   BMStrideDesc sd[1];
-   const size_t nBM= setBMSD(sd, def, 0); //(planeStride * def[2])
    int r= 0;
 
    acc_set_device_type( acc_device_nvidia ); // HACKY
    if (acc_device_nvidia == acc_get_device_type())
    {
-      #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF], def[:3], sd[:1], pMC[:1] ) copy( rBPFD[:MKF_BINS] )
+      BMStrideDesc sd;
+      const size_t nF= prodNI(def,3);
+      const size_t nBM= setBMSD(&sd, def, 0); //(planeStride * def[2])
+      MultiFieldInfo mfi={0};
+
+      mfi.nField= 1;
+      mfi.elemBits= 32;
+      //mfi.opr= mfi.profile= 0;
+      Stride k= 1;
+      for (int i=0; i<3; i++)
+      {
+         mfi.def[i]= def[i];
+         mfi.mfd.stride.s[i]= k;
+         k*= def[i];
+      }
+      #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF] ) copy( rBPFD[:MKF_BINS] )
       {
          // Do some OpenACC stuff here...
          // ...then invoke CUDA routines
          #pragma acc host_data use_device( rBPFD, pBM, pF ) // CUDA needs to access device memory
          { //  allocated via OpenACC for scalar field data (other args passed by value)
-            binMapCudaRowsF32(pBM, pF, def[0], sd[0].row, def[1] * def[2], pMC);
-            r= mkfCUDAGetBPFD(rBPFD, def, sd, pBM);
+            mfi.mfd.pF32[0]= pF;
+            if (binMapCUDA(pBM, &sd, &mfi, pMC))
+            //if (binMapCudaRowsF32(pBM, pF, def[0], sd.row, def[1] * def[2], pMC))
+               { r= mkfCUDAGetBPFD(rBPFD, mfi.def, &sd, pBM); }
          }
       }
    }

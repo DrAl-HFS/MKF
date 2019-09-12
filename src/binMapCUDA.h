@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 //extern "C"
-void binMapCudaRowsF32
+int binMapCudaRowsF32
 (
    U32 * pBM,
    const F32 * pF,

@@ -97,11 +97,12 @@ void reportMeasures (const size_t a[256], const float mScale)
 
 int main (int argc, char *argv[])
 {
-   int id=4, def[3]= {256+1, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
+   int id=4, def[3]= {256, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
    BinMapF32 bmc;
    size_t *pBPFD=NULL, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
    Context cux={0};
 
+ctuInfo();
    //geomTest(2,2);
    //c8sTest();
    mkfuTest(0);
