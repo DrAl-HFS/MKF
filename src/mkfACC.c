@@ -208,29 +208,24 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
       BMStrideDesc sd;
       const size_t nF= prodNI(def,3);
       const size_t nBM= setBMSD(&sd, def, 0); //(planeStride * def[2])
-      MultiFieldInfo mfi={0};
+      BMFieldInfo fi={0};
 
-      mfi.nField= 1;
-      mfi.elemBits= 32;
-      //mfi.opr= mfi.profile= 0;
-      Stride k= 1;
-      for (int i=0; i<3; i++)
-      {
-         mfi.def[i]= def[i];
-         mfi.mfd.stride.s[i]= k;
-         k*= def[i];
-      }
-      LOG("* row, plane = %u, %u\n", sd.row, sd.plane);
+      LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
+      fi.nField= 1;
+      fi.elemBits= 32;
+      //fi.opr= fi.profile= 0;
+      fi.pD= def;
+      //fi.pS= NULL; // auto stride
+      //LOG("* row, plane = %u, %u\n", sd.row, sd.plane);
       #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF] ) copy( rBPFD[:MKF_BINS] )
       {
          // Do some OpenACC stuff here...
          // ...then invoke CUDA routines
          #pragma acc host_data use_device( rBPFD, pBM, pF ) // CUDA needs to access device memory
          { //  allocated via OpenACC for scalar field data (other args passed by value)
-            mfi.mfd.field[0].pF32= pF;
-            if (binMapCUDA(pBM, &sd, &mfi, pMC))
-            //if (binMapCudaRowsF32(pBM, pF, def[0], sd.row, def[1] * def[2], pMC))
-               { r= mkfCUDAGetBPFD(rBPFD, mfi.def, &sd, pBM); }
+            fi.field[0].pF32= pF;
+            if (binMapCUDA(pBM, &sd, &fi, pMC))
+               { r= mkfCUDAGetBPFD(rBPFD, def, &sd, pBM); }
          }
       }
    }

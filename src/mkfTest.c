@@ -75,14 +75,23 @@ void checkNZ (const size_t u[], const int n, const char *pVrbFmt)
 int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flags)
 {
    int d, sDiff=0, nDiff= 0;
-   for (int i= 0; i < n; i++)
+   size_t s[2];
+   s[0]= sumNZ(u0,n); s[1]= sumNZ(u1, n);
+   if (s[0] != s[1])
    {
-      d= (int)(u1[i] - u0[i]);
-      sDiff+= d;
-      nDiff+= 0 != d;
-      if (flags && d) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); }
+      LOG("compareNZ() - s[]= %zu, %zu\n", s[0], s[1]);
    }
-   LOG("compareNZ() - sDiff=%d, nDiff=%d\n", sDiff, nDiff);
+   else
+   {
+      for (int i= 0; i < n; i++)
+      {
+         d= (int)(u1[i] - u0[i]);
+         sDiff+= d;
+         nDiff+= 0 != d;
+         if (flags && d) { LOG("[0x%X] %zu %zu\n", i, u0[i], u1[i]); }
+      }
+      LOG("compareNZ() - sDiff=%d, nDiff=%d\n", sDiff, nDiff);
+   }
    return(nDiff);
 } // compareNZ
 
@@ -91,7 +100,7 @@ void reportMeasures (const size_t a[256], const float mScale)
    float m[4];
    if (mkfMeasureBPFD(m, a, mScale, 0))
    {
-      LOG(" V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+      LOG(" K M S V: %G %G %G %G\n", m[0], m[1], m[2], m[3]);
    }
 } // reportMeasures
 
@@ -121,15 +130,6 @@ ctuInfo();
       mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
       reportMeasures(aBPFD1, mScale);
 
-#ifdef MKF_ACC_CUDA_INTEROP
-      LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
-      if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
-      {
-         reportMeasures(aBPFD2, mScale);
-         compareNZ(aBPFD1, aBPFD2, MKF_BINS, 1);
-      }
-#endif // MKF_ACC_CUDA_INTEROP
-
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
       LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
@@ -140,12 +140,24 @@ ctuInfo();
       }
 #endif // MKF_CUDA
 
-      LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", aBPFD2);
-      SWAP(int,def[0],def[2]);
-      vfR= genPattern(cux.pHF, id, def, param);
-      mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
-      reportMeasures(aBPFD2, mScale);
-      compareNZ(aBPFD1, aBPFD2, MKF_BINS, 0x0);
+#ifdef MKF_ACC_CUDA_INTEROP
+      LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
+      if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
+      {
+         reportMeasures(aBPFD2, mScale);
+         compareNZ(aBPFD1, aBPFD2, MKF_BINS, 1);
+      }
+#endif // MKF_ACC_CUDA_INTEROP
+
+      if (def[0] != def[2])
+      {
+         LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", aBPFD2);
+         SWAP(int,def[0],def[2]);
+         vfR= genPattern(cux.pHF, id, def, param);
+         mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
+         reportMeasures(aBPFD2, mScale);
+         compareNZ(aBPFD1, aBPFD2, MKF_BINS, 0x0);
+      }
    }
    buffRelease(&cux);
 	return(0);

@@ -257,7 +257,13 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         binMapCudaRowsF32(pC->pDU, pC->pDF, def[0], pC->sd.row, def[1] * def[2], pMC);
+
+         BMFieldInfo fi= {
+            { 1, 32, 0, 0 },
+            def, NULL,
+            {pC->pDF, NULL, NULL, NULL }
+         };
+         binMapCUDA(pC->pDU, &(pC->sd), &fi, pMC);
 
          if (pC->pHU)
          {

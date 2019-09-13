@@ -36,43 +36,26 @@ typedef struct
 #define BMC_NV (0x0)
 #define BMC_AL (0x7)
 
+typedef uint BMStride;
+
 typedef struct
-{
-   uint row, plane;
+{  // int def[3] ???
+   BMStride row, plane;
 } BMStrideDesc;
 
-typedef long int Stride;
+
+#define BMFI_FIELD_MAX 4
+
+typedef union { const void *p; const float *pF32; const double *pF64; size_t w; } ConstFieldPtr;
+typedef long int FieldStride;
+typedef int    FieldDef;
 typedef struct
 {
-   Stride s[2];
-} Stride2;
-
-typedef struct
-{
-   Stride s[3];
-} Stride3;
-
-#define MFC_FIELD_MAX 4
-
-typedef union { void *p; float *pF32; double *pF64; size_t w; } ScalarPtr;
-typedef struct
-{
-   Stride3 stride;
-    // Entire field, possibly interleaved
-   ScalarPtr field[MFC_FIELD_MAX];
-/*   union { // NB: always DEVICE mem ptrs!
-      const void * p[MFC_FIELD_MAX];
-      const float  * pF32[MFC_FIELD_MAX];
-      const double * pF64[MFC_FIELD_MAX];
-   };*/
-} MultiFieldDesc;
-
-typedef struct
-{  struct { // anon structs - influence packing ?
-      struct { uint8_t  nField, elemBits, opr, profile; };
-      int       def[3]; }; // Def to process, possibly sub region of larger field
-   MultiFieldDesc mfd;
-} MultiFieldInfo;
+   struct { uint8_t  nField, elemBits, opr, profile; }; // anon structs - may influence packing ?
+   const FieldDef    *pD;
+   const FieldStride *pS;  // Assume fully planar fields if NULL
+   ConstFieldPtr     field[BMFI_FIELD_MAX];
+} BMFieldInfo;
 
 
 /***/
