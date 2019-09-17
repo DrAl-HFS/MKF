@@ -34,7 +34,7 @@ U8 bm2F32 (const F32 f, const BinMapCtxF32 *pC)
 
 /***/
 
-void setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
+BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
 {
    int i= 0, inv= 0, valid= 1;
    pC->t[0]= t;
@@ -54,6 +54,7 @@ void setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
    } while (valid);
    if (inv) { pC->m^= BMC_AL; }
    //LOG_CALL("(%p, %s, %G) - m=0x%X\n", pC, relopChars, t, pC->m);
+   return(pC);
 } // setBinMapF32
 
 size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID)

@@ -218,10 +218,8 @@ __global__ void vThreshVSum32
 } // vThreshVSum32
 
 
-/* INTERFACE */
-
-extern "C"
-int binMapCudaRowsF32
+// DEPRECATED
+static int binMapCudaRowsF32
 (
    U32 * pBM,
    const F32 * pF,
@@ -254,6 +252,8 @@ int binMapCudaRowsF32
    return(r);
 } // binMapCudaRowsF32
 
+
+/* INTERFACE */
 
 extern "C"
 BMStrideDesc *binMapCUDA

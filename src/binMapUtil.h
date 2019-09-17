@@ -61,7 +61,7 @@ typedef struct
 /***/
 
 // Define map (comparison operator) using a string
-extern void setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t);
+extern BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t);
 
 extern size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID);
 

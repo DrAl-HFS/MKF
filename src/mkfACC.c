@@ -221,11 +221,15 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
       {
          // Do some OpenACC stuff here...
          // ...then invoke CUDA routines
-         #pragma acc host_data use_device( rBPFD, pBM, pF ) // CUDA needs to access device memory
-         { //  allocated via OpenACC for scalar field data (other args passed by value)
+         #pragma acc host_data use_device( rBPFD, pBM, pF ) // get device memory pointers
+         {  // allocated via OpenACC for CUDA access to array/field data (others passed to
+            // kernels using API "value parameter auto-marshalling" - const memory?)
             fi.field[0].pF32= pF;
             if (binMapCUDA(pBM, &sd, &fi, pMC))
-               { r= mkfCUDAGetBPFD(rBPFD, def, &sd, pBM); }
+            {
+               //LOG("\tsd= %u %u\n", sd.row, sd.plane);
+               r= mkfCUDAGetBPFD(rBPFD, def, &sd, pBM);
+            }
          }
       }
    }

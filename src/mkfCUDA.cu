@@ -109,7 +109,7 @@ __device__ void addRowBPFD
    ChunkBuf  cb(pRow[0]+0, pRow[1]+0, rowStride);
 
    cb.add(bpfd, k-1);
-   // Subsequent whole chunks yield n patterns
+   // Subsequent whole chunks yield k patterns
    while (++i < m)
    {
       cb.loadSh1(pRow[0]+i, pRow[1]+i, rowStride);
@@ -197,8 +197,8 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
    const int nBlk= (nRowPairs + blkD-1) / blkD;
 
    CTimerCUDA t;
-   t.stampStream();
-
+   //t.stampStream();
+   LOG("\tsd= %u, %u\n", pSD->row, pSD->plane);
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
@@ -302,12 +302,20 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
 #include "geomHacks.h"
 #include "mkfUtil.h"
 
-int buffAlloc (Context *pC, const int def[3])
+int buffAlloc (Context *pC, const int def[3], int flags)
 {
-   pC->nF= 0;
-   pC->bytesF= 0;
-   pC->nU= setBMSD(&(pC->sd), def, 0);
-   pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
+   if (flags & 0x01)
+   {
+      pC->nF= prodNI(def,3);
+      pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
+   }
+   else { pC->nF= 0; pC->bytesF= 0; }
+   if (flags & 0x02)
+   {
+      pC->nU= setBMSD(&(pC->sd), def, 0);
+      pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
+   }
+   else { pC->nU= 0; pC->bytesU= 0; }
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ;
 
@@ -364,7 +372,7 @@ checkHU ()
    dumpUX(pC->pHU+3*n, n, m);
 }
 #endif
-size_t mkft (const Context *pC, const int def[3])
+size_t mkft (const Context *pC, const int def[3], const float mScale)
 {
    cudaError_t r;
    size_t sum= 0;
@@ -376,9 +384,9 @@ size_t mkft (const Context *pC, const int def[3])
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
    float m[4];
-   if (mkfMeasureBPFD(m, pBPFD, 1, 0))
+   if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
    {
-      LOG(" V S M K: %G %G %G %G\n", m[3],m[2],m[1],m[0]);
+      LOG(" K M S V: %G %G %G %G\n", m[0],m[1],m[2],m[3]);
    }
    for (int i= 0; i<MKF_BINS; i++)
    {
@@ -390,20 +398,29 @@ size_t mkft (const Context *pC, const int def[3])
 
 int main (int argc, char *argv[])
 {
+   const float param= 256-64;
    const int def[3]= {256,256,256}; //{96,9,9};
    Context cux={0};
+   const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
 
-   if (buffAlloc(&cux, def))
+   if (buffAlloc(&cux, def, 0x03))
    {
       const size_t nC= prodOffsetNI(def,3,-1);
       LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
       //sanityTest(&cux);
-      if (1)
+      if (cux.pHF)
       {
-         genPattern(cux.pHF, 1, def, 0.5*def[1] - 0.5);
-         mkft(&cux,def);
+         BinMapF32 mc={0};
+         genPattern(cux.pHF, 4, def, param);
+         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5));
+         const size_t *pBPFD= (size_t*)(cux.pHZ);
+         float m[4];
+         if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
+         {
+            LOG(" K M S V: %G %G %G %G\n", m[0],m[1],m[2],m[3]);
+         }
       }
-      else
+      else if (cux.pHU)
       {
          const int wDef= cux.sd.row;
          const int lDef= def[1] * def[2];
@@ -414,7 +431,7 @@ int main (int argc, char *argv[])
             for (int j=0; j<wDef; j++) { cux.pHU[wDef * i + j]= 0xFFFFFFFF; }
             if (m) { cux.pHU[wDef * (i+1) - 1]= m; }
          }
-         mkft(&cux,def);
+         mkft(&cux,def, mScale);
 
          int j= wDef/2;
          for (int i= 0; i < lDef; i++)
@@ -429,7 +446,7 @@ int main (int argc, char *argv[])
             LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
 #endif
-         mkft(&cux,def);
+         mkft(&cux,def,mScale);
       }
       cuBuffRelease(&cux);
    }

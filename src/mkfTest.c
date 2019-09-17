@@ -18,9 +18,9 @@ int setupAcc (int id)
    if (1 == id) { id= acc_device_nvidia; } else { id= acc_device_host; }
    acc_set_device_type( id );
    r= acc_get_device_type();
-   LOG_CALL("() - acc_set_device_type( * ) - %d -> %d\n", "", id, r);
+   LOG_CALL("() - acc_set_device_type( * ) - 0x%X -> %d\n", "", id, r);
 #endif
-   return(r == id);
+   return(r);
 } // setupAcc
 
 B32 buffAlloc (Context *pC, const int def[3])
@@ -79,7 +79,7 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flag
    s[0]= sumNZ(u0,n); s[1]= sumNZ(u1, n);
    if (s[0] != s[1])
    {
-      LOG("compareNZ() - s[]= %zu, %zu\n", s[0], s[1]);
+      LOG("compareNZ() - s[]= %zu, %zu (ratio: %G %G)\n", s[0], s[1], (float)s[0] / s[1], (float)s[1]/ s[0]);
    }
    else
    {
@@ -104,6 +104,12 @@ void reportMeasures (const size_t a[256], const float mScale)
    }
 } // reportMeasures
 
+size_t bitCountNZ (size_t z[], const int n)
+{  size_t s= bitCountZ(z[0]);
+   for (int i=1; i<n; i++) { s+= bitCountZ(z[i]); }
+   return(s);
+} // bitCountNZ
+
 int main (int argc, char *argv[])
 {
    int id=4, def[3]= {256, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
@@ -111,7 +117,7 @@ int main (int argc, char *argv[])
    size_t *pBPFD=NULL, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
    Context cux={0};
 
-ctuInfo();
+   //ctuInfo();
    //geomTest(2,2);
    //c8sTest();
    mkfuTest(0);
@@ -135,6 +141,7 @@ ctuInfo();
       LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc))
       {
+         //LOG("bc=%zu\n", bitCountNZ(cux.pHU, cux.bytesU/sizeof(size_t)));
          reportMeasures(pBPFD, mScale);
          compareNZ(aBPFD1, pBPFD, MKF_BINS, 1);
       }
