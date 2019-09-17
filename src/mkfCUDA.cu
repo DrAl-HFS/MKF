@@ -403,7 +403,7 @@ int main (int argc, char *argv[])
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
 
-   if (buffAlloc(&cux, def, 0x03))
+   if (buffAlloc(&cux, def, 0x02))
    {
       const size_t nC= prodOffsetNI(def,3,-1);
       LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
@@ -411,7 +411,7 @@ int main (int argc, char *argv[])
       if (cux.pHF)
       {
          BinMapF32 mc={0};
-         genPattern(cux.pHF, 4, def, param);
+         genPattern(cux.pHF, def, 32, 4, param);
          mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5));
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
@@ -422,6 +422,7 @@ int main (int argc, char *argv[])
       }
       else if (cux.pHU)
       {
+#if 0
          const int wDef= cux.sd.row;
          const int lDef= def[1] * def[2];
          const uint m= BIT_MASK(def[0] & 0x1F);
@@ -445,6 +446,9 @@ int main (int argc, char *argv[])
             for ( ; j<wDef-1; j++) { LOG("%08X ", cux.pHU[wDef * i + j]); }
             LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
+#endif
+#else
+         genPattern(cux.pHU, def, 1, 4, param);
 #endif
          mkft(&cux,def,mScale);
       }
