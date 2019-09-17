@@ -39,6 +39,9 @@ extern float volFrac8 (const size_t hBPD[MKF_BINS]);
 
 extern void mkfuTest (int m);
 
+// DISPLACE - where ?
+extern size_t sumNZ (const size_t a[], const int n);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

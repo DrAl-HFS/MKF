@@ -125,6 +125,7 @@ I64 prodOffsetNI (const int x[], const int n, const int o)
 
 /***/
 
+/* DEPRECATE
 B32 inBall (const float x[3], const Ball3D *pB)
 {
    return( sqrMag3D(x[0]-pB->c[0], x[1]-pB->c[1], x[2]-pB->c[2]) <= (pB->r * pB->r) );
@@ -177,11 +178,12 @@ size_t genBlock (float f[], const int def[3], const float r[3])
    }
    return(n);
 } // genBlock
+*/
 
 float genPattern (float f[], int id, const int def[3], const float param)
 {
    const char *name[]={"empty","ball","solid","box","balls"};
-   size_t n, nF= def[0] * def[1] * def[2];
+   size_t n, nE= prodNI(def,3);
    float r[3], scale= 1.0 / midRangeNI(def,3);
    Ball3D b[2];
    GeomParam gp;
@@ -189,11 +191,11 @@ float genPattern (float f[], int id, const int def[3], const float param)
    VA3D m={0,0};
    int t=0;
 
-   n= nF;
+   n= nE;
    memset(&gp, 0, sizeof(gp));
    if (0 == (rp.flags & RAS_FLAG_WRAL))
    {  // Lazy write needs clean buffer...
-      memset(f, 0, nF * sizeof(f[0]) );
+      memset(f, 0, nE * sizeof(f[0]) );
    }
    switch(id)
    {
@@ -202,52 +204,48 @@ float genPattern (float f[], int id, const int def[3], const float param)
          b[1].r= 0.3 * param;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.4 * def[d]; b[1].c[d]= 0.6 * def[d]; }
          t= measureScaledBB(&m, b, scale);
-#if 0
-         n= genNBall(f, def, b, 2);
-#else
+         // set rasterisation param
+         gp.id= 0x3; //GEOM_BALL
+         gp.nObj= 2;
          gp.vF[gp.nF++]= b[0].r; // {r,c(x,y,z)}
          copyNF(gp.vF+gp.nF, 3, b[0].c); gp.nF+= 3;
          gp.vF[gp.nF++]= b[1].r; // {r,c(x,y,z)}
          copyNF(gp.vF+gp.nF, 3, b[1].c); gp.nF+= 3;
-         gp.nObj= 2;
-         gp.id= 0x3; //2;
-         LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
-         n= rasterise((void*)f, def, &gp, &rp);
-#endif
          break;
       case 3 :
-         setKNF(r,3,param*scale);
+         setKNF(r,3,0.5*param*scale);
          m.a= blockArea(r);
          m.v= blockVol(r);
-         n= genBlock(f, def, setKNF(r,3,param));
+         // set rasterisation param
+         gp.id= 0x5; //GEOM_BOX
+         gp.nObj= 1;
+         setKNF(gp.vF+gp.nF, 3, 0.5*param); gp.nF+= 3; // {r(x,y,z),c(x,y,z)}
+         scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
          break;
       case 2 :
          m.v= 1;
-         memset(f, -1, sizeof(f[0])*nF);
+         memset(f, -1, sizeof(f[0])*nE);
          break;
       case 1 :
          b[0].r= 0.5 * param;
          m.a= sphereArea(b[0].r*scale);
          m.v= sphereVol(b[0].r*scale);
-#if 0
-         scaleFNI(b[0].c, 3, def, 0.5);
-         n= genNBall(f, def, b, 1);
-#else
-         gp.vF[gp.nF++]= 0.5 * param; // {r,c(x,y,z)}
-         //gp.vF[gp.nF++]= 0.25 * param; // {r,c(x,y,z)}
-         scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
+         // set rasterisation param
+         gp.id= 0x3; //GEOM_BALL
          gp.nObj= 1;
-         gp.id= 0x3; //2;
-         LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
-         n= rasterise((void*)f, def, &gp, &rp);
-#endif
+         gp.vF[gp.nF++]= 0.5 * param; // {r,c(x,y,z)}
+         scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
          break;
       default :
          id= 0;
-         memset(f, 0, sizeof(f[0])*nF);
+         memset(f, 0, sizeof(f[0])*nE);
          break;
    }
-   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], param, t, n, nF, (F64)n / nF, m.v);
+   if ((gp.id > 0) && (gp.nObj > 0))
+   {  LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
+      n= rasterise((void*)f, def, &gp, &rp);
+   }
+   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], param, t, n, nE, (F64)n / nE, m.v);
    return(m.v);
 } // genPattern
 
