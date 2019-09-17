@@ -180,22 +180,26 @@ size_t genBlock (float f[], const int def[3], const float r[3])
 } // genBlock
 */
 
-float genPattern (float f[], int id, const int def[3], const float param)
+float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const float param)
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);
    float r[3], scale= 1.0 / midRangeNI(def,3);
    Ball3D b[2];
    GeomParam gp;
-   RasParam rp={{{0.0, 1.0}},RAS_FLAG_FLOAT|32};
+   RasParam rp={0,}; // {{0.0, 1.0}},RAS_FLAG_FLOAT|32};
    VA3D m={0,0};
    int t=0;
 
-   n= nE;
+   if (bits <= 32) { rp.flags= (RAS_MASK_BITS & bits); }
+   if (bits < 32) { rp.wI[0]= 0; rp.wI[1]= 1; }
+   else { rp.wF[0]= 0.0; rp.wF[1]= 1.0; rp.flags|= RAS_FLAG_FLOAT; }
+
+   n= BITS_TO_BYTES(bits * nE);
    memset(&gp, 0, sizeof(gp));
    if (0 == (rp.flags & RAS_FLAG_WRAL))
    {  // Lazy write needs clean buffer...
-      memset(f, 0, nE * sizeof(f[0]) );
+      memset(pV, 0, n);
    }
    switch(id)
    {
@@ -224,7 +228,7 @@ float genPattern (float f[], int id, const int def[3], const float param)
          break;
       case 2 :
          m.v= 1;
-         memset(f, -1, sizeof(f[0])*nE);
+         memset(pV, -1, n);
          break;
       case 1 :
          b[0].r= 0.5 * param;
@@ -238,12 +242,12 @@ float genPattern (float f[], int id, const int def[3], const float param)
          break;
       default :
          id= 0;
-         memset(f, 0, sizeof(f[0])*nE);
+         memset(pV, 0, n);
          break;
    }
    if ((gp.id > 0) && (gp.nObj > 0))
    {  LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
-      n= rasterise((void*)f, def, &gp, &rp);
+      n= rasterise(pV, def, &gp, &rp);
    }
    LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], param, t, n, nE, (F64)n / nE, m.v);
    return(m.v);

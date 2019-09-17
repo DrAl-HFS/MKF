@@ -9,8 +9,14 @@
 /***/
 
 #ifndef NO_REF_MEASURES
-// Reference measures published in ""
+
+// Source code for reference measures published in:
+// Ohser J, Mucklich F. (2001) "Statistical Analysis of
+//    Microstructures in Materials Science" pp.116-123,
+//    Wiley, ISBN-0471974862.
+
 #include "refMeasures.inc"
+
 #endif
 
 static const int8_t gWK[CELL8_SYMM_GROUPS]=
