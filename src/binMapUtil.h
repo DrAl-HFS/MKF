@@ -37,9 +37,11 @@ typedef struct
 #define BMC_AL (0x7)
 
 typedef uint BMStride;
+typedef uint BMPackWord;
 
 typedef struct
-{  // int def[3] ???
+{
+   int       def[3];
    BMStride row, plane;
 } BMStrideDesc;
 

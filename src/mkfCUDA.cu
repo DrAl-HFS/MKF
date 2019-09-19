@@ -99,7 +99,7 @@ public:
 __device__ void addRowBPFD
 (
    uint          bpfd[], // result pattern distribution
-   const uint * pRow[2],
+   const BMPackWord * pRow[2],
    const int    rowStride,
    const int    n    // Number of single bit elements packed in row
 )
@@ -161,7 +161,7 @@ __device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const int la
 } // reduceBins
 #endif
 
-__global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uint * pPln1, const int rowStride, const int defW, const int defH)
+__global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pPln0, const BMPackWord * pPln1, const int rowStride, const int defW, const int defH)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    const int laneIdx= i & BPFD_BLKM;
@@ -184,14 +184,36 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const uint * pPln0, const uin
    reduceBins(rBPFD, bpfd, laneIdx, bins);
 } // addPlaneBPFD
 
+__global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, const BMStrideDesc sd)
+{
+   const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
+   //const size_t j= blockIdx.y; // * blockDim.y + threadIdx.y;
+   const int laneIdx= i & BPFD_BLKM;
+   const int bins= BPFD_W32_BINS;
+#ifndef PACK16
+   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB/Warp -> 1W per SM
+#else
+   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB/Warp -> 2W per SM
+#endif
+   zeroBins(bpfd, laneIdx, bins);
+   if (i < sd.def[1])
+   {
+      const BMPackWord * pRow[2];
+      pRow[0]= pP + blockIdx.y * sd.plane + i * sd.row;
+      pRow[1]= pRow[0] + sd.plane;
+      addRowBPFD(bpfd+laneIdx*bins, pRow, sd.row, sd.def[0]);
+   }
+   __syncthreads();
+   reduceBins(rBPFD, bpfd, laneIdx, bins);
+} // addMultiPlaneBPFD
 
 /***/
 
 extern "C"
-int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, const U32 * pBM)
+int mkfCUDAGetBPFD (size_t * pBPFD, const BMStrideDesc *pSD, const U32 * pBM)
 {
-   const int nRowPairs= def[1]-1;
-   const int nPlanePairs= def[2]-1;
+   const int nRowPairs= pSD->def[1]-1;
+   const int nPlanePairs= pSD->def[2]-1;
 
    const int blkD= BPFD_BLKD;
    const int nBlk= (nRowPairs + blkD-1) / blkD;
@@ -199,24 +221,34 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const int def[3], const BMStrideDesc *pSD, c
    CTimerCUDA t;
    //t.stampStream();
    LOG("\tsd= %u, %u\n", pSD->row, pSD->plane);
+
+#if 0
+   dim3 grd(nBlk,nPlanePairs,1);
+   dim3 blk(blkD,1,1);
+   addMultiPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pBM, *pSD);
+   if (0 != ctuErr(NULL, "addMultiPlaneBPFD"))
+   { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pBM); }
+#endif
+
 #if 1
    for (int i= 0; i < nPlanePairs; i++)
    {
       const U32 *pP0= pBM + i * pSD->plane;
       const U32 *pP1= pBM + (i+1) * pSD->plane;
       //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, def[0], nRowPairs); //, pBPFD+256);
+      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
    }
-#else
+#endif
+#if 0
    const U32 *pP0= pBM;
    const U32 *pP1= pP0 + pSD->plane;
 
    for (int i= 0; i < nPlanePairs; i++)
    {
       //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, def[0], nRowPairs); //, pBPFD+256);
+      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
       if (0 != ctuErr(NULL, "addPlaneBPFD"))
       { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
       pP0= pP1; pP1+= pSD->plane;
@@ -285,7 +317,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
    if (pC->pDU && pC->pDZ)
    {
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, &(pC->sd), pC->pDU);
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU);
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
@@ -376,10 +408,11 @@ size_t mkft (const Context *pC, const int def[3], const float mScale)
 {
    cudaError_t r;
    size_t sum= 0;
+   int verbose= 0;
 
    r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
    r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
-   mkfCUDAGetBPFD((size_t*)(pC->pDZ), def, &(pC->sd), pC->pDU);
+   mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU);
    r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
@@ -391,7 +424,7 @@ size_t mkft (const Context *pC, const int def[3], const float mScale)
    for (int i= 0; i<MKF_BINS; i++)
    {
       sum+= pBPFD[i];
-      if (pBPFD[i] > 0) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
+      if (verbose && (pBPFD[i] > 0)) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
    }
    return(sum);
 } // mkft

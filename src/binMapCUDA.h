@@ -14,10 +14,10 @@ extern "C" {
 
 BMStrideDesc *binMapCUDA
 (
-   uint           * pBM,
-   BMStrideDesc  * pBMSD,
+   BMPackWord        * pBM,
+   BMStrideDesc      * pBMSD,
    const BMFieldInfo * pBMFI,
-   const BinMapF32    * pMC
+   const BinMapF32   * pMC
 );
 
 #ifdef __cplusplus

@@ -228,7 +228,7 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
             if (binMapCUDA(pBM, &sd, &fi, pMC))
             {
                //LOG("\tsd= %u %u\n", sd.row, sd.plane);
-               r= mkfCUDAGetBPFD(rBPFD, def, &sd, pBM);
+               r= mkfCUDAGetBPFD(rBPFD, &sd, pBM);
             }
          }
       }

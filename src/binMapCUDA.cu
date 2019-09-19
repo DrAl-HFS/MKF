@@ -101,7 +101,7 @@ __device__ int bm1f32 (const float f, const BinMapF32& bm)
    return( (bm.m >> d) & 0x1 );
 } // bm1f32
 
-__device__ void merge32 (uint u[32], const int j)
+__device__ void merge32 (BMPackWord u[32], const int j)
 {
 /* TODO: consider using CUDA9 warp level primitives...
 #define FULL_MASK 0xffffffff
@@ -127,7 +127,7 @@ for (int offset = 16; offset > 0; offset /= 2)
 
 /***/
 
-__global__ void vThreshL32 (uint r[], const float f[], const size_t n, const BinMapF32 bm)
+__global__ void vThreshL32 (BMPackWord r[], const float f[], const size_t n, const BinMapF32 bm)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint z[VT_BLKN];
@@ -164,7 +164,7 @@ __global__ void vThreshL32 (uint r[], const float f[], const size_t n, const Bin
 
 __global__ void vThreshV32
 (
-   uint rBM[],
+   BMPackWord rBM[],
    const CUDAFieldDesc fd,
    const BMStrideDesc sBM,
    const BinMapF32 bm
@@ -190,7 +190,7 @@ __global__ void vThreshV32
 
 __global__ void vThreshVSum32
 (
-   uint rBM[],
+   BMPackWord rBM[],
    const CUDAFieldDesc fd,
    const BMStrideDesc sBM,
    const BinMapF32 bm
@@ -221,7 +221,7 @@ __global__ void vThreshVSum32
 // DEPRECATED
 static int binMapCudaRowsF32
 (
-   U32 * pBM,
+   BMPackWord * pBM,
    const F32 * pF,
    const int rowLenF,      // row length ie. "X dimension"
    const int rowStrideBM,  // 32bit word stride of rows of packed binary map, should be >= rowLenF/32
@@ -258,8 +258,8 @@ static int binMapCudaRowsF32
 extern "C"
 BMStrideDesc *binMapCUDA
 (
-   uint        * pBM,
-   BMStrideDesc * pBMSD,
+   BMPackWord        * pBM,
+   BMStrideDesc      * pBMSD,
    const BMFieldInfo * pBMFI,
    const BinMapF32   * pMC
 )

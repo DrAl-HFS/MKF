@@ -59,20 +59,28 @@ BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
 
 size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID)
 {
-   BMStrideDesc sd;
+   BMStride rowStride, planeStride;
+   uint maxRow= MIN(2, def[1]);
    uint maxPlane= MIN(2, def[2]);
 
-   if (NULL == pSD) { pSD= &sd; }
-   sd.row= BITS_TO_WRDSH(def[0],5);  // Packed 32bit words
+   rowStride= BITS_TO_WRDSH(def[0],5);  // Packed 32bit words
    switch (profID)
    {
       case 0 :
+         maxRow=   def[1];
          maxPlane= def[2];
          break;
    }
-   sd.plane= sd.row * def[1];
-   if (pSD) { *pSD= sd; }
-   return((size_t)sd.plane * maxPlane);
+   planeStride= rowStride * maxRow;
+   if (pSD)
+   {
+      pSD->def[0]= def[0];
+      pSD->def[1]= maxRow;
+      pSD->def[2]= maxPlane;
+      pSD->row=   rowStride;
+      pSD->plane= planeStride;
+   }
+   return((size_t)planeStride * maxPlane);
 } // setBMSD
 
 #if 0
