@@ -186,7 +186,7 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pPln0, con
    reduceBins(rBPFD, bpfd, laneIdx, bins);
 } // addPlaneBPFD
 
-__global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, const BMStrideDesc sd)
+__global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, const BMOrg bmo)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    //const size_t j= blockIdx.y; // * blockDim.y + threadIdx.y;
@@ -198,12 +198,12 @@ __global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, c
    __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB/Warp -> 2W per SM
 #endif
    zeroBins(bpfd, laneIdx, bins);
-   if (i < (sd.def[1]-1))
+   if (i < bmo.rowPairs)
    {
       const BMPackWord * pRow[2];
-      pRow[0]= pP + blockIdx.y * sd.plane + i * sd.row;
-      pRow[1]= pRow[0] + sd.plane;
-      addRowBPFD(bpfd+laneIdx*bins, pRow, sd.row, sd.def[0]);
+      pRow[0]= pP + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
+      pRow[1]= pRow[0] + bmo.planeWS;
+      addRowBPFD(bpfd+laneIdx*bins, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
    reduceBins(rBPFD, bpfd, laneIdx, bins);
@@ -212,38 +212,35 @@ __global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, c
 /***/
 
 extern "C"
-int mkfCUDAGetBPFD (size_t * pBPFD, const BMStrideDesc *pSD, const U32 * pBM, const uint8_t profHack)
+int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const uint8_t profHack)
 {
-   const int nRowPairs= pSD->def[1]-1;
-   const int nPlanePairs= pSD->def[2]-1;
-
    const int blkD= BPFD_BLKD;
-   const int nBlk= (nRowPairs + blkD-1) / blkD;
+   const int nBlk= (pO->rowPairs + blkD-1) / blkD;
 
    CTimerCUDA t;
    //t.stampStream();
-   LOG("\tsd= %u, %u\n", pSD->row, pSD->plane);
+   //LOG("\tsd= %u, %u\n", pO->rowWS, pO->planeWS);
 
    switch (profHack)
    {
       case 3 :
       {
-         dim3 grd(nBlk,nPlanePairs,1);
+         dim3 grd(nBlk,pO->planePairs,1);
          dim3 blk(blkD,1,1);
-         addMultiPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pBM, *pSD);
+         addMultiPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, *pO);
          if (0 != ctuErr(NULL, "addMultiPlaneBPFD"))
-         { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pBM); }
+         { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW); }
          break;
       }
 
       case 2 :
       {
-         for (int i= 0; i < nPlanePairs; i++)
+         for (int i= 0; i < pO->planePairs; i++)
          {
-            const U32 *pP0= pBM + i * pSD->plane;
-            const U32 *pP1= pBM + (i+1) * pSD->plane;
+            const BMPackWord *pP0= pW + i * pO->planeWS;
+            const BMPackWord *pP1= pW + (i+1) * pO->planeWS;
             //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
+            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pO->rowWS, pO->rowElem, pO->rowPairs); //, pBPFD+256);
             if (0 != ctuErr(NULL, "addPlaneBPFD"))
             { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
          }
@@ -252,16 +249,16 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMStrideDesc *pSD, const U32 * pBM, co
 
       default :
       {
-         const U32 *pP0= pBM;
-         const U32 *pP1= pP0 + pSD->plane;
+         const BMPackWord *pP0= pW;
+         const BMPackWord *pP1= pP0 + pO->planeWS;
 
-         for (int i= 0; i < nPlanePairs; i++)
+         for (int i= 0; i < pO->planePairs; i++)
          {
             //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
+            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pO->rowWS, pO->rowElem, pO->rowPairs); //, pBPFD+256);
             if (0 != ctuErr(NULL, "addPlaneBPFD"))
             { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-            pP0= pP1; pP1+= pSD->plane;
+            pP0= pP1; pP1+= pO->planeWS;
          }
          break;
       }
@@ -306,7 +303,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
             def, NULL,
             {pC->pDF, NULL, NULL, NULL }
          };
-         binMapCUDA(pC->pDU, &(pC->sd), &fi, pMC);
+         binMapCUDA(pC->pDU, &(pC->bmo), &fi, pMC);
 
          if (pC->pHU)
          {
@@ -328,7 +325,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
    if (pC->pDU && pC->pDZ)
    {
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU, 0);
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, 0);
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
@@ -355,7 +352,7 @@ int buffAlloc (Context *pC, const int def[3], int flags)
    else { pC->nF= 0; pC->bytesF= 0; }
    if (flags & 0x02)
    {
-      pC->nU= setBMSD(&(pC->sd), def, 0);
+      pC->nU= setBMO(&(pC->bmo), def, 0);
       pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    }
    else { pC->nU= 0; pC->bytesU= 0; }
@@ -423,7 +420,7 @@ size_t mkft (const Context *pC, const int def[3], const float mScale, const uint
 
    r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
    r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
-   mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU, profHack);
+   mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, profHack);
    r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
@@ -442,7 +439,7 @@ size_t mkft (const Context *pC, const int def[3], const float mScale, const uint
 
 int main (int argc, char *argv[])
 {
-   const int def[3]= {64,64,2}; //{96,9,9};
+   const int def[3]= {256, 256, 256}; // {64,64,2}; //{96,9,9};
    const float param= def[0] * 0.75; //256-64;
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean

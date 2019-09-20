@@ -31,7 +31,7 @@ B32 buffAlloc (Context *pC, const int def[3])
 
    pC->nF= prodOffsetNI(def,3,0);
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
-   pC->nU= setBMSD(&(pC->sd), def, 0);
+   pC->nU= setBMO(&(pC->bmo), def, 0);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))

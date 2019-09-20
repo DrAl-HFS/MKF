@@ -40,10 +40,11 @@ typedef uint BMStride;
 typedef uint BMPackWord;
 
 typedef struct
-{
-   int       def[3];
-   BMStride row, plane;
-} BMStrideDesc;
+{  // Memory organisation of BM
+   uint  rowElem;
+   uint  rowPairs, planePairs; // paired (N-1) counts
+   BMStride rowWS, planeWS;   // 32b word strides
+} BMOrg;
 
 
 #define BMFI_FIELD_MAX 4
@@ -65,7 +66,7 @@ typedef struct
 // Define map (comparison operator) using a string
 extern BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t);
 
-extern size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID);
+extern size_t setBMO (BMOrg *pO, const int def[3], const char profID);
 
 #ifdef __cplusplus
 } // extern "C"

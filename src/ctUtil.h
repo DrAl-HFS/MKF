@@ -18,9 +18,9 @@ typedef struct
    long nU, bytesU;
    long nZ, bytesZ;
    float *pDF, *pHF;  // Device / Host ptrs
-   uint  *pDU, *pHU;
+   BMPackWord  *pDU, *pHU;
    void *pDZ, *pHZ;
-   BMStrideDesc   sd;
+   BMOrg bmo;
 } Context;
 
 extern void ctuInfo (void);

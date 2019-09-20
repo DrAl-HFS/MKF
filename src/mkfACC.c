@@ -205,9 +205,9 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
    acc_set_device_type( acc_device_nvidia ); // HACKY
    if (acc_device_nvidia == acc_get_device_type())
    {
-      BMStrideDesc sd;
+      BMOrg bmo;
       const size_t nF= prodNI(def,3);
-      const size_t nBM= setBMSD(&sd, def, 0); //(planeStride * def[2])
+      const size_t nBM= setBMO(&bmo, def, 0); //(planeStride * def[2])
       BMFieldInfo fi={0};
 
       LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
@@ -225,10 +225,10 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
          {  // allocated via OpenACC for CUDA access to array/field data (others passed to
             // kernels using API "value parameter auto-marshalling" - const memory?)
             fi.field[0].pF32= pF;
-            if (binMapCUDA(pBM, &sd, &fi, pMC))
+            if (binMapCUDA(pBM, &bmo, &fi, pMC))
             {
                //LOG("\tsd= %u %u\n", sd.row, sd.plane);
-               r= mkfCUDAGetBPFD(rBPFD, &sd, pBM, 0);
+               r= mkfCUDAGetBPFD(rBPFD, &bmo, pBM, 0);
             }
          }
       }

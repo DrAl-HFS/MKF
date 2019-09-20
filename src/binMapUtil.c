@@ -57,7 +57,7 @@ BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
    return(pC);
 } // setBinMapF32
 
-size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID)
+size_t setBMO (BMOrg *pO, const int def[3], const char profID)
 {
    BMStride rowStride, planeStride;
    uint maxRow= MIN(2, def[1]);
@@ -72,13 +72,13 @@ size_t setBMSD (BMStrideDesc *pSD, const int def[3], const char profID)
          break;
    }
    planeStride= rowStride * maxRow;
-   if (pSD)
+   if (pO)
    {
-      pSD->def[0]= def[0];
-      pSD->def[1]= maxRow;
-      pSD->def[2]= maxPlane;
-      pSD->row=   rowStride;
-      pSD->plane= planeStride;
+      pO->rowElem= def[0];
+      pO->rowPairs= maxRow-1;
+      pO->planePairs= maxPlane-1;
+      pO->rowWS=   rowStride;
+      pO->planeWS= planeStride;
    }
    return((size_t)planeStride * maxPlane);
 } // setBMSD

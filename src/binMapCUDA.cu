@@ -166,7 +166,7 @@ __global__ void vThreshV32
 (
    BMPackWord rBM[],
    const CUDAFieldDesc fd,
-   const BMStrideDesc sBM,
+   const BMOrg bmo,
    const BinMapF32 bm
 )
 {
@@ -182,7 +182,7 @@ __global__ void vThreshV32
       merge32(u, j);
       if (0 == j) // & VT_WRDM) if BLKS > WRDS !
       {  // (x >> VT_WRDS)
-         i= blockIdx.x + blockIdx.y * sBM.row + blockIdx.z * sBM.plane;
+         i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
          rBM[i]= u[0] | u[16];
       }
    }
@@ -192,7 +192,7 @@ __global__ void vThreshVSum32
 (
    BMPackWord rBM[],
    const CUDAFieldDesc fd,
-   const BMStrideDesc sBM,
+   const BMOrg bmo,
    const BinMapF32 bm
 )
 {
@@ -211,7 +211,7 @@ __global__ void vThreshVSum32
       merge32(u, j);
       if (0 == j)
       {
-         i= (x >> VT_WRDS) + blockIdx.y * sBM.row + blockIdx.z * sBM.plane;
+         i= (x >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
          rBM[i]= u[0] | u[16];
       }
    }
@@ -256,40 +256,40 @@ static int binMapCudaRowsF32
 /* INTERFACE */
 
 extern "C"
-BMStrideDesc *binMapCUDA
+BMOrg *binMapCUDA
 (
-   BMPackWord        * pBM,
-   BMStrideDesc      * pBMSD,
-   const BMFieldInfo * pBMFI,
+   BMPackWord  * pW,
+   BMOrg       * pO,
+   const BMFieldInfo * pF,
    const BinMapF32   * pMC
 )
 {
    CUDAFieldDesc fd;
-   const int id= checkFD(&fd, pBMFI);
+   const int id= checkFD(&fd, pF);
    if (id > 0)
    {
       CTimerCUDA t;
       const char * pID= NULL;
       const int   nBlkRow= (fd.def[0] + VT_BLKM) / VT_BLKN;
-      setBMSD(pBMSD, fd.def, pBMFI->profile);
+      setBMO(pO, fd.def, pF->profile);
       if (id <= 2)
       {
 #if 0
-         binMapCudaRowsF32(pBM, fd.field[0].pF32, fd.def[0], pBMSD->row, prodNI(fd.def+1,2), pMC);
+         binMapCudaRowsF32(pW, fd.field[0].pF32, fd.def[0], pO->rowWS, prodNI(fd.def+1,2), pMC);
          pID= "binMapCudaRowsF32()";
 #else
          switch (id)
          {
             case 1 :
             {  const size_t nF= prodNI(fd.def,3);
-               vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pBM, fd.field[0].pF32, nF, *pMC);
+               vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pW, fd.field[0].pF32, nF, *pMC);
                pID= "vThreshL32()";
             }  break;
             case 2 : // Horribly inefficient iteration - only method presently working for !=*32 row length
             {  const int nRows= prodNI(fd.def+1,2);
                for (int i=0; i<nRows; i++)
                {
-                  vThreshL32<<<nBlkRow,VT_BLKN>>>(pBM + i * pBMSD->row, fd.field[0].pF32 + i * fd.stride[1], fd.def[0], *pMC);
+                  vThreshL32<<<nBlkRow,VT_BLKN>>>(pW + i * pO->rowWS, fd.field[0].pF32 + i * fd.stride[1], fd.def[0], *pMC);
                }
                pID= "nRows*vThreshL32()";
             }  break;
@@ -303,17 +303,17 @@ BMStrideDesc *binMapCUDA
          switch (id)
          {
             case 3 :
-               vThreshV32<<<grd,blk>>>(pBM, fd, *pBMSD, *pMC);
+               vThreshV32<<<grd,blk>>>(pW, fd, *pO, *pMC);
                pID= "vThreshV32()";
                break;
             case 4 :
-               vThreshVSum32<<<grd,blk>>>(pBM, fd, *pBMSD, *pMC);
+               vThreshVSum32<<<grd,blk>>>(pW, fd, *pO, *pMC);
                pID= "vThreshVSum32()";
                break;
          }
       }
       LOG("binMapCUDA() - %s - dt= %Gms\n", pID, t.elapsedms());
-      if (0 == ctuErr(NULL, pID)) { return(pBMSD); }
+      if (0 == ctuErr(NULL, pID)) { return(pO); }
    }
    return(NULL);
 } // binMapCUDA

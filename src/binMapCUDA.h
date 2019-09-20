@@ -12,12 +12,12 @@
 extern "C" {
 #endif
 
-BMStrideDesc *binMapCUDA
+BMOrg *binMapCUDA
 (
-   BMPackWord        * pBM,
-   BMStrideDesc      * pBMSD,
-   const BMFieldInfo * pBMFI,
-   const BinMapF32   * pMC
+   BMPackWord        * pW,
+   BMOrg               * pO,
+   const BMFieldInfo * pF,
+   const BinMapF32   * pM
 );
 
 #ifdef __cplusplus
