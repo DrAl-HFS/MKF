@@ -11,6 +11,7 @@
 
 #define PACK16
 
+// Double warp if permitted by local mem & algorithm (16bit packed counters)
 #ifdef PACK16
 #define BPFD_W32_BINS (MKF_BINS/2)
 #define BPFD_BLKS 6
@@ -19,6 +20,7 @@
 //#define BPFD_BLKS 5
 #endif
 
+// Default single warp
 #ifndef BPFD_BLKS
 #define BPFD_BLKS 5
 #endif
@@ -196,7 +198,7 @@ __global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, c
    __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB/Warp -> 2W per SM
 #endif
    zeroBins(bpfd, laneIdx, bins);
-   if (i < sd.def[1])
+   if (i < (sd.def[1]-1))
    {
       const BMPackWord * pRow[2];
       pRow[0]= pP + blockIdx.y * sd.plane + i * sd.row;
@@ -210,7 +212,7 @@ __global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, c
 /***/
 
 extern "C"
-int mkfCUDAGetBPFD (size_t * pBPFD, const BMStrideDesc *pSD, const U32 * pBM)
+int mkfCUDAGetBPFD (size_t * pBPFD, const BMStrideDesc *pSD, const U32 * pBM, const uint8_t profHack)
 {
    const int nRowPairs= pSD->def[1]-1;
    const int nPlanePairs= pSD->def[2]-1;
@@ -222,39 +224,48 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMStrideDesc *pSD, const U32 * pBM)
    //t.stampStream();
    LOG("\tsd= %u, %u\n", pSD->row, pSD->plane);
 
-#if 0
-   dim3 grd(nBlk,nPlanePairs,1);
-   dim3 blk(blkD,1,1);
-   addMultiPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pBM, *pSD);
-   if (0 != ctuErr(NULL, "addMultiPlaneBPFD"))
-   { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pBM); }
-#endif
-
-#if 1
-   for (int i= 0; i < nPlanePairs; i++)
+   switch (profHack)
    {
-      const U32 *pP0= pBM + i * pSD->plane;
-      const U32 *pP1= pBM + (i+1) * pSD->plane;
-      //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
-      if (0 != ctuErr(NULL, "addPlaneBPFD"))
-      { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-   }
-#endif
-#if 0
-   const U32 *pP0= pBM;
-   const U32 *pP1= pP0 + pSD->plane;
+      case 3 :
+      {
+         dim3 grd(nBlk,nPlanePairs,1);
+         dim3 blk(blkD,1,1);
+         addMultiPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pBM, *pSD);
+         if (0 != ctuErr(NULL, "addMultiPlaneBPFD"))
+         { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pBM); }
+         break;
+      }
 
-   for (int i= 0; i < nPlanePairs; i++)
-   {
-      //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-      addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
-      if (0 != ctuErr(NULL, "addPlaneBPFD"))
-      { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-      pP0= pP1; pP1+= pSD->plane;
-   }
-#endif
+      case 2 :
+      {
+         for (int i= 0; i < nPlanePairs; i++)
+         {
+            const U32 *pP0= pBM + i * pSD->plane;
+            const U32 *pP1= pBM + (i+1) * pSD->plane;
+            //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
+            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
+            if (0 != ctuErr(NULL, "addPlaneBPFD"))
+            { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+         }
+         break;
+      }
 
+      default :
+      {
+         const U32 *pP0= pBM;
+         const U32 *pP1= pP0 + pSD->plane;
+
+         for (int i= 0; i < nPlanePairs; i++)
+         {
+            //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
+            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pSD->row, pSD->def[0], nRowPairs); //, pBPFD+256);
+            if (0 != ctuErr(NULL, "addPlaneBPFD"))
+            { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+            pP0= pP1; pP1+= pSD->plane;
+         }
+         break;
+      }
+   }
    LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms());
    //cudaDeviceSynchronize();
    return(MKF_BINS);
@@ -317,7 +328,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
    if (pC->pDU && pC->pDZ)
    {
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU);
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU, 0);
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
@@ -404,7 +415,7 @@ checkHU ()
    dumpUX(pC->pHU+3*n, n, m);
 }
 #endif
-size_t mkft (const Context *pC, const int def[3], const float mScale)
+size_t mkft (const Context *pC, const int def[3], const float mScale, const uint8_t profHack)
 {
    cudaError_t r;
    size_t sum= 0;
@@ -412,27 +423,27 @@ size_t mkft (const Context *pC, const int def[3], const float mScale)
 
    r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
    r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
-   mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU);
+   mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->sd), pC->pDU, profHack);
    r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
    float m[4];
-   if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
-   {
-      LOG(" K M S V: %G %G %G %G\n", m[0],m[1],m[2],m[3]);
-   }
    for (int i= 0; i<MKF_BINS; i++)
    {
       sum+= pBPFD[i];
       if (verbose && (pBPFD[i] > 0)) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
+   }
+   if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
+   {
+      LOG("\tID%d: S=%zu\tK M S V: %G %G %G %G\n", profHack, sum, m[0],m[1],m[2],m[3]);
    }
    return(sum);
 } // mkft
 
 int main (int argc, char *argv[])
 {
-   const float param= 256-64;
-   const int def[3]= {256,256,256}; //{96,9,9};
+   const int def[3]= {64,64,2}; //{96,9,9};
+   const float param= def[0] * 0.75; //256-64;
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
 
@@ -455,7 +466,7 @@ int main (int argc, char *argv[])
       }
       else if (cux.pHU)
       {
-#if 0
+#if 0    // word boundary test - should be factored into pattern gen
          const int wDef= cux.sd.row;
          const int lDef= def[1] * def[2];
          const uint m= BIT_MASK(def[0] & 0x1F);
@@ -472,7 +483,6 @@ int main (int argc, char *argv[])
          {
             cux.pHU[wDef * i + j]= 0xFFF7FFFF;
          }
-#if 0
          for (int i= 0; i < lDef; i++)
          {
             int j= 0;
@@ -480,10 +490,9 @@ int main (int argc, char *argv[])
             LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
 #endif
-#else
          genPattern(cux.pHU, def, 1, 4, param);
-#endif
-         mkft(&cux,def,mScale);
+         mkft(&cux,def,mScale,2);
+         mkft(&cux,def,mScale,3);
       }
       cuBuffRelease(&cux);
    }
