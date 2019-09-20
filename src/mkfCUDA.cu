@@ -59,7 +59,7 @@ class ChunkBuf
    } // buildNext
 
 public:
-   __device__ ChunkBuf (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
+   __device__ ChunkBuf (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const BMStride rowStride)
    {
       u00= pR0[0];
       u01= pR0[rowStride];
@@ -68,7 +68,7 @@ public:
       c= 0;
    } // ChunkBuf
 
-   __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const int rowStride)
+   __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const BMStride rowStride)
    {
       //if (0 == pR1[rowStride]) { printf("%p+%x\n",pR1,rowStride); }
       u00|= ( (ULL) pR0[0] ) << 1;
@@ -78,17 +78,17 @@ public:
    } // loadSh1
 
 #ifndef PACK16
-   __device__ void add (uint bpfd[], const int n)
+   __device__ void add (uint bpfd[], const uint n)
    {
-      for (int i= 0; i < n; i++) { bpfd[ buildNext() ]++; }
+      for (uint i= 0; i < n; i++) { bpfd[ buildNext() ]++; }
    } // add (uint)
 #else
-   __device__ void add (U16P bpfd[], const int n)
+   __device__ void add (U16P bpfd[], const uint n)
    {
       //const ushort2 lh[2]={ushort2(1,0),ushort2(0,1)}; //
       const U16P lh[2]={1,1<<16}; // even -> lo, odd -> hi (16b)
 
-      for (int i= 0; i < n; i++)
+      for (uint i= 0; i < n; i++)
       {
          const uint bp= buildNext();
          //c++; if (bp < 0xFF) { logErr(c, u00,u01,u10,u11); } // DBG
@@ -102,8 +102,8 @@ __device__ void addRowBPFD
 (
    uint          bpfd[], // result pattern distribution
    const BMPackWord * pRow[2],
-   const int    rowStride,
-   const int    n    // Number of single bit elements packed in row
+   const BMStride   rowStride,
+   const uint       n    // Number of single bit elements packed in row
 )
 {  // seq
    const int m= n>>CHUNK_SHIFT;
@@ -126,18 +126,18 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__device__ void zeroBins (uint bpfd[], const int laneIdx, const int bins)
+__device__ void zeroBins (uint bpfd[], const uint laneIdx, const uint bins)
 {
-   for (int k= laneIdx; k < bins; k+= blockDim.x)
+   for (uint k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed zeroing for write coalescing)
-      for (int j= 0; j < blockDim.x; j++) { bpfd[j*bins+k]= 0; }
+      for (uint j= 0; j < blockDim.x; j++) { bpfd[j*bins+k]= 0; }
    }
 } // zeroBins
 
 #ifndef PACK16
-__device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const int laneIdx, const int bins)
+__device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const uint laneIdx, const uint bins)
 {
-   for (int k= laneIdx; k < bins; k+= blockDim.x)
+   for (uint k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
       ULL t= 0;
       for (int j= 0; j < blockDim.x; j++) { t+= bpfd[j*bins+k]; }
@@ -145,9 +145,9 @@ __device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const int la
    }
 } // reduceBins
 #else
-__device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const int laneIdx, const int bins)
+__device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const uint laneIdx, const uint bins)
 {
-   for (int k= laneIdx; k < bins; k+= blockDim.x)
+   for (uint k= laneIdx; k < bins; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
       ULL t[2]= {0,0};
       for (int j= 0; j < blockDim.x; j++)
@@ -163,11 +163,15 @@ __device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const int la
 } // reduceBins
 #endif
 
-__global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pPln0, const BMPackWord * pPln1, const int rowStride, const int defW, const int defH)
+// Pairs of planes that may be non-contiguous i.e. wrap-around in partial buffer
+// Consider:
+//    using modulo operation on plane indices could be useful for more
+//    efficient partial buffer batches. But how to set up ???
+__global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pWP0, const BMPackWord * pWP1, const BMOrg bmo)
 {
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   const int laneIdx= i & BPFD_BLKM;
-   const int bins= BPFD_W32_BINS;
+   const uint i= blockIdx.x * blockDim.x + threadIdx.x; // ???
+   const uint laneIdx= i & BPFD_BLKM;
+   const uint bins= BPFD_W32_BINS;
 #ifndef PACK16
    __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB/Warp -> 1W per SM
 #else
@@ -176,22 +180,26 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pPln0, con
    //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
    //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
    zeroBins(bpfd, laneIdx, bins);
-   if (i < defH)
+   if (i < bmo.rowPairs)
    {
-      const U32 * pRow[2]= { pPln0 + i*rowStride, pPln1 + i*rowStride };
+      const BMPackWord * pRow[2]= {
+         pWP0 + blockIdx.y * bmo.planeWS + i * bmo.rowWS,
+         pWP1 + blockIdx.y * bmo.planeWS + i * bmo.rowWS
+         };
 
-      addRowBPFD(bpfd+laneIdx*bins, pRow, rowStride, defW);
+      addRowBPFD(bpfd+laneIdx*bins, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
    reduceBins(rBPFD, bpfd, laneIdx, bins);
 } // addPlaneBPFD
 
-__global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, const BMOrg bmo)
+// Contiguous sequence of planes i.e. entire full size buffer
+__global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW, const BMOrg bmo)
 {
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x; // ???
-   //const size_t j= blockIdx.y; // * blockDim.y + threadIdx.y;
-   const int laneIdx= i & BPFD_BLKM;
-   const int bins= BPFD_W32_BINS;
+   const uint i= blockIdx.x * blockDim.x + threadIdx.x; // ???
+   //const uint j= blockIdx.y; // * blockDim.y + threadIdx.y;
+   const uint laneIdx= i & BPFD_BLKM;
+   const uint bins= BPFD_W32_BINS;
 #ifndef PACK16
    __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB/Warp -> 1W per SM
 #else
@@ -201,13 +209,13 @@ __global__ void addMultiPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pP, c
    if (i < bmo.rowPairs)
    {
       const BMPackWord * pRow[2];
-      pRow[0]= pP + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
+      pRow[0]= pW + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
       pRow[1]= pRow[0] + bmo.planeWS;
       addRowBPFD(bpfd+laneIdx*bins, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
    reduceBins(rBPFD, bpfd, laneIdx, bins);
-} // addMultiPlaneBPFD
+} // addMultiPlaneSeqBPFD
 
 /***/
 
@@ -227,39 +235,42 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
       {
          dim3 grd(nBlk,pO->planePairs,1);
          dim3 blk(blkD,1,1);
-         addMultiPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, *pO);
-         if (0 != ctuErr(NULL, "addMultiPlaneBPFD"))
+         addMultiPlaneSeqBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, *pO);
+         if (0 != ctuErr(NULL, "addMultiPlaneSeqBPFD"))
          { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW); }
          break;
       }
 
       case 2 :
       {
-         for (int i= 0; i < pO->planePairs; i++)
-         {
-            const BMPackWord *pP0= pW + i * pO->planeWS;
-            const BMPackWord *pP1= pW + (i+1) * pO->planeWS;
-            //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pO->rowWS, pO->rowElem, pO->rowPairs); //, pBPFD+256);
-            if (0 != ctuErr(NULL, "addPlaneBPFD"))
-            { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-         }
+         dim3 grd(nBlk,pO->planePairs,1);
+         dim3 blk(blkD,1,1);
+         addPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, pW + pO->planeWS, *pO); //, pBPFD+256);
+         if (0 != ctuErr(NULL, "addPlaneBPFD"))
+         { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW, pW + pO->planeWS); }
          break;
       }
 
       default :
       {
-         const BMPackWord *pP0= pW;
+         for (int i= 0; i < pO->planePairs; i++)
+         {
+            const BMPackWord *pP0= pW + i * pO->planeWS;
+            const BMPackWord *pP1= pW + (i+1) * pO->planeWS;
+            //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
+            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO); //, pBPFD+256);
+            if (0 != ctuErr(NULL, "addPlaneBPFD"))
+            { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+         }
+/*         const BMPackWord *pP0= pW;
          const BMPackWord *pP1= pP0 + pO->planeWS;
 
          for (int i= 0; i < pO->planePairs; i++)
          {
-            //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, pO->rowWS, pO->rowElem, pO->rowPairs); //, pBPFD+256);
-            if (0 != ctuErr(NULL, "addPlaneBPFD"))
+            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO);
             { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
             pP0= pP1; pP1+= pO->planeWS;
-         }
+         }*/
          break;
       }
    }
@@ -325,7 +336,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
    }
    if (pC->pDU && pC->pDZ)
    {
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, 0);
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, 3);
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
