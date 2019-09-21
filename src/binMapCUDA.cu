@@ -14,6 +14,25 @@
 #define VT_BLKN (1<<VT_BLKS)
 #define VT_BLKM (VT_BLKN-1)
 
+template <typename T>
+struct CUDAFieldMap
+{
+   T     t[BM_NUMT];
+   uint  m;
+   uint        nF;
+   FieldDef       def[3];
+   FieldStride    stride[3];
+   const T * field[BMFI_FIELD_MAX];
+
+   uint eval (const size_t i) const
+   {
+      const T f= field[0][i];
+      for (uint iF=1; iF<nF; iF++) { f+= field[iF][i]; }
+      const int d= (1 + (f > t[0]) - (f < t[0]));
+      return( (m >> d) & 0x1 );
+   } // eval
+}; // struct BinMap
+
 struct CUDAFieldDesc
 {  // Expect multiple fields, common def & stride
    int            nF;
@@ -21,12 +40,8 @@ struct CUDAFieldDesc
    FieldStride    stride[3];
    ConstFieldPtr  field[BMFI_FIELD_MAX];
 };
-/*
-static int planarity (const int def[3], const BMStride s[3])
-{  // Only works for full image def, not sub region!
-   return((1 == s[0]) + (def[0] == s[1]) + (def[0] * def[1] == s[2]));
-} // planar
-*/
+
+// Refactor to CTOR + check ? ...
 static int checkFD (CUDAFieldDesc *pD, const BMFieldInfo *pI)
 {
    if (pD && pI && pI->pD)
@@ -94,7 +109,7 @@ __global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMa
    }
 } // vThresh8
 */
-// class ??
+
 __device__ int bm1f32 (const float f, const BinMapF32& bm)
 {
    const int d= (1 + (f > bm.t[0]) - (f < bm.t[0]));
