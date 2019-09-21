@@ -25,10 +25,18 @@ extern "C" {
 // threshold value plus the lookup.
 typedef struct
 {
+   double t[BM_NUMT];
+   uint   m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
+} BinMapF64;
+
+// DEPRECATE
+typedef struct
+{
    float t[BM_NUMT];
-   int   m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
+   uint  m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
    // NB: 32bit alignment (pre-NVIDIA-Pascal).
 } BinMapF32;
+
 
 #define BMC_GT (0x4)
 #define BMC_EQ (0x2)
