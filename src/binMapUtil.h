@@ -61,10 +61,10 @@ typedef union { const void *p; const float *pF32; const double *pF64; size_t w; 
 typedef long int FieldStride;
 typedef int    FieldDef;
 typedef struct
-{
+{  // CONSIDER: better to use enable mask rather than count for fields ?
    struct { uint8_t  nField, elemBits, opr, profile; }; // anon structs - may influence packing ?
    const FieldDef    *pD;
-   const FieldStride *pS;  // Assume fully planar fields if NULL
+   const FieldStride *pS;  // NULL => assume fully planar fields
    ConstFieldPtr     field[BMFI_FIELD_MAX];
 } BMFieldInfo;
 
