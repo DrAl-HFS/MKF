@@ -54,15 +54,18 @@ typedef struct
    BMStride rowWS, planeWS;   // 32b word strides
 } BMOrg;
 
+#define BMFI_EIDM_TYP 0xF0
+#define BMFI_EIDT_FPB 0xF0
+#define BMFI_EIDM_NUM 0x0F
 
 #define BMFI_FIELD_MAX 4
-
+// const half *pF16;  ???
 typedef union { const void *p; const float *pF32; const double *pF64; size_t w; } ConstFieldPtr;
 typedef long int FieldStride;
 typedef int    FieldDef;
 typedef struct
 {  // CONSIDER: better to use enable mask rather than count for fields ?
-   struct { uint8_t  nField, elemBits, opr, profile; }; // anon structs - may influence packing ?
+   struct { uint8_t  fieldMask, elemID, oprID, profID; }; // anon structs - may influence packing ?
    const FieldDef    *pD;
    const FieldStride *pS;  // NULL => assume fully planar fields
    ConstFieldPtr     field[BMFI_FIELD_MAX];

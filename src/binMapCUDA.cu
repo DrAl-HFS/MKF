@@ -30,10 +30,10 @@ static int checkFD (CUDAFieldDesc *pD, const BMFieldInfo *pI)
    if (pD && pI && pI->pD)
    {
       int pad= (pI->pD[0] & VT_WRDM);
-      int n=0, m= MIN(BMFI_FIELD_MAX, pI->nField);
-      if (m > 0)
+      int n=0;
+      if (0 != pI->fieldMask)
       {
-         for (int i=0; i<m; i++)
+         for (int i=0; i<BMFI_FIELD_MAX; i++)
          {
             pD->field[n]= pI->field[i];
             n+= (NULL != pI->field[i].p);
@@ -96,8 +96,6 @@ public:
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval(pF[i]); }
 }; // template class CUDAFieldMap
 
-#if 0
-
 template <typename T_Elem>
 class CUDAMultiField
 {  // Multiple fields with common stride
@@ -125,12 +123,12 @@ protected:
       }
    } // setDS
 
-   uint setF (ConstFieldPtr a[], const uint m)
+   uint setF (const ConstFieldPtr a[], const uint m)
    {
       uint n= 0;
       for (int i=0; i<BMFI_FIELD_MAX; i++)
       {
-         if (m & (0x1 << i)) { fPtr[n]= a[i].p; }
+         if (m & (0x1 << i)) { fPtr[n]= (const T_Elem*) a[i].p; }
          n+= (NULL != fPtr[i]);
       }
       return(n);
@@ -142,16 +140,19 @@ public:
       if (pI->pD)
       {
          setDS(pI->pD, pI->pS);
-         nF= setF(pI->field, 0xF);
+         nF= setF(pI->field, pI->fieldMask);
       }
    } // CTOR
 
-   __device__ T_Elem operator () (const size_t i) const
+   __device__ size_t index (uint x, uint y, uint z) const { return(x * stride[0] + y * stride[1] + z * stride[2]); }
+
+   __device__ T_Elem sum (const size_t i) const
    {
       T_Elem s= (fPtr[0])[i];
       for (int iF=1; iF < nF; iF++) { s+= (fPtr[iF])[i]; }
       return(s);
-   } // operator ()
+   } // sum
+   __device__ T_Elem operator () (const size_t i) const { return sum(i); }
 }; // template class CUDAMultiField
 
 template <typename T_Elem>
@@ -161,10 +162,9 @@ public:
    CUDAMultiFieldMap (const BMFieldInfo *pI, const BinMapF32 *pM) : CUDAMultiField<T_Elem>(pI), CUDAMap<T_Elem>(pM) {;}
    CUDAMultiFieldMap (const BMFieldInfo *pI, const BinMapF64 *pM) : CUDAMultiField<T_Elem>(pI), CUDAMap<T_Elem>(pM) {;}
 
-   __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::( CUDAMultiField<T_Elem>::(i) ); }
+   __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval( CUDAMultiField<T_Elem>::sum(i) ); }
 }; // template class CUDAMultiFieldMap
 
-#endif
 
 /***/
 
@@ -195,6 +195,42 @@ __global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMa
       }
    }
 } // vThresh8
+
+__global__ void vThreshL32 (BMPackWord r[], const float f[], const size_t n, const BinMapF32 bm)
+{
+   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
+   __shared__ uint z[VT_BLKN];
+   if (i < n)
+   {
+      const int j= i & VT_BLKM;
+
+      z[j]= bm1f32(f[i],bm) << j;
+
+      merge32(z, j);
+      if (0 == j) { r[i>>VT_WRDS]= z[0] | z[16]; }
+/ *
+      __syncthreads();
+
+      if (0 == (j & 0x3))
+      {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
+         for (int l=1; l<4; l++) { z[j]|= z[j+l]; }
+
+         __syncthreads();
+
+         //if (0 == j) { r[i>>BLKS]= z[0] | z[4] | z[8] | z[12] | z[16] | z[20] | z[24] | z[28]; }
+         if (0 == (j & 0xF))
+         {  // j : { 0, 16 } 2P 3I
+            for (int l=4; l<16; l+=4) { z[j]|= z[j+l]; }
+
+            __syncthreads();
+
+            if (0 == j) { r[i>>VT_BLKS]= z[0] | z[16]; }
+         }
+      }
+* /
+   }
+} // vThreshL32
+
 */
 
 __device__ int bm1f32 (const float f, const BinMapF32& bm)
@@ -233,53 +269,40 @@ template <typename T_Elem>
 __global__ void mapFieldL32 (BMPackWord r[], const CUDAFieldMap<T_Elem> f, const size_t n)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint z[VT_BLKN];
+   __shared__ uint u[VT_BLKN];
    if (i < n)
    {
       const int j= i & VT_BLKM;
 
-      z[j]= f(i) << j;
+      u[j]= f(i) << j;
 
-      merge32(z, j);
-      if (0 == j) { r[i>>VT_WRDS]= z[0] | z[16]; }
+      merge32(u, j);
+      if (0 == j) { r[i>>VT_WRDS]= u[0] | u[16]; }
    }
 } // mapFieldL32
-
-__global__ void vThreshL32 (BMPackWord r[], const float f[], const size_t n, const BinMapF32 bm)
-{
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint z[VT_BLKN];
-   if (i < n)
-   {
-      const int j= i & VT_BLKM;
-
-      z[j]= bm1f32(f[i],bm) << j;
-
-      merge32(z, j);
-      if (0 == j) { r[i>>VT_WRDS]= z[0] | z[16]; }
 /*
-      __syncthreads();
+template <typename T_Elem>
+__global__ void mapFieldV32 (BMPackWord rBM[], const CUDAMultiFieldMap<T_Elem> f, const BMOrg bmo) // const size_t n)
+{
+   const int x= blockIdx.x * blockDim.x + threadIdx.x;
+   __shared__ uint u[VT_BLKN];
+   if (x < bmo.rowElem)
+   {
+      size_t i= f.index(x, blockIdx.y, blockIdx.z);
+      const uint j= threadIdx.x & VT_WRDM;
+      const uint k= threadIdx.x & ~VT_WRDM;
 
-      if (0 == (j & 0x3))
-      {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
-         for (int l=1; l<4; l++) { z[j]|= z[j+l]; }
+      u[threadIdx.x]= f(i) << j;
 
-         __syncthreads();
-
-         //if (0 == j) { r[i>>BLKS]= z[0] | z[4] | z[8] | z[12] | z[16] | z[20] | z[24] | z[28]; }
-         if (0 == (j & 0xF))
-         {  // j : { 0, 16 } 2P 3I
-            for (int l=4; l<16; l+=4) { z[j]|= z[j+l]; }
-
-            __syncthreads();
-
-            if (0 == j) { r[i>>VT_BLKS]= z[0] | z[16]; }
-         }
+      merge32(u+k, j);
+      if (0 == j) // & VT_WRDM) if BLKS > WRDS !
+      {  // (x >> VT_WRDS)
+         i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= u[0] | u[16];
       }
-*/
    }
-} // vThreshL32
-
+} // vThreshV32
+*/
 __global__ void vThreshV32
 (
    BMPackWord rBM[],
@@ -336,41 +359,6 @@ __global__ void vThreshVSum32
 } // vThreshVSum32
 
 
-// DEPRECATED
-static int binMapCudaRowsF32
-(
-   BMPackWord * pBM,
-   const F32 * pF,
-   const int rowLenF,      // row length ie. "X dimension"
-   const int rowStrideBM,  // 32bit word stride of rows of packed binary map, should be >= rowLenF/32
-   const int nRows,        // product of other "dimensions" (Y * Z)
-   const BinMapF32 *pMC
-)
-{
-   int r= 0;
-   CTimerCUDA t;
-
-   if (0 == (rowLenF & VT_BLKM))
-   {  // Treat as 1D
-      size_t nF= rowLenF * nRows;
-      vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pBM, pF, nF, *pMC);
-      r= (0 == ctuErr(NULL, "vThreshL32()"));
-   }
-   else
-   {  // Hacky 2D - needs proper implementation
-      int nBlkRow= (rowLenF + VT_BLKM) / VT_BLKN;
-      for (int i=0; i<nRows; i++)
-      {
-         vThreshL32<<<nBlkRow,VT_BLKN>>>(pBM + i * rowStrideBM, pF + i * rowLenF, rowLenF, *pMC);
-      }
-      r= (0 == ctuErr(NULL, "nRows*vThreshL32()"));
-   }
-   LOG("binMapCudaRowsF32(.., L=%d, S=%d, N=%d, BM(%f,0x%X) ) - dt= %Gms\n", rowLenF, rowStrideBM, nRows, pMC->t[0], pMC->m, t.elapsedms());
-   //cudaDeviceSynchronize(); // stream sync provided by timer
-   return(r);
-} // binMapCudaRowsF32
-
-
 /* INTERFACE */
 
 extern "C"
@@ -389,43 +377,38 @@ BMOrg *binMapCUDA
       CTimerCUDA t;
       const char * pID= NULL;
       const int   nBlkRow= (fd.def[0] + VT_BLKM) / VT_BLKN;
-      setBMO(pO, fd.def, pF->profile);
-      if (id <= 2)
-      {
-#if 0
-         binMapCudaRowsF32(pW, fd.field[0].pF32, fd.def[0], pO->rowWS, prodNI(fd.def+1,2), pMC);
-         pID= "binMapCudaRowsF32()";
-#else
-         switch (id)
-         {
-            case 1 :
-            {  const size_t nF= prodNI(fd.def,3);
-               mapFieldL32<<<nF/VT_BLKN,VT_BLKN>>>(pW, CUDAFieldMap<float>(fd.field[0].pF32, pMC), nF);
-//               vThreshL32<<<nF/VT_BLKN,VT_BLKN>>>(pW, fd.field[0].pF32, nF, *pMC);
-               pID= "map()"; // "vThreshL32()";
-            }  break;
-            case 2 : // Horribly inefficient iteration - only method presently working for !=*32 row length
-            {  const int nRows= prodNI(fd.def+1,2);
-               for (int i=0; i<nRows; i++)
-               {
-                  vThreshL32<<<nBlkRow,VT_BLKN>>>(pW + i * pO->rowWS, fd.field[0].pF32 + i * fd.stride[1], fd.def[0], *pMC);
-               }
-               pID= "nRows*vThreshL32()";
-            }  break;
-         }
-#endif
-      }
-      else
+      setBMO(pO, fd.def, pF->profID);
+      if (id > 0)
       {
          const dim3 grd(nBlkRow, fd.def[1], fd.def[2]);
          const dim3 blk(VT_BLKN,1,1);
-         switch (id)
+         switch (pF->profID & 0x30)
          {
-            case 3 :
+            case 0x10 :
+            if (0 == (fd.def[0] & VT_BLKM)) // 1D collapsable
+            {  const size_t nF= prodNI(fd.def,3);
+               mapFieldL32<<<nF/VT_BLKN,VT_BLKN>>>(pW, CUDAFieldMap<float>(fd.field[0].pF32, pMC), nF);
+               pID= "mapFieldL32()"; // "vThreshL32()";
+               break;
+            }
+            //else...
+            case 0x00 : // Horribly inefficient iteration - only method presently working for !=*32 row length
+            {  const int nRows= prodNI(fd.def+1,2);
+               for (int i=0; i<nRows; i++)
+               {
+                  mapFieldL32<<<nBlkRow,VT_BLKN>>>(pW + i * pO->rowWS, CUDAFieldMap<float>(fd.field[0].pF32 + i * fd.stride[1], pMC), fd.def[0]);
+               }
+               pID= "nRows*mapFieldL32()";
+            }  break;
+
+            case 0x20 :
+               //mapFieldV32<<<grd,blk>>>(pW, CUDAMultiFieldMap<float>(pF, pMC), *pO);
+               //pID= "mapFieldV32()";
                vThreshV32<<<grd,blk>>>(pW, fd, *pO, *pMC);
                pID= "vThreshV32()";
                break;
-            case 4 :
+
+            case 0x30 :
                vThreshVSum32<<<grd,blk>>>(pW, fd, *pO, *pMC);
                pID= "vThreshVSum32()";
                break;

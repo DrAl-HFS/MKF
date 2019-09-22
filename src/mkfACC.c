@@ -211,9 +211,10 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
       BMFieldInfo fi={0};
 
       LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
-      fi.nField= 1;
-      fi.elemBits= 32;
-      //fi.opr= fi.profile= 0;
+      fi.fieldMask=  0x01;
+      fi.elemID=     BMFI_EIDT_FPB|4;
+      //fi.opr=
+      fi.profID= 0x10;
       fi.pD= def;
       //fi.pS= NULL; // auto stride
       //LOG("* row, plane = %u, %u\n", sd.row, sd.plane);

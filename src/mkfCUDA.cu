@@ -280,7 +280,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
 } // mkfCUDAGetBPFD
 
 extern "C"
-int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC, const uint8_t profHack)
 {
    cudaError_t r;
 
@@ -310,7 +310,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC)
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
 
          BMFieldInfo fi= {
-            { 1, 32, 0, 0 },
+            { 0x01, BMFI_EIDT_FPB|4, 0, profHack },
             def, NULL,
             {pC->pDF, NULL, NULL, NULL }
          };
@@ -464,7 +464,7 @@ int main (int argc, char *argv[])
       {
          BinMapF32 mc={0};
          genPattern(cux.pHF, def, 32, 4, param);
-         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5));
+         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x20);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
          if (mkfMeasureBPFD(m, pBPFD, mScale, 0))

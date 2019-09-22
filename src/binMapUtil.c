@@ -64,7 +64,7 @@ size_t setBMO (BMOrg *pO, const int def[3], const char profID)
    uint maxPlane= MIN(2, def[2]);
 
    rowStride= BITS_TO_WRDSH(def[0],5);  // Packed 32bit words
-   switch (profID)
+   switch (profID & 0x0F)
    {
       case 0 :
          maxRow=   def[1];

@@ -16,7 +16,7 @@ extern "C" {
 int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const uint8_t profHack);
 
 //extern "C"
-int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC);
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC, const uint8_t profHack);
 
 #ifdef __cplusplus
 } // extern "C"
