@@ -239,7 +239,7 @@ __device__ int bm1f32 (const float f, const BinMapF32& bm)
    return( (bm.m >> d) & 0x1 );
 } // bm1f32
 
-__device__ void merge32 (BMPackWord u[32], const int j)
+__device__ int merge32 (BMPackWord u[32], const int j)
 {
 /* TODO: consider using CUDA9 warp level primitives...
 #define FULL_MASK 0xffffffff
@@ -259,14 +259,16 @@ for (int offset = 16; offset > 0; offset /= 2)
          for (int l=4; l<16; l+=4) { u[j]|= u[j+l]; }
 
          __syncthreads(); //  Optional ?
+         if (0 == j) { u[0]|= u[16]; }
       }
    }
+   return(j);
 } // merge32
 
 /***/
 
 template <typename T_Elem>
-__global__ void mapFieldL32 (BMPackWord r[], const CUDAFieldMap<T_Elem> f, const size_t n)
+__global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
@@ -276,8 +278,7 @@ __global__ void mapFieldL32 (BMPackWord r[], const CUDAFieldMap<T_Elem> f, const
 
       u[j]= f(i) << j;
 
-      merge32(u, j);
-      if (0 == j) { r[i>>VT_WRDS]= u[0] | u[16]; }
+      if (0 == merge32(u, j)) { rBM[i>>VT_WRDS]= u[0]; }
    }
 } // mapFieldL32
 /*
@@ -320,11 +321,10 @@ __global__ void vThreshV32
 
       u[j]= bm1f32( fd.field[0].pF32[i], bm ) << j; // (j & VT_WRDM)
 
-      merge32(u, j);
-      if (0 == j) // & VT_WRDM) if BLKS > WRDS !
+      if (0 == merge32(u, j)) // & VT_WRDM) if BLKS > WRDS !
       {  // (x >> VT_WRDS)
          i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[0] | u[16];
+         rBM[i]= u[0];
       }
    }
 } // vThreshV32
@@ -349,11 +349,10 @@ __global__ void vThreshVSum32
 
       u[j]= bm1f32(s,bm) << j;
 
-      merge32(u, j);
-      if (0 == j)
+      if (0 == merge32(u, j))
       {
          i= (x >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[0] | u[16];
+         rBM[i]= u[0];
       }
    }
 } // vThreshVSum32
