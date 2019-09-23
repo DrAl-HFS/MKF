@@ -10,7 +10,7 @@
 #define VT_WRDN (1<<VT_WRDS)
 #define VT_WRDM (VT_WRDN-1)
 
-#define VT_BLKS 5
+#define VT_BLKS 7             // 7
 #define VT_BLKN (1<<VT_BLKS)
 #define VT_BLKM (VT_BLKN-1)
 
@@ -169,6 +169,12 @@ public:
 
 /***/
 
+__device__ int bm1f32 (const float f, const BinMapF32& bm)
+{
+   const int d= (1 + (f > bm.t[0]) - (f < bm.t[0]));
+   return( (bm.m >> d) & 0x1 );
+} // bm1f32
+
 /*
 __global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
 {
@@ -234,11 +240,7 @@ __global__ void vThreshL32 (BMPackWord r[], const float f[], const size_t n, con
 
 */
 
-__device__ int bm1f32 (const float f, const BinMapF32& bm)
-{
-   const int d= (1 + (f > bm.t[0]) - (f < bm.t[0]));
-   return( (bm.m >> d) & 0x1 );
-} // bm1f32
+/***/
 
 __device__ int merge32 (BMPackWord u[32], const int j)
 {
@@ -280,17 +282,17 @@ __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, con
 
       u[threadIdx.x]= f(i) << j;
 
-      if (0 == merge32(u+k, j)) { rBM[i>>VT_WRDS]= u[j]; }
+      if (0 == merge32(u+k, j)) { rBM[i>>VT_WRDS]= u[threadIdx.x]; }
    }
 } // mapFieldL32
 
-//#define BMC_TEST_MFV32
+//define BMC_TEST_MFV32
 
 #ifdef BMC_TEST_MFV32
 template <typename T_Elem>
 __global__ void mapFieldV32 (BMPackWord rBM[], const BMOrg bmo, const CUDAMultiFieldMap<T_Elem> f) // const size_t n)
 {
-   const int x= blockIdx.x * blockDim.x + threadIdx.x;
+   const uint x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
    if (x < bmo.rowElem)
    {
@@ -302,8 +304,8 @@ __global__ void mapFieldV32 (BMPackWord rBM[], const BMOrg bmo, const CUDAMultiF
 
       if (0 == merge32(u+k, j)) // & VT_WRDM) if BLKS > WRDS !
       {  // (x >> VT_WRDS)
-         i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[j];
+         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= u[threadIdx.x];
       }
    }
 } // mapFieldV32
@@ -317,7 +319,7 @@ __global__ void vThreshV32
    const BinMapF32 bm
 )
 {
-   const int x= blockIdx.x * blockDim.x + threadIdx.x;
+   const uint x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
    if (x < fd.def[0])
    {
@@ -329,8 +331,8 @@ __global__ void vThreshV32
 
       if (0 == merge32(u+k, j)) // & VT_WRDM) if BLKS > WRDS !
       {  // (x >> VT_WRDS)
-         i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[j];
+         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= u[threadIdx.x];
       }
    }
 } // vThreshV32
@@ -343,22 +345,23 @@ __global__ void vThreshVSum32
    const BinMapF32 bm
 )
 {
-   const int x= blockIdx.x * blockDim.x + threadIdx.x;
+   const uint x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
    if (x < fd.def[0])// && (y < defY))
    {
       size_t i= x * fd.stride[0] + blockIdx.y * fd.stride[1] + blockIdx.z * fd.stride[2];
-      const int j= i & VT_BLKM;
+      const uint j= threadIdx.x & VT_WRDM;
+      const uint k= threadIdx.x & ~VT_WRDM;
 
       float s= (fd.field[0].pF32)[i];
       for (int f=1; f < fd.nF; f++) { s+= fd.field[f].pF32[i]; }
 
-      u[j]= bm1f32(s,bm) << j;
+      u[threadIdx.x]= bm1f32(s,bm) << j;
 
       if (0 == merge32(u, j))
       {
-         i= (x >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[0];
+         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= u[threadIdx.x];
       }
    }
 } // vThreshVSum32
@@ -382,8 +385,8 @@ BMOrg *binMapCUDA
       CTimerCUDA t;
       const char * pID= NULL;
       const int   nBlkRow= (fd.def[0] + VT_BLKM) / VT_BLKN;
-      setBMO(pO, fd.def, pF->profID);
-      if (id > 0)
+
+      if ( setBMO(pO, fd.def, pF->profID) )
       {
          const dim3 grd(nBlkRow, fd.def[1], fd.def[2]);
          const dim3 blk(VT_BLKN,1,1);
@@ -421,9 +424,9 @@ BMOrg *binMapCUDA
                pID= "vThreshVSum32()";
                break;
          }
+         LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, blk.x, t.elapsedms());
+         if (0 == ctuErr(NULL, pID)) { return(pO); }
       }
-      LOG("binMapCUDA() - %s - dt= %Gms\n", pID, t.elapsedms());
-      if (0 == ctuErr(NULL, pID)) { return(pO); }
    }
    return(NULL);
 } // binMapCUDA
