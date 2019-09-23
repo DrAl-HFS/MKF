@@ -14,6 +14,9 @@
 #define VT_BLKN (1<<VT_BLKS)
 #define VT_BLKM (VT_BLKN-1)
 
+#define VT_BWS (VT_BLKS - VT_WRDS)
+
+
 /***/
 
 struct CUDAFieldDesc
@@ -128,8 +131,10 @@ protected:
       uint n= 0;
       for (int i=0; i<BMFI_FIELD_MAX; i++)
       {
-         if (m & (0x1 << i)) { fPtr[n]= (const T_Elem*) a[i].p; }
-         n+= (NULL != fPtr[i]);
+         if ((NULL != a[i].p) && (m & (0x1 << i)))
+         {
+            fPtr[n++]= (const T_Elem*) a[i].p;
+         }
       }
       return(n);
    } // setF
@@ -167,7 +172,7 @@ public:
 }; // template class CUDAMultiFieldMap
 
 
-/***/
+/* DEPRECATION ZONE */
 
 __device__ int bm1f32 (const float f, const BinMapF32& bm)
 {
@@ -176,6 +181,33 @@ __device__ int bm1f32 (const float f, const BinMapF32& bm)
 } // bm1f32
 
 /*
+
+__global__ void vThreshV32
+(
+   BMPackWord rBM[],
+   const CUDAFieldDesc fd,
+   const BMOrg bmo,
+   const BinMapF32 bm
+)
+{
+   const uint x= blockIdx.x * blockDim.x + threadIdx.x;
+   __shared__ BMPackWord w[VT_BLKN];
+   if (x < fd.def[0])
+   {
+      size_t i= x * fd.stride[0] + blockIdx.y * fd.stride[1] + blockIdx.z * fd.stride[2];
+      const uint j= threadIdx.x & VT_WRDM;
+      const uint k= threadIdx.x & ~VT_WRDM;
+
+      w[threadIdx.x]= bm1f32( fd.field[0].pF32[i], bm ) << j;
+
+      if (0 == merge32(w+k, j)) // & VT_WRDM) if BLKS > WRDS !
+      {  // (x >> VT_WRDS)
+         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= w[threadIdx.x];
+      }
+   }
+} // vThreshV32
+
 __global__ void vThresh8 (uint r[], const float f[], const size_t n, const BinMapF32 mc)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
@@ -242,7 +274,8 @@ __global__ void vThreshL32 (BMPackWord r[], const float f[], const size_t n, con
 
 /***/
 
-__device__ int merge32 (BMPackWord u[32], const int j)
+// local mem bit merge util
+__device__ int merge32 (BMPackWord w[32], const int j)
 {
 /* TODO: consider using CUDA9 warp level primitives...
 #define FULL_MASK 0xffffffff
@@ -253,16 +286,16 @@ for (int offset = 16; offset > 0; offset /= 2)
 
    if (0 == (j & 0x3))
    {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
-      for (int l=1; l<4; l++) { u[j]|= u[j+l]; }
+      for (int l=1; l<4; l++) { w[j]|= w[j+l]; }
 
       __syncthreads(); // Required for (unexplained) divergence
 
       if (0 == (j & 0xF))
       {  // j : { 0, 16 } 2P 3I
-         for (int l=4; l<16; l+=4) { u[j]|= u[j+l]; }
+         for (int l=4; l<16; l+=4) { w[j]|= w[j+l]; }
 
          __syncthreads(); //  Optional ?
-         if (0 == j) { u[0]|= u[16]; }
+         if (0 == j) { w[0]|= w[16]; }
       }
    }
    return(j);
@@ -274,68 +307,39 @@ template <typename T_Elem>
 __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint u[VT_BLKN];
+   __shared__ BMPackWord w[VT_BLKN];
    if (i < n)
-   {  //const int j= i & VT_BLKM;
-      const uint j= threadIdx.x & VT_WRDM;   // lane index
-      const uint k= threadIdx.x & ~VT_WRDM;  // warp/word index
+   {
+      const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
+      const uint k= threadIdx.x & ~VT_WRDM;  // warp index (word number)
 
-      u[threadIdx.x]= f(i) << j;
+      w[threadIdx.x]= f(i) << j;
 
-      if (0 == merge32(u+k, j)) { rBM[i>>VT_WRDS]= u[threadIdx.x]; }
+      if (0 == merge32(w+k, j)) { rBM[i>>VT_WRDS]= w[threadIdx.x]; }
    }
 } // mapFieldL32
 
-//define BMC_TEST_MFV32
-
-#ifdef BMC_TEST_MFV32
 template <typename T_Elem>
 __global__ void mapFieldV32 (BMPackWord rBM[], const BMOrg bmo, const CUDAMultiFieldMap<T_Elem> f) // const size_t n)
 {
    const uint x= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint u[VT_BLKN];
+   __shared__ BMPackWord w[VT_BLKN];
    if (x < bmo.rowElem)
    {
       size_t i= f.index(x, blockIdx.y, blockIdx.z);
       const uint j= threadIdx.x & VT_WRDM;
       const uint k= threadIdx.x & ~VT_WRDM;
 
-      u[threadIdx.x]= f(i) << j;
+      w[threadIdx.x]= f(i) << j;
 
-      if (0 == merge32(u+k, j)) // & VT_WRDM) if BLKS > WRDS !
-      {  // (x >> VT_WRDS)
-         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[threadIdx.x];
+      if (0 == merge32(w+k, j))
+      {  // One thread per word
+         i= ((blockIdx.x << VT_BWS) + (k >> VT_WRDS)) +
+               blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= w[threadIdx.x];
       }
    }
 } // mapFieldV32
-#endif  // BMC_TEST_MFV32
-
-__global__ void vThreshV32
-(
-   BMPackWord rBM[],
-   const CUDAFieldDesc fd,
-   const BMOrg bmo,
-   const BinMapF32 bm
-)
-{
-   const uint x= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint u[VT_BLKN];
-   if (x < fd.def[0])
-   {
-      size_t i= x * fd.stride[0] + blockIdx.y * fd.stride[1] + blockIdx.z * fd.stride[2];
-      const uint j= threadIdx.x & VT_WRDM;
-      const uint k= threadIdx.x & ~VT_WRDM;
-
-      u[threadIdx.x]= bm1f32( fd.field[0].pF32[i], bm ) << j;
-
-      if (0 == merge32(u+k, j)) // & VT_WRDM) if BLKS > WRDS !
-      {  // (x >> VT_WRDS)
-         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[threadIdx.x];
-      }
-   }
-} // vThreshV32
 
 __global__ void vThreshVSum32
 (
@@ -346,8 +350,8 @@ __global__ void vThreshVSum32
 )
 {
    const uint x= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ uint u[VT_BLKN];
-   if (x < fd.def[0])// && (y < defY))
+   __shared__ BMPackWord w[VT_BLKN];
+   if (x < bmo.rowElem)// && (y < defY))
    {
       size_t i= x * fd.stride[0] + blockIdx.y * fd.stride[1] + blockIdx.z * fd.stride[2];
       const uint j= threadIdx.x & VT_WRDM;
@@ -356,12 +360,13 @@ __global__ void vThreshVSum32
       float s= (fd.field[0].pF32)[i];
       for (int f=1; f < fd.nF; f++) { s+= fd.field[f].pF32[i]; }
 
-      u[threadIdx.x]= bm1f32(s,bm) << j;
+      w[threadIdx.x]= bm1f32(s,bm) << j;
 
-      if (0 == merge32(u, j))
+      if (0 == merge32(w, j))
       {
-         i= blockIdx.x + (k >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[threadIdx.x];
+         i= ((blockIdx.x << VT_BWS) + (k >> VT_WRDS)) +
+               blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         rBM[i]= w[threadIdx.x];
       }
    }
 } // vThreshVSum32
@@ -410,13 +415,8 @@ BMOrg *binMapCUDA
             }  break;
 
             case 0x20 :
-#ifdef BMC_TEST_MFV32
                mapFieldV32<<<grd,blk>>>(pW, *pO, CUDAMultiFieldMap<float>(pF, pMC));
                pID= "mapFieldV32()";
-#else
-               vThreshV32<<<grd,blk>>>(pW, fd, *pO, *pMC);
-               pID= "vThreshV32()";
-#endif
                break;
 
             case 0x30 :
