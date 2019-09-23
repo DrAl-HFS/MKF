@@ -162,6 +162,7 @@ public:
    CUDAMultiFieldMap (const BMFieldInfo *pI, const BinMapF32 *pM) : CUDAMultiField<T_Elem>(pI), CUDAMap<T_Elem>(pM) {;}
    CUDAMultiFieldMap (const BMFieldInfo *pI, const BinMapF64 *pM) : CUDAMultiField<T_Elem>(pI), CUDAMap<T_Elem>(pM) {;}
 
+   __device__ size_t index (uint x, uint y, uint z) const { return CUDAMultiField<T_Elem>::index(x,y,z); }
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval( CUDAMultiField<T_Elem>::sum(i) ); }
 }; // template class CUDAMultiFieldMap
 
@@ -273,17 +274,21 @@ __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, con
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
    if (i < n)
-   {
-      const int j= i & VT_BLKM;
+   {  //const int j= i & VT_BLKM;
+      const uint j= threadIdx.x & VT_WRDM;   // lane index
+      const uint k= threadIdx.x & ~VT_WRDM;  // warp/word index
 
-      u[j]= f(i) << j;
+      u[threadIdx.x]= f(i) << j;
 
-      if (0 == merge32(u, j)) { rBM[i>>VT_WRDS]= u[0]; }
+      if (0 == merge32(u+k, j)) { rBM[i>>VT_WRDS]= u[j]; }
    }
 } // mapFieldL32
-/*
+
+//#define BMC_TEST_MFV32
+
+#ifdef BMC_TEST_MFV32
 template <typename T_Elem>
-__global__ void mapFieldV32 (BMPackWord rBM[], const CUDAMultiFieldMap<T_Elem> f, const BMOrg bmo) // const size_t n)
+__global__ void mapFieldV32 (BMPackWord rBM[], const BMOrg bmo, const CUDAMultiFieldMap<T_Elem> f) // const size_t n)
 {
    const int x= blockIdx.x * blockDim.x + threadIdx.x;
    __shared__ uint u[VT_BLKN];
@@ -295,15 +300,15 @@ __global__ void mapFieldV32 (BMPackWord rBM[], const CUDAMultiFieldMap<T_Elem> f
 
       u[threadIdx.x]= f(i) << j;
 
-      merge32(u+k, j);
-      if (0 == j) // & VT_WRDM) if BLKS > WRDS !
+      if (0 == merge32(u+k, j)) // & VT_WRDM) if BLKS > WRDS !
       {  // (x >> VT_WRDS)
          i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[0] | u[16];
+         rBM[i]= u[j];
       }
    }
-} // vThreshV32
-*/
+} // mapFieldV32
+#endif  // BMC_TEST_MFV32
+
 __global__ void vThreshV32
 (
    BMPackWord rBM[],
@@ -317,14 +322,15 @@ __global__ void vThreshV32
    if (x < fd.def[0])
    {
       size_t i= x * fd.stride[0] + blockIdx.y * fd.stride[1] + blockIdx.z * fd.stride[2];
-      const int j= i & VT_BLKM;
+      const uint j= threadIdx.x & VT_WRDM;
+      const uint k= threadIdx.x & ~VT_WRDM;
 
-      u[j]= bm1f32( fd.field[0].pF32[i], bm ) << j; // (j & VT_WRDM)
+      u[threadIdx.x]= bm1f32( fd.field[0].pF32[i], bm ) << j;
 
-      if (0 == merge32(u, j)) // & VT_WRDM) if BLKS > WRDS !
+      if (0 == merge32(u+k, j)) // & VT_WRDM) if BLKS > WRDS !
       {  // (x >> VT_WRDS)
          i= blockIdx.x + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
-         rBM[i]= u[0];
+         rBM[i]= u[j];
       }
    }
 } // vThreshV32
@@ -401,10 +407,13 @@ BMOrg *binMapCUDA
             }  break;
 
             case 0x20 :
-               //mapFieldV32<<<grd,blk>>>(pW, CUDAMultiFieldMap<float>(pF, pMC), *pO);
-               //pID= "mapFieldV32()";
+#ifdef BMC_TEST_MFV32
+               mapFieldV32<<<grd,blk>>>(pW, *pO, CUDAMultiFieldMap<float>(pF, pMC));
+               pID= "mapFieldV32()";
+#else
                vThreshV32<<<grd,blk>>>(pW, fd, *pO, *pMC);
                pID= "vThreshV32()";
+#endif
                break;
 
             case 0x30 :

@@ -139,7 +139,7 @@ int main (int argc, char *argv[])
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
       LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
-      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x10))
+      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x20))
       {
          //LOG("bc=%zu\n", bitCountNZ(cux.pHU, cux.bytesU/sizeof(size_t)));
          reportMeasures(pBPFD, mScale);
