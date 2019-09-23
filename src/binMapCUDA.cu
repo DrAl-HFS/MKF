@@ -274,16 +274,10 @@ __global__ void vThreshL32 (BMPackWord r[], const float f[], const size_t n, con
 
 /***/
 
+
 // local mem bit merge util
 __device__ int merge32 (BMPackWord w[32], const int j)
 {
-/* TODO: consider using CUDA9 warp level primitives...
-#define FULL_MASK 0xffffffff
-for (int offset = 16; offset > 0; offset /= 2)
-    val += __shfl_down_sync(FULL_MASK, val, offset);
-*/
-   //__syncthreads(); // Unnecessary - no divergence at this point
-
    if (0 == (j & 0x3))
    {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
       for (int l=1; l<4; l++) { w[j]|= w[j+l]; }
@@ -303,6 +297,50 @@ for (int offset = 16; offset > 0; offset /= 2)
 
 /***/
 
+#ifdef WLP_BALLOT
+// doesn't work... ?
+template <typename T_Elem>
+__global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
+{
+   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < n)
+   {
+      uint w= __ballot_sync(VT_WRDM, f(i) > 0);
+
+      if (0 == (threadIdx.x & VT_WRDM)) { rBM[i>>VT_WRDS]= w; }
+   }
+} // mapFieldL32
+#endif
+
+#if 1 //def WLP_MERGE
+
+__device__ int merge (BMPackWord& w, const int j)
+{  // CUDA9 warp level primitives (supported on CUDA7+ ? )
+   for (uint offset= warpSize/2; offset > 0; offset /= 2)
+   { // m= 0xFFFF ??? (1<<offset)-1 ??? (1<<(warpSize/2))-1
+      w|= __shfl_down_sync(-1, w, offset);
+   }
+   return(j);
+} // merge
+
+template <typename T_Elem>
+__global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
+{
+   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
+   if (i < n)
+   {
+      const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
+      //const uint k= threadIdx.x & ~VT_WRDM;  // warp index (word number)
+
+      uint w= f(i) << j;
+
+      if (0 == merge(w, j)) { rBM[i>>VT_WRDS]= w; }
+   }
+} // mapFieldL32
+
+
+#else
+
 template <typename T_Elem>
 __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
 {
@@ -318,6 +356,8 @@ __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, con
       if (0 == merge32(w+k, j)) { rBM[i>>VT_WRDS]= w[threadIdx.x]; }
    }
 } // mapFieldL32
+
+#endif // WLP_MERGE
 
 template <typename T_Elem>
 __global__ void mapFieldV32 (BMPackWord rBM[], const BMOrg bmo, const CUDAMultiFieldMap<T_Elem> f) // const size_t n)
