@@ -76,7 +76,7 @@ struct Region
 }; // struct Region
 
 
-/***/
+/* Templated device classes */
 
 template <typename T_Elem>
 class CUDAImgMom
@@ -84,7 +84,7 @@ class CUDAImgMom
 protected:
    T_Elem * pM2;
 
-   CUDAImgMom (void *p) { pM= static_cast<T_Elem*>p; }
+   CUDAImgMom (void *p) { pM2= static_cast<T_Elem*>(p); }
 
    __device__ void add (int x, int y, int z, T_Elem m)
    {
@@ -108,7 +108,7 @@ protected:
          atomicAdd( pM2+2, m2[0] );
       }
    }
-};
+}; // class CUDAImgMom
 
 template <typename T_Elem>
 class CUDAMap
@@ -135,7 +135,7 @@ class CUDAFieldMap : protected CUDAMap<T_Elem>
 protected:
    const T_Elem * pF;
 
-public:                 // static_cast< const T_Elem * >
+public:                 // static_cast< const T_Elem * >() - irrelevant so why bother?
    CUDAFieldMap (const void * p, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM) { pF= (const T_Elem *)p; }
    CUDAFieldMap (const void * p, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM) { pF= (const T_Elem *)p; }
 
@@ -228,10 +228,10 @@ public:
 }; // template class CUDAMultiFieldMap
 
 
-//ifdef NO_WLP
+/* Device utility functions */
 
-// local mem bit merge util
-__device__ int merge32 (BMPackWord w[32], const int j)
+/*
+__device__ int merge32x (BMPackWord w[32], const int j)
 {
    if (0 == (j & 0x3))
    {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
@@ -248,42 +248,49 @@ __device__ int merge32 (BMPackWord w[32], const int j)
       }
    }
    return(j);
+} // merge32x
+*/
+__device__ int merge32 (BMPackWord w[32], const int lane)
+{
+   for (int s= 16; s > 0; s>>= 1)
+   {
+      __syncthreads();
+      //w[lane]|= w[lane+s]; // incorrect!
+      if (lane < s) { w[lane]|= w[lane+s]; }
+   }
 } // merge32
 
-uint bitMergeShared (uint v)
+__device__ uint bitMergeShared (uint v)
 {
-   __shared__ BMPackWord w[VT_BLKN];
+   __shared__ BMPackWord w[VT_BLKN]; // Caution! fixed blocksize!
 
    w[threadIdx.x]= v;
-   merge32(w, threadIdx.x);
+   merge32(w + (threadIdx.x & ~VT_WRDM), threadIdx.x & VT_WRDM);
    return(w[threadIdx.x]);
 } // bitMergeShared
 
-#ifdef NO_WLP
+__device__ uint bitMergeBallot (uint v)
+{  // Nice simplification but doesn't work... ?
+   return __ballot_sync(VT_WRDM, v);
+} // bitMergeBallot
 
-template <typename T_Elem>
-__global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
-{
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   __shared__ BMPackWord w[VT_BLKN];
-   if (i < n)
-   {
-      const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
-      const uint k= threadIdx.x & ~VT_WRDM;  // warp index (word number)
-
-      w[threadIdx.x]= f(i) << j;
-
-      if (0 == merge32(w+k, j)) { rBM[i>>VT_WRDS]= w[threadIdx.x]; }
+__device__ uint bitMergeWarp (uint w)
+{  // CUDA9 warp level primitives (supported on CUDA7+ ? )
+   for (int s= warpSize/2; s > 0; s>>= 1)
+   {  // TODO - FIX - warning: integer conversion resulted in a change of sign
+      w|= (uint)__shfl_down_sync(-1, w, s);
    }
-} // mapField
+   return(w);
+} // bitMergeWarp
 
+#ifdef NO_WLP
+#define BIT_MERGE(w) bitMergeShared(w)
+#else
+#define BIT_MERGE(w) bitMergeWarp(w)
 #endif
 
-
-/***/
-
-#ifdef WLP_BALLOT
-
+/* KERNELS */
+/*
 template <typename T_Elem>
 __global__ void mapFieldB (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
 {
@@ -295,17 +302,7 @@ __global__ void mapFieldB (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const
       if (0 == (threadIdx.x & VT_WRDM)) { rBM[i>>VT_WRDS]= w; }
    }
 } // mapFieldB
-
-#endif // WLP_BALLOT
-
-__device__ uint bitMergeWarp (uint w)
-{  // CUDA9 warp level primitives (supported on CUDA7+ ? )
-   for (int s= warpSize/2; s > 0; s>>= 1)
-   {  // TODO - FIX - warning: integer conversion resulted in a change of sign
-      w|= (uint)__shfl_down_sync(-1, w, s);
-   }
-   return(w);
-} // bitMergeWarp
+*/
 
 template <typename T_Elem>
 __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
@@ -315,8 +312,9 @@ __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const 
    {
       const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
 
-      uint w= bitMergeWarp( f(i) << j );
+      uint w= BIT_MERGE( f(i) << j );
       //uint w= bitMergeShared( f(i) << j );
+      //uint w= bitMergeBallot( f(i) );
 
       if (0 == j) { rBM[i>>VT_WRDS]= w; }
    }
@@ -330,7 +328,7 @@ __global__ void mapMultiField (BMPackWord rBM[], const CUDAMultiFieldMap<T_Elem>
    {
       const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
 
-      uint w= bitMergeWarp( mf(i) << j );
+      uint w= BIT_MERGE( mf(i) << j );
 
       if (0 == j) { rBM[i>>VT_WRDS]= w; }
    }
@@ -345,7 +343,7 @@ __global__ void mapStrideField (BMPackWord rBM[], const CUDAOrg org, const CUDAF
       size_t i= org.fieldIndex(x, blockIdx.y, blockIdx.z);
       const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
 
-      uint w= bitMergeWarp( f(i) << j );
+      uint w= BIT_MERGE( f(i) << j );
 
       if (0 == j) { rBM[org.bmIndex(x, blockIdx.y, blockIdx.z)]= w; }
    }
@@ -360,7 +358,7 @@ __global__ void mapStrideMultiField (BMPackWord rBM[], const CUDAOrg org, const 
       size_t i= org.fieldIndex(x, blockIdx.y, blockIdx.z);
       const uint j= threadIdx.x & VT_WRDM;
 
-      uint w= bitMergeWarp( mf(i) << j );
+      uint w= BIT_MERGE( mf(i) << j );
 
       if (0 == j) { rBM[org.bmIndex(x, blockIdx.y, blockIdx.z)]= w; }
    }
