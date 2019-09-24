@@ -297,26 +297,29 @@ __device__ int merge32 (BMPackWord w[32], const int j)
 
 /***/
 
+
+#if 1 //def WLP_MERGE
+
 #ifdef WLP_BALLOT
-// doesn't work... ?
+
 template <typename T_Elem>
 __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
 {
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    if (i < n)
    {
-      uint w= __ballot_sync(VT_WRDM, f(i) > 0);
+      uint r= f(i);
+      uint w= __ballot_sync(VT_WRDM, r ); // doesn't work... ?
 
       if (0 == (threadIdx.x & VT_WRDM)) { rBM[i>>VT_WRDS]= w; }
    }
 } // mapFieldL32
-#endif
 
-#if 1 //def WLP_MERGE
+#else // WLP_BALLOT
 
 __device__ int merge (BMPackWord& w, const int j)
 {  // CUDA9 warp level primitives (supported on CUDA7+ ? )
-   for (uint offset= warpSize/2; offset > 0; offset /= 2)
+   for (int offset= warpSize/2; offset > 0; offset /= 2)
    { // m= 0xFFFF ??? (1<<offset)-1 ??? (1<<(warpSize/2))-1
       w|= __shfl_down_sync(-1, w, offset);
    }
@@ -338,8 +341,9 @@ __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, con
    }
 } // mapFieldL32
 
+#endif // WLP_BALLOT
 
-#else
+#else // WLP_MERGE
 
 template <typename T_Elem>
 __global__ void mapFieldL32 (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
@@ -374,8 +378,7 @@ __global__ void mapFieldV32 (BMPackWord rBM[], const BMOrg bmo, const CUDAMultiF
 
       if (0 == merge32(w+k, j))
       {  // One thread per word
-         i= ((blockIdx.x << VT_BWS) + (k >> VT_WRDS)) +
-               blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         i= (x >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
          rBM[i]= w[threadIdx.x];
       }
    }
@@ -402,10 +405,9 @@ __global__ void vThreshVSum32
 
       w[threadIdx.x]= bm1f32(s,bm) << j;
 
-      if (0 == merge32(w, j))
+      if (0 == merge32(w+k, j))
       {
-         i= ((blockIdx.x << VT_BWS) + (k >> VT_WRDS)) +
-               blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
+         i= (x >> VT_WRDS) + blockIdx.y * bmo.rowWS + blockIdx.z * bmo.planeWS;
          rBM[i]= w[threadIdx.x];
       }
    }
@@ -437,15 +439,7 @@ BMOrg *binMapCUDA
          const dim3 blk(VT_BLKN,1,1);
          switch (pF->profID & 0x30)
          {
-            case 0x10 :
-            if (0 == (fd.def[0] & VT_BLKM)) // 1D collapsable
-            {  const size_t nF= prodNI(fd.def,3);
-               mapFieldL32<<<nF/VT_BLKN,VT_BLKN>>>(pW, CUDAFieldMap<float>(fd.field[0].pF32, pMC), nF);
-               pID= "mapFieldL32()"; // "vThreshL32()";
-               break;
-            }
-            //else...
-            case 0x00 : // Horribly inefficient iteration - only method presently working for !=*32 row length
+            case 0x00 : // Horribly inefficient iteration
             {  const int nRows= prodNI(fd.def+1,2);
                for (int i=0; i<nRows; i++)
                {
@@ -454,6 +448,14 @@ BMOrg *binMapCUDA
                pID= "nRows*mapFieldL32()";
             }  break;
 
+            case 0x10 :
+            if (0 == (fd.def[0] & VT_BLKM)) // 1D collapsable
+            {  const size_t nF= prodNI(fd.def,3);
+               mapFieldL32<<<nF/VT_BLKN,VT_BLKN>>>(pW, CUDAFieldMap<float>(fd.field[0].pF32, pMC), nF);
+               pID= "mapFieldL32()"; // "vThreshL32()";
+               break;
+            }
+            //else need strided access...
             case 0x20 :
                mapFieldV32<<<grd,blk>>>(pW, *pO, CUDAMultiFieldMap<float>(pF, pMC));
                pID= "mapFieldV32()";
