@@ -19,13 +19,15 @@
 
 /***/
 
+bool validPtr (const void *p) { return(NULL != p); }
+
 uint copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask)
 {
    uint t, i= 0, n= 0;
    do
    {
       t= (0x1 << i);
-      if ((NULL != a[i].p) && (mask & t))
+      if (validPtr(a[i].p) && (mask & t))
       {
          r[n++]= a[i];
       }
@@ -41,7 +43,7 @@ struct Region
    ConstFieldPtr f0;
 
 //public:
-   bool validate (const BMFieldInfo *pI) // SubRegion/Box ???
+   bool validate (const BMFieldInfo *pI) // TODO: SubRegion/Box ???
    {
       int nD= 0;
       if (pI)
@@ -65,22 +67,54 @@ struct Region
       return((nD > 0) && (NULL != f0.p));
    } // validate (as conditional 'CTOR')
 
-   bool collapsable (void) const { return(0 == (elemDef[0] & VT_BLKM)); }
+   bool collapsable (void) const { return(0 == (elemDef[0] & VT_WRDM)); }
 
    dim3 blockDef (void) { return dim3(blkDef0, 1, 1); }
    dim3 gridDef (void) { return dim3(grdDef0, elemDef[1], elemDef[2]); }
    int collapsedBlockDef (void) { return(blkDef0); }
    int collapsedGridDef (void) { if (blkDef0 > 0) { return((n + blkDef0-1) / blkDef0); } else return(0); }
-};
+}; // struct Region
 
 
 /***/
 
 template <typename T_Elem>
+class CUDAImgMom
+{
+protected:
+   T_Elem * pM2;
+
+   CUDAImgMom (void *p) { pM= static_cast<T_Elem*>p; }
+
+   __device__ void add (int x, int y, int z, T_Elem m)
+   {
+      __shared__ T_Elem m0[VT_BLKN], m1[VT_BLKN], m2[VT_BLKN];
+
+      m0[threadIdx.x]= (m > 0);
+      m1[threadIdx.x]= m;
+      m2[threadIdx.x]= m * m;
+      for (int s= blockDim.x/2; s > 0; s>>= 1)
+      {
+         __syncthreads();
+         // if (threadIdx.x < s) {
+         m0[threadIdx.x]+= m0[threadIdx.x + s];
+         m1[threadIdx.x]+= m1[threadIdx.x + s];
+         m2[threadIdx.x]+= m2[threadIdx.x + s];
+      }
+      if (0 == threadIdx.x)
+      {
+         atomicAdd( pM2+0, m0[0] );
+         atomicAdd( pM2+1, m1[0] );
+         atomicAdd( pM2+2, m2[0] );
+      }
+   }
+};
+
+template <typename T_Elem>
 class CUDAMap
 {
 protected:
-   T_Elem t[BM_NUMT];
+   T_Elem   t[BM_NUMT];
    uint     m;
 
 public:
@@ -99,11 +133,11 @@ template <typename T_Elem>
 class CUDAFieldMap : protected CUDAMap<T_Elem>
 {
 protected:
-   const T_Elem *pF;
+   const T_Elem * pF;
 
-public:
-   CUDAFieldMap (const void * p, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM) { pF= (T_Elem *)p; }
-   CUDAFieldMap (const void * p, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM) { pF= (T_Elem *)p; }
+public:                 // static_cast< const T_Elem * >
+   CUDAFieldMap (const void * p, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM) { pF= (const T_Elem *)p; }
+   CUDAFieldMap (const void * p, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM) { pF= (const T_Elem *)p; }
 
    //__device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::operator () (pF[i]); }
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval(pF[i]); }
@@ -194,7 +228,7 @@ public:
 }; // template class CUDAMultiFieldMap
 
 
-#ifdef NO_WLP
+//ifdef NO_WLP
 
 // local mem bit merge util
 __device__ int merge32 (BMPackWord w[32], const int j)
@@ -215,6 +249,17 @@ __device__ int merge32 (BMPackWord w[32], const int j)
    }
    return(j);
 } // merge32
+
+uint bitMergeShared (uint v)
+{
+   __shared__ BMPackWord w[VT_BLKN];
+
+   w[threadIdx.x]= v;
+   merge32(w, threadIdx.x);
+   return(w[threadIdx.x]);
+} // bitMergeShared
+
+#ifdef NO_WLP
 
 template <typename T_Elem>
 __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
@@ -271,6 +316,7 @@ __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const 
       const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
 
       uint w= bitMergeWarp( f(i) << j );
+      //uint w= bitMergeShared( f(i) << j );
 
       if (0 == j) { rBM[i>>VT_WRDS]= w; }
    }
@@ -344,13 +390,7 @@ BMOrg *binMapCUDA
       {
          switch (pF->profID & 0x30)
          {
-/*          {  const int nRows= prodNI(fd.def+1,2);
-               for (int i=0; i<nRows; i++)
-               {  // Horribly inefficient iteration
-                  mapField<<<reg.nBlk,VT_BLKN>>>(pW + i * pO->rowWS, CUDAFieldMap<float>(fd.field[0].pF32 + i * fd.stride[1], pMC), fd.def[0]);
-               }
-               pID= "nRows*mapField()";
-            }  break; */
+
             case 0x00 :
             if (reg.collapsable())
             {
@@ -374,6 +414,14 @@ BMOrg *binMapCUDA
                mapStrideMultiField<<< reg.gridDef(), reg.blockDef() >>>(pW, CUDAOrg(pO, pF), CUDAMultiFieldMap<float>(pF, pMC));
                pID= "mapStrideMultiField()";
                break;
+            /*case never :
+            {  const int nRows= prodNI(fd.def+1,2);
+               for (int i=0; i<nRows; i++)
+               {  // Horribly inefficient iteration
+                  mapField<<<reg.nBlk,VT_BLKN>>>(pW + i * pO->rowWS, CUDAFieldMap<float>(fd.field[0].pF32 + i * fd.stride[1], pMC), fd.def[0]);
+               }
+               pID= "nRows*mapField()"; break;
+            }*/
          }
          LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.collapsedBlockDef(), t.elapsedms());
          if (0 == ctuErr(NULL, pID)) { return(pO); }
