@@ -252,12 +252,21 @@ __device__ int merge32x (BMPackWord w[32], const int j)
 */
 __device__ int merge32 (BMPackWord w[32], const int lane)
 {
+#if 0
+   // Hoped to shared read contention...
    for (int s= 16; s > 0; s>>= 1)
-   {
-      __syncthreads();
-      //w[lane]|= w[lane+s]; // incorrect!
+   {  __syncthreads();
       if (lane < s) { w[lane]|= w[lane+s]; }
    }
+#else
+   if (lane < 16)
+   {  // ...but this seems fractionally faster...
+      for (int s= 16; s > 0; s>>= 1)
+      {  __syncthreads();
+         w[lane]|= w[lane+s];
+      }
+   }
+#endif
 } // merge32
 
 __device__ uint bitMergeShared (uint v)

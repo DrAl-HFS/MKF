@@ -112,7 +112,7 @@ size_t bitCountNZ (size_t z[], const int n)
 
 int main (int argc, char *argv[])
 {
-   int id=3, def[3]= {257, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
+   int id=3, def[3]= {256, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
    BinMapF32 bmc;
    size_t *pBPFD=NULL, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
    Context cux={0};
@@ -139,7 +139,7 @@ int main (int argc, char *argv[])
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
       LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
-      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x10))
+      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x00))
       {
          //LOG("bc=%zu\n", bitCountNZ(cux.pHU, cux.bytesU/sizeof(size_t)));
          reportMeasures(pBPFD, mScale);
