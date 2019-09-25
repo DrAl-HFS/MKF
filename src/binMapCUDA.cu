@@ -33,23 +33,40 @@ uint copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a
       }
       i++;
    } while ((mask > t) && (n < max));
+   //if (n < max) { r[n].p= NULL; } guard ?
+   return(n);
+} // copyValidPtrByMask
+
+uint countValidPtrByMask (const ConstFieldPtr a[], uint mask)
+{
+   uint i= 0, n= 0;
+   do
+   {
+      n+= validPtr(a[i].p) && (mask & 0x1);
+      mask >>= 1;
+      i++;
+   } while (mask > 0);
    return(n);
 } // copyValidPtrByMask
 
 struct Region
 {  // Expect multiple fields, common def & stride
-   FieldDef elemDef[3], blkDef0, grdDef0;
-   size_t  n;
-   ConstFieldPtr f0;
+   size_t   nElem;
+   FieldDef elemDef[3];
+   int      grdDef0;
+   uint16_t blkDef0;
+   uint8_t  nD, nF;
 
 //public:
    bool validate (const BMFieldInfo *pI) // TODO: SubRegion/Box ???
    {
-      int nD= 0;
       if (pI)
       {
-         if (pI->pFieldDevPtrTable) { copyValidPtrByMask(&f0, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); }
-         else { f0.p= NULL; }
+         nD= 0; nF= 0;
+         if (pI->pFieldDevPtrTable)
+         {
+            nF= countValidPtrByMask(pI->pFieldDevPtrTable, pI->fieldTableMask);
+         }
          if (pI->pD)
          {
             for (int i=0; i<3; i++)
@@ -61,18 +78,19 @@ struct Region
             blkDef0= VT_BLKN;
             //if (blkDim0...
             grdDef0= (elemDef[0] + (blkDef0-1) ) / blkDef0;
-            n= prodNI(elemDef,3);
+            nElem= prodNI(elemDef,3);
          }
+         return((nD > 0) && (nF > 0));
       }
-      return((nD > 0) && (NULL != f0.p));
+      return(false);
    } // validate (as conditional 'CTOR')
 
-   bool collapsable (void) const { return( (elemDef[0] == n) || (0 == (elemDef[0] & VT_WRDM)) ); }
+   bool collapsable (void) const { return( (elemDef[0] == nElem) || (0 == (elemDef[0] & VT_WRDM)) ); }
 
    dim3 blockDef (void) { return dim3(blkDef0, 1, 1); }
    dim3 gridDef (void) { return dim3(grdDef0, elemDef[1], elemDef[2]); }
    int collapsedBlockDef (void) { return(blkDef0); }
-   int collapsedGridDef (void) { if (blkDef0 > 0) { return((n + blkDef0-1) / blkDef0); } else return(0); }
+   int collapsedGridDef (void) { if (blkDef0 > 0) { return((nElem + blkDef0-1) / blkDef0); } else return(0); }
 }; // struct Region
 
 
@@ -136,8 +154,10 @@ protected:
    const T_Elem * pF;
 
 public:                 // static_cast< const T_Elem * >() - irrelevant so why bother?
-   CUDAFieldMap (const void * p, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM) { pF= (const T_Elem *)p; }
-   CUDAFieldMap (const void * p, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM) { pF= (const T_Elem *)p; }
+   CUDAFieldMap (const BMFieldInfo *pI, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM)
+   { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); }
+   CUDAFieldMap (const BMFieldInfo *pI, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM)
+   { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); }
 
    //__device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::operator () (pF[i]); }
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval(pF[i]); }
@@ -187,7 +207,7 @@ template <typename T_Elem>
 class CUDAMultiField
 {  // Multiple fields with common stride
 protected:
-   const T_Elem   * fPtr[BMFI_FIELD_MAX];
+   const T_Elem   * fPtrTab[BMFI_FIELD_MAX];
    uint           nF;
 
 public:
@@ -195,7 +215,7 @@ public:
    {
       if (pI->pD)
       {
-         nF= copyValidPtrByMask( (ConstFieldPtr*)fPtr, BMFI_FIELD_MAX, pI->pFieldDevPtrTable, pI->fieldTableMask);
+         nF= copyValidPtrByMask( (ConstFieldPtr*)fPtrTab, BMFI_FIELD_MAX, pI->pFieldDevPtrTable, pI->fieldTableMask);
       }
    } // CTOR
 
@@ -203,8 +223,8 @@ public:
 
    __device__ T_Elem sum (const size_t i) const
    {
-      T_Elem s= (fPtr[0])[i];
-      for (int iF=1; iF < nF; iF++) { s+= (fPtr[iF])[i]; }
+      T_Elem s= (fPtrTab[0])[i];
+      for (int iF=1; iF < nF; iF++) { s+= (fPtrTab[iF])[i]; }
       return(s);
    } // sum
    __device__ T_Elem operator () (const size_t i) const { return sum(i); }
@@ -365,25 +385,27 @@ BMOrg *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pF->profID) )
       {
+         //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
          switch (pF->profID & 0x30)
          {
-
             case 0x00 :
-            if (reg.collapsable())
+            if (reg.collapsable() && (1 == reg.nF))
             {
-               mapField<<< reg.collapsedGridDef(), reg.collapsedBlockDef() >>>(pW, CUDAFieldMap<float>(reg.f0.pF32, pMC), reg.n);
+               mapField<<< reg.collapsedGridDef(), reg.collapsedBlockDef() >>>(pW, CUDAFieldMap<float>(pF, pMC), reg.nElem);
                pID= "mapField()";
                break;
             } // else...
             case 0x10 :
-               mapStrideField<<< reg.gridDef(), reg.blockDef() >>>(pW, CUDAOrg(pO, pF), CUDAFieldMap<float>(reg.f0.pF32, pMC));
+            if (1 == reg.nF)
+            {
+               mapStrideField<<< reg.gridDef(), reg.blockDef() >>>(pW, CUDAOrg(pO, pF), CUDAFieldMap<float>(pF, pMC));
                pID= "mapStrideField()";
                break;
-
+            } // else...
             case 0x20 :
             if (reg.collapsable())
             {
-               mapMultiField<<< reg.collapsedGridDef(), reg.collapsedBlockDef() >>>(pW, CUDAMultiFieldMap<float>(pF, pMC), reg.n);
+               mapMultiField<<< reg.collapsedGridDef(), reg.collapsedBlockDef() >>>(pW, CUDAMultiFieldMap<float>(pF, pMC), reg.nElem);
                pID= "mapMultiField()";
                break;
             } // else ...
