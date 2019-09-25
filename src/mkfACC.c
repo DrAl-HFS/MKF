@@ -209,14 +209,16 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
       const size_t nF= prodNI(def,3);
       const size_t nBM= setBMO(&bmo, def, 0); //(planeStride * def[2])
       BMFieldInfo fi={0};
+      ConstFieldPtr table[1];
 
       LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
-      fi.fieldMask=  0x01;
+      fi.fieldTableMask=  0x01;
       fi.elemID=     BMFI_EIDT_FPB|4;
       //fi.opr=
-      fi.profID= 0x10;
+      //fi.profID=
       fi.pD= def;
       //fi.pS= NULL; // auto stride
+      fi.pFieldDevPtrTable= table;
       //LOG("* row, plane = %u, %u\n", sd.row, sd.plane);
       #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF] ) copy( rBPFD[:MKF_BINS] )
       {
@@ -224,8 +226,8 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
          // ...then invoke CUDA routines
          #pragma acc host_data use_device( rBPFD, pBM, pF ) // get device memory pointers
          {  // allocated via OpenACC for CUDA access to array/field data (others passed to
-            // kernels using API "value parameter auto-marshalling" - const memory?)
-            fi.field[0].pF32= pF;
+            // kernels using API "value parameter auto-marshalling" into const memory)
+            table[0].pF32= pF;
             if (binMapCUDA(pBM, &bmo, &fi, pMC))
             {
                //LOG("\tsd= %u %u\n", sd.row, sd.plane);

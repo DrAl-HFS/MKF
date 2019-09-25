@@ -58,17 +58,29 @@ typedef struct
 #define BMFI_EIDT_FPB 0xF0
 #define BMFI_EIDM_NUM 0x0F
 
-#define BMFI_FIELD_MAX 4
-// const half *pF16;  ???
+// Common data types
+#define BMFI_F32 (BMFI_EIDT_FPB|4)
+#define BMFI_F64 (BMFI_EIDT_FPB|8)
+// Aliases
+#define BMFI_FLOAT  BMFI_F32
+#define BMFI_DOUBLE BMFI_F64
+
+#define BMFI_FIELD_MAX 4   // Number of fields actually supported
+
+// Could add "const half *pF16;" if relevant headers included, but perhaps not useful?
 typedef union { const void *p; const float *pF32; const double *pF64; size_t w; } ConstFieldPtr;
+
 typedef long int FieldStride;
 typedef int    FieldDef;
 typedef struct
-{  // CONSIDER: better to use enable mask rather than count for fields ?
-   struct { uint8_t  fieldMask, elemID, oprID, profID; }; // anon structs - may influence packing ?
-   const FieldDef    *pD;
+{
+   struct { // anon struct used to influence packing
+      uint32_t  fieldTableMask; // Bits 0..31 enable/disable entries in field device pointer table
+      uint8_t   elemID, oprID, profID, flags;
+   };
+   const FieldDef     *pD;
    const FieldStride *pS;  // NULL => assume fully planar fields
-   ConstFieldPtr     field[BMFI_FIELD_MAX];
+   ConstFieldPtr      *pFieldDevPtrTable;
 } BMFieldInfo;
 
 

@@ -48,8 +48,8 @@ struct Region
       int nD= 0;
       if (pI)
       {
-         //if (pI->)
-         copyValidPtrByMask(&f0, 1, pI->field, pI->fieldMask);
+         if (pI->pFieldDevPtrTable) { copyValidPtrByMask(&f0, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); }
+         else { f0.p= NULL; }
          if (pI->pD)
          {
             for (int i=0; i<3; i++)
@@ -67,7 +67,7 @@ struct Region
       return((nD > 0) && (NULL != f0.p));
    } // validate (as conditional 'CTOR')
 
-   bool collapsable (void) const { return(0 == (elemDef[0] & VT_WRDM)); }
+   bool collapsable (void) const { return( (elemDef[0] == n) || (0 == (elemDef[0] & VT_WRDM)) ); }
 
    dim3 blockDef (void) { return dim3(blkDef0, 1, 1); }
    dim3 gridDef (void) { return dim3(grdDef0, elemDef[1], elemDef[2]); }
@@ -190,17 +190,12 @@ protected:
    const T_Elem   * fPtr[BMFI_FIELD_MAX];
    uint           nF;
 
-   uint setF (const ConstFieldPtr a[], const uint mask)
-   {
-      return copyValidPtrByMask( (ConstFieldPtr*)fPtr, BMFI_FIELD_MAX, a, mask);
-   } // setF
-
 public:
    CUDAMultiField (const BMFieldInfo *pI)
    {
       if (pI->pD)
       {
-         nF= setF(pI->field, pI->fieldMask);
+         nF= copyValidPtrByMask( (ConstFieldPtr*)fPtr, BMFI_FIELD_MAX, pI->pFieldDevPtrTable, pI->fieldTableMask);
       }
    } // CTOR
 
@@ -230,43 +225,21 @@ public:
 
 /* Device utility functions */
 
-/*
-__device__ int merge32x (BMPackWord w[32], const int j)
+#ifdef NO_WLP
+
+__device__ uint merge32 (uint w[32], const int lane)
 {
-   if (0 == (j & 0x3))
-   {  // j : { 0, 4, 8, 12, 16, 10, 24, 28 } 8P 3I
-      for (int l=1; l<4; l++) { w[j]|= w[j+l]; }
-
-      __syncthreads(); // Required for (unexplained) divergence
-
-      if (0 == (j & 0xF))
-      {  // j : { 0, 16 } 2P 3I
-         for (int l=4; l<16; l+=4) { w[j]|= w[j+l]; }
-
-         __syncthreads(); //  Optional ?
-         if (0 == j) { w[0]|= w[16]; }
-      }
+   if (lane < 16)
+   {  // Manual / auto unrolling ineffective: presume limited by shared read/write
+      for (int s= 16; s > 0; s>>= 1) { __syncthreads(); w[lane]|= w[lane+s]; }
    }
-   return(j);
-} // merge32x
-*/
-__device__ int merge32 (BMPackWord w[32], const int lane)
-{
-#if 0
-   // Hoped to shared read contention...
+#if 0 // Tried to reduce shared read contention but actually slightly slower...
    for (int s= 16; s > 0; s>>= 1)
    {  __syncthreads();
       if (lane < s) { w[lane]|= w[lane+s]; }
    }
-#else
-   if (lane < 16)
-   {  // ...but this seems fractionally faster...
-      for (int s= 16; s > 0; s>>= 1)
-      {  __syncthreads();
-         w[lane]|= w[lane+s];
-      }
-   }
 #endif
+   return(w[lane]);
 } // merge32
 
 __device__ uint bitMergeShared (uint v)
@@ -274,44 +247,43 @@ __device__ uint bitMergeShared (uint v)
    __shared__ BMPackWord w[VT_BLKN]; // Caution! fixed blocksize!
 
    w[threadIdx.x]= v;
-   merge32(w + (threadIdx.x & ~VT_WRDM), threadIdx.x & VT_WRDM);
-   return(w[threadIdx.x]);
+   return merge32(w + (threadIdx.x & ~VT_WRDM), threadIdx.x & VT_WRDM);
 } // bitMergeShared
+
+#define BIT_MERGE(w) bitMergeShared(w)
+
+#else // NO_WLP
 
 __device__ uint bitMergeBallot (uint v)
 {  // Nice simplification but doesn't work... ?
    return __ballot_sync(VT_WRDM, v);
 } // bitMergeBallot
 
+#define SHFL_MASK_ALL (-1) // (1<<warpSize)-1 or 0xFFFFFFFF
+
+// TODO - FIX - warning: integer conversion resulted in a change of sign
+// #pragma NVCC warning disable ?
+
 __device__ uint bitMergeWarp (uint w)
 {  // CUDA9 warp level primitives (supported on CUDA7+ ? )
-   for (int s= warpSize/2; s > 0; s>>= 1)
-   {  // TODO - FIX - warning: integer conversion resulted in a change of sign
-      w|= (uint)__shfl_down_sync(-1, w, s);
-   }
+#if 1
+   #pragma unroll // Seems to have no effect - need to enable a setting ?
+   for (int s= warpSize/2; s > 0; s>>= 1) { w|= __shfl_down_sync(SHFL_MASK_ALL, w, s); }
+#else // Manual unroll is faster (but reducing mask in successive steps makes negligible difference)
+   w|= __shfl_down_sync(SHFL_MASK_ALL, w, 16);
+   w|= __shfl_down_sync(SHFL_MASK_ALL, w, 8);
+   w|= __shfl_down_sync(SHFL_MASK_ALL, w, 4);
+   w|= __shfl_down_sync(SHFL_MASK_ALL, w, 2);
+   w|= __shfl_down_sync(SHFL_MASK_ALL, w, 1);
+#endif
    return(w);
 } // bitMergeWarp
 
-#ifdef NO_WLP
-#define BIT_MERGE(w) bitMergeShared(w)
-#else
 #define BIT_MERGE(w) bitMergeWarp(w)
-#endif
+
+#endif // NO_WLP
 
 /* KERNELS */
-/*
-template <typename T_Elem>
-__global__ void mapFieldB (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
-{
-   const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
-   if (i < n)
-   {
-      uint w= __ballot_sync(VT_WRDM, f(i) ); // Nice simplification but doesn't work... ?
-
-      if (0 == (threadIdx.x & VT_WRDM)) { rBM[i>>VT_WRDS]= w; }
-   }
-} // mapFieldB
-*/
 
 template <typename T_Elem>
 __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
@@ -322,8 +294,6 @@ __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const 
       const uint j= threadIdx.x & VT_WRDM;   // lane index (bit number)
 
       uint w= BIT_MERGE( f(i) << j );
-      //uint w= bitMergeShared( f(i) << j );
-      //uint w= bitMergeBallot( f(i) );
 
       if (0 == j) { rBM[i>>VT_WRDS]= w; }
    }
