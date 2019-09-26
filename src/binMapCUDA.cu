@@ -105,39 +105,45 @@ protected:
 
    CUDAImgMom (void *p) { pM2= static_cast<T_Elem*>(p); }
 
-   __device__ T_Elem sum (const T_Elem v) // const ? // Block-wide sum reduction
+   __device__ void sum (T_Elem *pR, const T_Elem v) // Block-wide sum reduction
    {
       __shared__ T_Elem t[VT_BLKN];
       t[threadIdx.x]= v;
-      for (int s= blockSize.x>>1; s > 0; s>>= 1)
+      //#pragma unroll 5
+      for (int s= blockDim.x>>1; s > 0; s>>= 1)
       {  __syncthreads(); // Keep block together
          if (threadIdx.x < s) { t[threadIdx.x]+= t[threadIdx.x+s]; }
       }
-
-      return(t[threadIdx.x]);
+      if (0 == threadIdx.x) { atomicAdd( pR, t[0] ); }
+      __syncthreads();
    } // sum
-/*
+
    __device__ void sumCat (T_Elem *pR, const int strideR, const T_Elem v, const int c) // Block-wide categorical sum reduction
    {
       __shared__ T_Elem t[CAT_NUM][VT_BLKN];
 #if CAT_NUM > 2
+      #pragma unroll CAT_NUM
       for (int i=0; i<CAT_NUM; i++) { t[i][threadIdx.x]= 0; }
 #else
       t[c^0x1][threadIdx.x]= 0;
 #endif
       t[c][threadIdx.x]= v;
-      for (int s= blockSize.x>>1; s > 0; s>>= 1)
+      for (int s= blockDim.x>>1; s > 0; s>>= 1)
       {  __syncthreads(); // Keep block together
-         if (threadIdx.x < s) { t[c][threadIdx.x]+= t[c][threadIdx.x+s]; }
+         if (threadIdx.x < s)
+         {
+            #pragma unroll CAT_NUM
+            for (int i=0; i<CAT_NUM; i++) { t[i][threadIdx.x]+= t[i][threadIdx.x+s]; }
+         }
       }
-      // NOT SUFFICIENT! Only t[c][0] will be correct, other categories incomplete partial in t[x][y]
       if (0 == threadIdx.x)
       {
+         #pragma unroll CAT_NUM
          for (int i=0; i<CAT_NUM; i++) { atomicAdd( pR+i*strideR, t[i][0] ); }
       }
       __syncthreads();
    } // sumCat
-*/
+
    __device__ void add (int x, int y, int z, T_Elem m)
    {
       T_Elem s, m2= m * m;
@@ -147,6 +153,12 @@ protected:
       s= sum(m2);
       if (0 == threadIdx.x) { atomicAdd( pM2+1, s); }
    }
+   __device__ void addCat (int x, int y, int z, T_Elem m, uint c)
+   {
+      sumCat(pM2+0, 2, m, c);
+      sumCat(pM2+1, 2, m*m, c);
+   }
+
 }; // class CUDAImgMom
 
 template <typename T_Elem>
