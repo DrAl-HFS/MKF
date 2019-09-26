@@ -16,6 +16,7 @@
 
 #define VT_BWS (VT_BLKS - VT_WRDS)
 
+#define CAT_NUM 2
 
 /***/
 
@@ -104,27 +105,47 @@ protected:
 
    CUDAImgMom (void *p) { pM2= static_cast<T_Elem*>(p); }
 
-   __device__ void add (int x, int y, int z, T_Elem m)
+   __device__ T_Elem sum (const T_Elem v) // const ? // Block-wide sum reduction
    {
-      __shared__ T_Elem m0[VT_BLKN], m1[VT_BLKN], m2[VT_BLKN];
-
-      m0[threadIdx.x]= (m > 0);
-      m1[threadIdx.x]= m;
-      m2[threadIdx.x]= m * m;
-      for (int s= blockDim.x/2; s > 0; s>>= 1)
-      {
-         __syncthreads();
-         // if (threadIdx.x < s) {
-         m0[threadIdx.x]+= m0[threadIdx.x + s];
-         m1[threadIdx.x]+= m1[threadIdx.x + s];
-         m2[threadIdx.x]+= m2[threadIdx.x + s];
+      __shared__ T_Elem t[VT_BLKN];
+      t[threadIdx.x]= v;
+      for (int s= blockSize.x>>1; s > 0; s>>= 1)
+      {  __syncthreads(); // Keep block together
+         if (threadIdx.x < s) { t[threadIdx.x]+= t[threadIdx.x+s]; }
       }
+
+      return(t[threadIdx.x]);
+   } // sum
+/*
+   __device__ void sumCat (T_Elem *pR, const int strideR, const T_Elem v, const int c) // Block-wide categorical sum reduction
+   {
+      __shared__ T_Elem t[CAT_NUM][VT_BLKN];
+#if CAT_NUM > 2
+      for (int i=0; i<CAT_NUM; i++) { t[i][threadIdx.x]= 0; }
+#else
+      t[c^0x1][threadIdx.x]= 0;
+#endif
+      t[c][threadIdx.x]= v;
+      for (int s= blockSize.x>>1; s > 0; s>>= 1)
+      {  __syncthreads(); // Keep block together
+         if (threadIdx.x < s) { t[c][threadIdx.x]+= t[c][threadIdx.x+s]; }
+      }
+      // NOT SUFFICIENT! Only t[c][0] will be correct, other categories incomplete partial in t[x][y]
       if (0 == threadIdx.x)
       {
-         atomicAdd( pM2+0, m0[0] );
-         atomicAdd( pM2+1, m1[0] );
-         atomicAdd( pM2+2, m2[0] );
+         for (int i=0; i<CAT_NUM; i++) { atomicAdd( pR+i*strideR, t[i][0] ); }
       }
+      __syncthreads();
+   } // sumCat
+*/
+   __device__ void add (int x, int y, int z, T_Elem m)
+   {
+      T_Elem s, m2= m * m;
+
+      s= sum(m);
+      if (0 == threadIdx.x) { atomicAdd( pM2+0, s); }
+      s= sum(m2);
+      if (0 == threadIdx.x) { atomicAdd( pM2+1, s); }
    }
 }; // class CUDAImgMom
 
@@ -244,30 +265,34 @@ public:
 
 
 /* Device utility functions */
+//#define NO_WLP
+//#define MERGE32_SAFE
 
 #ifdef NO_WLP
 
-__device__ uint merge32 (uint w[32], const int lane)
+__device__ uint mergeOR32 (volatile uint w[32], const int lane)
 {
-   if (lane < 16)
-   {  // Manual / auto unrolling ineffective: presume limited by shared read/write
-      for (int s= 16; s > 0; s>>= 1) { __syncthreads(); w[lane]|= w[lane+s]; }
-   }
-#if 0 // Tried to reduce shared read contention but actually slightly slower...
+#ifdef MERGE32_SAFE
    for (int s= 16; s > 0; s>>= 1)
-   {  __syncthreads();
+   {  __syncthreads(); // Slightly slower but keeps warp together
       if (lane < s) { w[lane]|= w[lane+s]; }
+   }
+#else
+   if (lane < 16) // DANGER! Half warp will free-run to next sync -
+   {  // DO NOT USE when warp-wide functions are subsequently employed!
+      #pragma unroll 5 // Ineffective? Presume limited by shared read/write
+      for (int s= 16; s > 0; s>>= 1) { __syncthreads(); w[lane]|= w[lane+s]; }
    }
 #endif
    return(w[lane]);
-} // merge32
+} // mergeOR32
 
 __device__ uint bitMergeShared (uint v)
 {
    __shared__ BMPackWord w[VT_BLKN]; // Caution! fixed blocksize!
 
    w[threadIdx.x]= v;
-   return merge32(w + (threadIdx.x & ~VT_WRDM), threadIdx.x & VT_WRDM);
+   return mergeOR32(w + (threadIdx.x & ~VT_WRDM), threadIdx.x & VT_WRDM);
 } // bitMergeShared
 
 #define BIT_MERGE(w) bitMergeShared(w)
@@ -287,7 +312,7 @@ __device__ uint bitMergeBallot (uint v)
 __device__ uint bitMergeWarp (uint w)
 {  // CUDA9 warp level primitives (supported on CUDA7+ ? )
 #if 1
-   #pragma unroll // Seems to have no effect - need to enable a setting ?
+   #pragma unroll 5 // Seems to have no effect - need to enable a setting ?
    for (int s= warpSize/2; s > 0; s>>= 1) { w|= __shfl_down_sync(SHFL_MASK_ALL, w, s); }
 #else // Manual unroll is faster (but reducing mask in successive steps makes negligible difference)
    w|= __shfl_down_sync(SHFL_MASK_ALL, w, 16);
