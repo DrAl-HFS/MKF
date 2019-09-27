@@ -18,7 +18,7 @@
 
 #define CAT_NUM 2
 
-/***/
+/* Misc host side utility functions */
 
 bool validPtr (const void *p) { return(NULL != p); }
 
@@ -49,6 +49,20 @@ uint countValidPtrByMask (const ConstFieldPtr a[], uint mask)
    } while (mask > 0);
    return(n);
 } // copyValidPtrByMask
+
+int genStride (FieldStride fs[], const int n, const FieldDef *pD, int skip, FieldStride stride=1)
+{
+   int i, r= 0;
+   if (pD)
+   {  // Generate stride
+      for (i= 0; i<skip; i++) { stride*= pD[i]; }
+      while (r < n) { fs[r++]= stride; stride*= pD[i]; }
+   }
+   return(r);
+} // genStride
+
+
+/* Util class/struct */
 
 struct Region
 {  // Expect multiple fields, common def & stride
@@ -88,10 +102,14 @@ struct Region
 
    bool collapsable (void) const { return( (elemDef[0] == nElem) || (0 == (elemDef[0] & VT_WRDM)) ); }
 
-   dim3 blockDef (void) { return dim3(blkDef0, 1, 1); }
-   dim3 gridDef (void) { return dim3(grdDef0, elemDef[1], elemDef[2]); }
-   int collapsedBlockDef (void) { return(blkDef0); }
-   int collapsedGridDef (void) { if (blkDef0 > 0) { return((nElem + blkDef0-1) / blkDef0); } else return(0); }
+   // 3D vs. 1D-collapsed launch params
+   dim3 blkDef (void) const { return dim3(blkDef0, 1, 1); }
+   dim3 grdDef (void) const { return dim3(grdDef0, elemDef[1], elemDef[2]); }
+   int blkDefColl (void) const { return(blkDef0); }
+   int grdDefColl (void) const { if (blkDef0 > 0) { return((nElem + blkDef0-1) / blkDef0); } else return(0); }
+   // Methods for hacky test code
+   int blkDefRow (void) const { return(blkDef0); }
+   int grdDefRow (void) const { return(grdDef0); }
 }; // struct Region
 
 
@@ -185,42 +203,46 @@ class CUDAFieldMap : protected CUDAMap<T_Elem>
 {
 protected:
    const T_Elem * pF;
+   size_t iOff; // Hacky debug/test aid
 
 public:                 // static_cast< const T_Elem * >() - irrelevant so why bother?
    CUDAFieldMap (const BMFieldInfo *pI, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM)
-   { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); }
+   { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); iOff= 0; }
    CUDAFieldMap (const BMFieldInfo *pI, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM)
-   { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); }
+   { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); iOff= 0; }
 
    //__device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::operator () (pF[i]); }
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval(pF[i]); }
+
+   void setOffset (size_t i=0, bool log=false)
+   {
+      const T_Elem *p= pF;
+      pF+= (signed)i - (signed)iOff;
+      if (log) { LOG("CUDAFieldMap::setOffset(%zu) %p->%p\n", i, p, pF); }
+      iOff= i;
+   } // setOffset
+
 }; // template class CUDAFieldMap
+
 
 class CUDAOrg
 {
+protected:
    FieldStride fs[3];
    uint  rowElem;
    BMStride rowWS, planeWS;   // 32b word strides
 
-   void setDS (const FieldStride *pS, const FieldDef *pD)
+   bool setDS (const FieldStride *pS, const FieldDef *pD)
    {
       if (pS)
-      {  // copy
+      {  // copy - check >= def ?
          for (int i=0; i<3; i++) { fs[i]= pS[i]; }
       }
-      else if (pD)
-      {  // Generate stride
-         FieldStride k= 1;
-         for (int i=0; i<3; i++)
-         {
-            fs[i]= k;
-            k*= pD[i];
-         }
-      }
+      else { return(genStride(fs, 3, pD, 0) > 0); }
+      return(false);
    } // setDS
 
 public:
-
    CUDAOrg (const BMOrg *pO, const BMFieldInfo *pI)
    {
       setDS(pI->pS, pI->pD);
@@ -408,58 +430,63 @@ BMOrg *binMapCUDA
 (
    BMPackWord  * pW,
    BMOrg       * pO,
-   const BMFieldInfo * pF,
-   const BinMapF32   * pMC
+   const BMFieldInfo * pI,
+   const BinMapF32   * pM
 )
 {
    Region reg;
 
    //if (32 != warpSize) { WARN("[binMapCUDA] warpSize=%d\n", warpSize); }
-   if (reg.validate(pF))
+   if (reg.validate(pI))
    {
       CTimerCUDA t;
       const char * pID= NULL;
 
-      if ( setBMO(pO, reg.elemDef, pF->profID) )
+      if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
          //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
-         switch (pF->profID & 0x30)
+         switch (pI->profID & 0x70)
          {
             case 0x00 :
             if (reg.collapsable() && (1 == reg.nF))
             {
-               mapField<<< reg.collapsedGridDef(), reg.collapsedBlockDef() >>>(pW, CUDAFieldMap<float>(pF, pMC), reg.nElem);
+               mapField<<< reg.grdDefColl(), reg.blkDefColl() >>>(pW, CUDAFieldMap<float>(pI, pM), reg.nElem);
                pID= "mapField()";
                break;
             } // else...
             case 0x10 :
             if (1 == reg.nF)
             {
-               mapStrideField<<< reg.gridDef(), reg.blockDef() >>>(pW, CUDAOrg(pO, pF), CUDAFieldMap<float>(pF, pMC));
+               mapStrideField<<< reg.grdDef(), reg.blkDef() >>>(pW, CUDAOrg(pO, pI), CUDAFieldMap<float>(pI, pM));
                pID= "mapStrideField()";
                break;
             } // else...
             case 0x20 :
             if (reg.collapsable())
             {
-               mapMultiField<<< reg.collapsedGridDef(), reg.collapsedBlockDef() >>>(pW, CUDAMultiFieldMap<float>(pF, pMC), reg.nElem);
+               mapMultiField<<< reg.grdDefColl(), reg.blkDefColl() >>>(pW, CUDAMultiFieldMap<float>(pI, pM), reg.nElem);
                pID= "mapMultiField()";
                break;
             } // else ...
             case 0x30 :
-               mapStrideMultiField<<< reg.gridDef(), reg.blockDef() >>>(pW, CUDAOrg(pO, pF), CUDAMultiFieldMap<float>(pF, pMC));
+               mapStrideMultiField<<< reg.grdDef(), reg.blkDef() >>>(pW, CUDAOrg(pO, pI), CUDAMultiFieldMap<float>(pI, pM));
                pID= "mapStrideMultiField()";
                break;
-            /*case never :
-            {  const int nRows= prodNI(fd.def+1,2);
+            case 0x40 : // HACK! ALERT! flaky test code!
+            {  const int nRows= prodNI(reg.elemDef+1,2);
+               CUDAFieldMap<float> map(pI, pM);
+               FieldStride rowStride;
+               genStride(&rowStride, 1, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
+
                for (int i=0; i<nRows; i++)
-               {  // Horribly inefficient iteration
-                  mapField<<<reg.nBlk,VT_BLKN>>>(pW + i * pO->rowWS, CUDAFieldMap<float>(fd.field[0].pF32 + i * fd.stride[1], pMC), fd.def[0]);
+               {  // Horribly inefficient single row iteration
+                  map.setOffset(i * rowStride); // i>(nRows-10));
+                  mapField<<< reg.grdDefRow(), reg.blkDefRow() >>>(pW + i * pO->rowWS, map, reg.elemDef[0]);
                }
                pID= "nRows*mapField()"; break;
-            }*/
+            }
          }
-         LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.collapsedBlockDef(), t.elapsedms());
+         LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.blkDefColl(), t.elapsedms());
          if (0 == ctuErr(NULL, pID)) { return(pO); }
       }
    }

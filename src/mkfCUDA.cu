@@ -279,8 +279,36 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
    return(MKF_BINS);
 } // mkfCUDAGetBPFD
 
+ConstFieldPtr *asFieldTab (const void **pp, const U8 id)
+{
+   ConstFieldPtr *pFP= (ConstFieldPtr*)pp;
+   if (BMFI_EIDT_FPB == (id & BMFI_EIDM_TYP))
+   {
+      const U8 n= id & BMFI_EIDM_NUM;
+      const U8 m= (n-1); // BIT_MASK(n);
+      if (0 != (pFP->w & m)) { WARN("[mkfCUDA] alignment %u %p\n", n, pFP->p); }
+   }
+   return(pFP);
+} // asFieldTab
+
+const BMFieldInfo *setup1F32 (BMFieldInfo *pI, float **ppF, const int def[3], const uint8_t profile)
+{  // field arg should be const float **ppF, but pgc++ appears to have defective const-ness rule for multiple indirection
+   if (pI)
+   {
+      pI->fieldTableMask= 0x1;
+      pI->elemID= BMFI_F32;
+      pI->oprID= 0;
+      pI->profID= profile;
+      pI->flags= 0;
+      pI->pD= def;
+      pI->pS= NULL;  // NULL => assume fully planar fields
+      pI->pFieldDevPtrTable= asFieldTab((const void**)ppF, pI->elemID);
+   }
+   return(pI);
+} // setup1F32
+
 extern "C"
-int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC, const uint8_t profHack)
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, const uint8_t profHack)
 {
    cudaError_t r;
 
@@ -308,19 +336,19 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC, 
       if (pC->pDF && pC->pDU)
       {
          if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
-         ConstFieldPtr table[1];
-         BMFieldInfo fi= {
-            { 0x01, BMFI_EIDT_FPB|4, 0, profHack },
-            def, NULL, table
-         };
-         table[0].pF32= pC->pDF;
-         binMapCUDA(pC->pDU, &(pC->bmo), &fi, pMC);
-
-         if (pC->pHU)
+         BMFieldInfo fi;
+         BMOrg *pO= binMapCUDA(pC->pDU, &(pC->bmo), setup1F32(&fi, &(pC->pDF), def, profHack), pM);
+         if (NULL == pO)
+         {
+            LOG("\tpC= %p; pC->pDF= %p; &(pC->pDF)= %p\n\tpFDPT= %p; pFDPT->p= %p\n", pC, pC->pDF, &(pC->pDF),
+               fi.pFieldDevPtrTable, fi.pFieldDevPtrTable->p);
+            return(0);
+         }
+         if (pO && pC->pHU)
          {
             LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHU, pC->pDU, pC->bytesU);
             r= cudaMemcpy(pC->pHU, pC->pDU, pC->bytesU, cudaMemcpyDeviceToHost);
-            ctuErr(NULL, "{vThresh32+} cudaMemcpy()");
+            ctuErr(NULL, "{binMapCUDA+} cudaMemcpy()");
          }
       }
    }
@@ -340,7 +368,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pMC, 
       if (pC->pHZ)
       {
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
-         ctuErr(&r, "{addPlane+} cudaMemcpy()");
+         ctuErr(&r, "{mkfCUDAGetBPFD+} cudaMemcpy()");
       }
    }
    return(1);

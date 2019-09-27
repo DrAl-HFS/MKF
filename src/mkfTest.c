@@ -139,12 +139,12 @@ int main (int argc, char *argv[])
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
       LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
-      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x00))
+      if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x40))
       {
          //LOG("bc=%zu\n", bitCountNZ(cux.pHU, cux.bytesU/sizeof(size_t)));
          reportMeasures(pBPFD, mScale);
          compareNZ(aBPFD1, pBPFD, MKF_BINS, 1);
-      }
+      } else { cudaDeviceReset(); }
 #endif // MKF_CUDA
 
 #ifdef MKF_ACC_CUDA_INTEROP
@@ -153,7 +153,7 @@ int main (int argc, char *argv[])
       {
          reportMeasures(aBPFD2, mScale);
          compareNZ(aBPFD1, aBPFD2, MKF_BINS, 1);
-      }
+      } else { cudaDeviceReset(); }
 #endif // MKF_ACC_CUDA_INTEROP
 
       if (def[0] != def[2])
