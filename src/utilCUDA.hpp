@@ -26,11 +26,11 @@ protected:
    int n;
 
 public:
-   CTimerCUDA (int af=CDTM_AF_STAMP)
+   CTimerCUDA (int af=CDTM_AF_STAMP, cudaStream_t s=0)
    {
       n= 0;
       for (int i=0; i < CDTM_EVN_COUNT; i++) { r= cudaEventCreate(e+i); }
-      if (CDTM_AF_STAMP & af) { stampStream(); }
+      if (CDTM_AF_STAMP & af) { stampStream(s); }
    } // CTor
 
    ~CTimerCUDA ()
@@ -38,12 +38,16 @@ public:
       for (int i=0; i < CDTM_EVN_COUNT; i++) { r= cudaEventDestroy(e[i]); }
    } // DTor
 
-   void stampStream (void) { r= cudaEventRecord( e[ n++ & CDTM_EVN_MASK ] ); }
+   void stampStream (cudaStream_t s=0)
+   {
+      if (0 == s) { r= cudaEventRecord( e[ n++ & CDTM_EVN_MASK ] ); }
+      else { r= cudaEventRecord( e[ n++ & CDTM_EVN_MASK ], s ); }
+   } // stampStream
    //void syncStream (void) { r= cudaEventSynchronize( e[ n & CDTM_EVN_MASK ] ); }
 
-   float elapsedms (int af=CDTM_AF_STAMP|CDTM_AF_SYNC)
+   float elapsedms (int af=CDTM_AF_STAMP|CDTM_AF_SYNC, cudaStream_t s=0)
    {  float ms=0;
-      if (CDTM_AF_STAMP & af) { stampStream(); }
+      if (CDTM_AF_STAMP & af) { stampStream(s); }
       if (n>1)
       {
          int i0= (n-2) & CDTM_EVN_MASK;
@@ -54,6 +58,24 @@ public:
       return(ms);
    } // elapsedms
 }; // CTimerCUDA
+
+// PO2 defs
+#define CDSM_BLK_S 2
+#define CDSM_BLK_N (1<<CDSM_BLK_S)
+#define CDSM_BLK_M (CDSM_BLK_N-1)
+
+struct CUDAStrmBlk
+{
+//public:
+   cudaError_t r; // For debug
+   cudaStream_t s[CDSM_BLK_N];
+
+   CUDAStrmBlk (void) { for (int i=0; i<CDSM_BLK_N; i++) { r= cudaStreamCreate(s+i); } }
+
+   ~CUDAStrmBlk () { for (int i=0; i<CDSM_BLK_N; i++) { r= cudaStreamDestroy(s[i]); } }
+
+   const cudaStream_t& operator [] (int i) const { return( s[ i & CDSM_BLK_M ] ); }
+}; // struct CUDAStrmBlk
 
 #endif // __NVCC__
 

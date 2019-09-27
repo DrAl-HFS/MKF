@@ -110,6 +110,7 @@ struct Region
    // Methods for hacky test code
    int blkDefRow (void) const { return(blkDef0); }
    int grdDefRow (void) const { return(grdDef0); }
+   size_t blkShMem (void) { return( blkDef0 * sizeof(uint) ); }
 }; // struct Region
 
 
@@ -424,6 +425,9 @@ __global__ void mapStrideMultiField (BMPackWord rBM[], const CUDAOrg org, const 
 
 
 /* INTERFACE */
+#define STRM_S (2)
+#define STRM_N (1<<STRM_S)
+#define STRM_M (STRM_N-1)
 
 extern "C"
 BMOrg *binMapCUDA
@@ -475,14 +479,19 @@ BMOrg *binMapCUDA
             case 0x40 : // HACK! ALERT! flaky test code!
             {  const int nRows= prodNI(reg.elemDef+1,2);
                CUDAFieldMap<float> map(pI, pM);
-               FieldStride rowStride;
-               genStride(&rowStride, 1, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
+               FieldStride rowStride; genStride(&rowStride, 1, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
+               CUDAStrmBlk s;
+
+               //LOG("\tinit dt=%Gms\n", t.elapsedms());
+               //t.stampStream(s[0]);
 
                for (int i=0; i<nRows; i++)
                {  // Horribly inefficient single row iteration
                   map.setOffset(i * rowStride); // i>(nRows-10));
-                  mapField<<< reg.grdDefRow(), reg.blkDefRow() >>>(pW + i * pO->rowWS, map, reg.elemDef[0]);
+                  mapField<<< reg.grdDefRow(), reg.blkDefRow(), 0, s[i] >>>(pW + i * pO->rowWS, map, reg.elemDef[0]);
                }
+               //LOG("\tsubmit dt=%Gms\n", t.elapsedms(CDTM_AF_STAMP|CDTM_AF_SYNC, s[0]));
+
                pID= "nRows*mapField()"; break;
             }
          }
