@@ -83,6 +83,48 @@ size_t setBMO (BMOrg *pO, const int def[3], const char profID)
    return((size_t)planeStride * maxPlane);
 } // setBMSD
 
+
+int validPtr (const void *p) { return(NULL != p); } // Type code, address range ??
+
+int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask)
+{
+   int t, i= 0, n= 0;
+   do
+   {
+      t= (0x1 << i);
+      if (validPtr(a[i].p) && (mask & t))
+      {
+         r[n++]= a[i];
+      }
+      i++;
+   } while ((mask > t) && (n < max));
+   //if (n < max) { r[n].p= NULL; } guard ?
+   return(n);
+} // copyValidPtrByMask
+
+int countValidPtrByMask (const ConstFieldPtr a[], uint mask)
+{
+   int i= 0, n= 0;
+   do
+   {
+      n+= validPtr(a[i].p) && (mask & 0x1);
+      mask >>= 1;
+      i++;
+   } while (mask > 0);
+   return(n);
+} // copyValidPtrByMask
+
+int genStride (FieldStride fs[], const int n, const FieldDef *pD, int skip, FieldStride stride)
+{
+   int i, r= 0;
+   if (pD)
+   {  // Generate stride
+      for (i= 0; i<skip; i++) { stride*= pD[i]; }
+      while (r < n) { fs[r++]= stride; stride*= pD[i]; }
+   }
+   return(r);
+} // genStride
+
 #if 0
 testBMC (const float f0, const float fs, const int n, const BinMapF32 *pC)
 {

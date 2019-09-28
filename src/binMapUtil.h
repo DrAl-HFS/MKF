@@ -89,7 +89,13 @@ typedef struct
 // Define map (comparison operator) using a string
 extern BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t);
 
-extern size_t setBMO (BMOrg *pO, const int def[3], const char profID);
+extern size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
+
+extern int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask);
+
+extern int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
+
+extern int genStride (FieldStride fs[], const int n, const FieldDef *pD, int skip, FieldStride stride);
 
 #ifdef __cplusplus
 } // extern "C"

@@ -18,51 +18,11 @@
 
 #define CAT_NUM 2
 
-/* Misc host side utility functions */
-
-bool validPtr (const void *p) { return(NULL != p); }
-
-uint copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask)
-{
-   uint t, i= 0, n= 0;
-   do
-   {
-      t= (0x1 << i);
-      if (validPtr(a[i].p) && (mask & t))
-      {
-         r[n++]= a[i];
-      }
-      i++;
-   } while ((mask > t) && (n < max));
-   //if (n < max) { r[n].p= NULL; } guard ?
-   return(n);
-} // copyValidPtrByMask
-
-uint countValidPtrByMask (const ConstFieldPtr a[], uint mask)
-{
-   uint i= 0, n= 0;
-   do
-   {
-      n+= validPtr(a[i].p) && (mask & 0x1);
-      mask >>= 1;
-      i++;
-   } while (mask > 0);
-   return(n);
-} // copyValidPtrByMask
-
-int genStride (FieldStride fs[], const int n, const FieldDef *pD, int skip, FieldStride stride=1)
-{
-   int i, r= 0;
-   if (pD)
-   {  // Generate stride
-      for (i= 0; i<skip; i++) { stride*= pD[i]; }
-      while (r < n) { fs[r++]= stride; stride*= pD[i]; }
-   }
-   return(r);
-} // genStride
+/* Misc functions */
 
 
-/* Util class/struct */
+
+/* Host side utility class/struct */
 
 struct Region
 {  // Expect multiple fields, common def & stride
@@ -113,6 +73,40 @@ struct Region
    size_t blkShMem (void) { return( blkDef0 * sizeof(uint) ); }
 }; // struct Region
 
+
+/* Device classes */
+
+class CUDAOrg
+{
+protected:
+   FieldStride fs[3];
+   uint  rowElem;
+   BMStride rowWS, planeWS;   // 32b word strides
+
+   bool setDS (const FieldStride *pS, const FieldDef *pD)
+   {
+      if (pS)
+      {  // copy - check >= def ?
+         for (int i=0; i<3; i++) { fs[i]= pS[i]; }
+      }
+      else { return(genStride(fs, 3, pD, 0) > 0); }
+      return(false);
+   } // setDS
+
+public:
+   CUDAOrg (const BMOrg *pO, const BMFieldInfo *pI)
+   {
+      setDS(pI->pS, pI->pD);
+      rowElem= pO->rowElem;
+      rowWS=   pO->rowWS;
+      planeWS= pO->planeWS;
+   } // CTOR
+
+   __device__ bool inRow (uint x) const { return(x < rowElem); }
+   __device__ size_t fieldIndex (uint x, uint y, uint z) const { return(x * fs[0] + y * fs[1] + z * fs[2]); }
+   __device__ size_t bmIndex (uint x, uint y, uint z) const { return((x >> VT_WRDS) + y * rowWS + z * planeWS); }
+
+}; // CUDAOrg
 
 /* Templated device classes */
 
@@ -224,40 +218,6 @@ public:                 // static_cast< const T_Elem * >() - irrelevant so why b
    } // setOffset
 
 }; // template class CUDAFieldMap
-
-
-class CUDAOrg
-{
-protected:
-   FieldStride fs[3];
-   uint  rowElem;
-   BMStride rowWS, planeWS;   // 32b word strides
-
-   bool setDS (const FieldStride *pS, const FieldDef *pD)
-   {
-      if (pS)
-      {  // copy - check >= def ?
-         for (int i=0; i<3; i++) { fs[i]= pS[i]; }
-      }
-      else { return(genStride(fs, 3, pD, 0) > 0); }
-      return(false);
-   } // setDS
-
-public:
-   CUDAOrg (const BMOrg *pO, const BMFieldInfo *pI)
-   {
-      setDS(pI->pS, pI->pD);
-      rowElem= pO->rowElem;
-      rowWS=   pO->rowWS;
-      planeWS= pO->planeWS;
-   } // CTOR
-
-   __device__ bool inRow (uint x) const { return(x < rowElem); }
-   __device__ size_t fieldIndex (uint x, uint y, uint z) const { return(x * fs[0] + y * fs[1] + z * fs[2]); }
-   __device__ size_t bmIndex (uint x, uint y, uint z) const { return((x >> VT_WRDS) + y * rowWS + z * planeWS); }
-
-}; // CUDAOrg
-
 
 template <typename T_Elem>
 class CUDAMultiField
@@ -425,9 +385,6 @@ __global__ void mapStrideMultiField (BMPackWord rBM[], const CUDAOrg org, const 
 
 
 /* INTERFACE */
-#define STRM_S (2)
-#define STRM_N (1<<STRM_S)
-#define STRM_M (STRM_N-1)
 
 extern "C"
 BMOrg *binMapCUDA
