@@ -95,7 +95,9 @@ extern int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFiel
 
 extern int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
 
-extern int genStride (FieldStride fs[], const int n, const FieldDef *pD, int skip, FieldStride stride);
+// Generate n stride values from definition and base stride, skipping some if required.
+// Returns number generated (zero for bad inputs)
+extern int genStride (FieldStride fs[], const int n, int skip, const FieldDef *pD, FieldStride stride);
 
 #ifdef __cplusplus
 } // extern "C"

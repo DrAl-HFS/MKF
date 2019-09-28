@@ -114,10 +114,10 @@ int countValidPtrByMask (const ConstFieldPtr a[], uint mask)
    return(n);
 } // copyValidPtrByMask
 
-int genStride (FieldStride fs[], const int n, const FieldDef *pD, int skip, FieldStride stride)
+int genStride (FieldStride fs[], const int n, int skip, const FieldDef *pD, FieldStride stride)
 {
    int i, r= 0;
-   if (pD)
+   if (pD && (0 != stride))
    {  // Generate stride
       for (i= 0; i<skip; i++) { stride*= pD[i]; }
       while (r < n) { fs[r++]= stride; stride*= pD[i]; }

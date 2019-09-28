@@ -89,7 +89,7 @@ protected:
       {  // copy - check >= def ?
          for (int i=0; i<3; i++) { fs[i]= pS[i]; }
       }
-      else { return(genStride(fs, 3, pD, 0) > 0); }
+      else { return(genStride(fs, 3, 0, pD, 1) > 0); }
       return(false);
    } // setDS
 
@@ -436,7 +436,7 @@ BMOrg *binMapCUDA
             case 0x40 : // HACK! ALERT! flaky test code!
             {  const int nRows= prodNI(reg.elemDef+1,2);
                CUDAFieldMap<float> map(pI, pM);
-               FieldStride rowStride; genStride(&rowStride, 1, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
+               FieldStride rowStride; genStride(&rowStride, 1, 1, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
                CUDAStrmBlk s;
 
                //LOG("\tinit dt=%Gms\n", t.elapsedms());
