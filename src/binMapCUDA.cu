@@ -209,13 +209,14 @@ public:                 // static_cast< const T_Elem * >() - irrelevant so why b
    //__device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::operator () (pF[i]); }
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval(pF[i]); }
 
-   void setOffset (size_t i=0, bool log=false)
+   void setOffset (size_t i=0)
    {
-      const T_Elem *p= pF;
+      //const T_Elem *p= pF;
       pF+= (signed)i - (signed)iOff;
-      if (log) { LOG("CUDAFieldMap::setOffset(%zu) %p->%p\n", i, p, pF); }
+      //if (log) { LOG("CUDAFieldMap::setOffset(%zu) %p->%p\n", i, p, pF); }
       iOff= i;
    } // setOffset
+   void addOffset (size_t i=0) { pF+= i; iOff+= i; }
 
 }; // template class CUDAFieldMap
 
@@ -405,14 +406,43 @@ BMOrg *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
+         uint8_t nStrm= 4; // pI->profID & 0x0 ???
          //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
          switch (pI->profID & 0x70)
          {
             case 0x00 :
             if (reg.collapsable() && (1 == reg.nF))
             {
-               mapField<<< reg.grdDefColl(), reg.blkDefColl() >>>(pW, CUDAFieldMap<float>(pI, pM), reg.nElem);
-               pID= "mapField()";
+               if (nStrm > 1)
+               {
+                  CUDAStrmBlk s;
+                  //FieldStride stride; genStride(&stride, 1, 2, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
+                  CUDAFieldMap<float> map(pI, pM);
+                  const int blkStrm= reg.blkDefColl();
+                  const int grdStrm= reg.grdDefColl() / nStrm;
+                  const FieldStride stride= blkStrm * grdStrm;
+                  const int wStride= stride / 32;
+                  const int resid= reg.grdDefColl() - (nStrm * grdStrm);
+                  int i, n= nStrm - (resid > 0);
+                  for (i=0; i<n; i++)
+                  {
+                     mapField<<< grdStrm, blkStrm, 0, s[i] >>>(pW+(i*wStride), map, stride);
+                     ctuErr(NULL, "mapField");
+                     map.addOffset(stride);
+                     //map.setOffset((1+i) * stride);
+                  }
+                  if (resid > 0)
+                  {
+                     mapField<<< grdStrm+resid, blkStrm, 0, s[i] >>>(pW+(i*wStride), map, reg.nElem-(i*stride));
+                     ctuErr(NULL, "mapField (resid)");
+                  }
+                  pID= "nStrm*mapField()";
+               }
+               else
+               {
+                  mapField<<< reg.grdDefColl(), reg.blkDefColl() >>>(pW, CUDAFieldMap<float>(pI, pM), reg.nElem);
+                  pID= "mapField()";
+               }
                break;
             } // else...
             case 0x10 :
