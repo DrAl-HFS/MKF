@@ -23,7 +23,6 @@
 
 
 /* Host side utility class/struct */
-     *pD;
 
 int planarity (const FieldDef def[], const FieldStride stride[], int n)
 {
@@ -33,7 +32,7 @@ int planarity (const FieldDef def[], const FieldStride stride[], int n)
       FieldStride s= 1;
       do
       {
-         r+= (s == stride[i])
+         r+= (s == stride[i]);
          s*= def[i];
       } while (++i < n);
    }
@@ -53,7 +52,7 @@ struct Region
    {
       if (pI)
       {
-         nD= 0; nF= 0;
+         nD= 0; nF= 0; nS= 0;
          if (pI->pFieldDevPtrTable)
          {
             nF= countValidPtrByMask(pI->pFieldDevPtrTable, pI->fieldTableMask);
@@ -72,7 +71,7 @@ struct Region
             nElem= prodNI(elemDef,3);
             if ( (elemDef[0] == nElem) ||
                ( (0 == (elemDef[0] & VT_WRDM)) &&
-                  ((NULL == pD->pS) || (3 == planarity(elemDef, pI->pS, 3)) ) ) )
+                  ((NULL == pI->pS) || (3 == planarity(elemDef, pI->pS, 3)) ) ) )
             {
                flags|= REG_AS1D;
             }
@@ -434,7 +433,7 @@ BMOrg *binMapCUDA
             case 0x00 :
             if (reg.collapsable() && (1 == reg.nF))
             {
-               if (reg.nS > 1)
+               if (reg.nS > 0)
                {
                   CUDAStrmBlk s;
                   //FieldStride stride; genStride(&stride, 1, 2, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
@@ -443,7 +442,7 @@ BMOrg *binMapCUDA
                   const int grdStrm= reg.grdDefColl() / reg.nS;
                   const FieldStride stride= blkStrm * grdStrm;
                   const int wStride= stride / 32;
-                  const int resid= reg.grdDefColl() - (nStrm * grdStrm);
+                  const int resid= reg.grdDefColl() - (reg.nS * grdStrm);
                   int i, n= reg.nS - (resid > 0);
                   for (i=0; i<n; i++)
                   {
