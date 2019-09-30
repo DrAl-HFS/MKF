@@ -23,15 +23,31 @@
 
 
 /* Host side utility class/struct */
+     *pD;
+
+int planarity (const FieldDef def[], const FieldStride stride[], int n)
+{
+   int i=0, r=0;
+   if (n > 0)
+   {
+      FieldStride s= 1;
+      do
+      {
+         r+= (s == stride[i])
+         s*= def[i];
+      } while (++i < n);
+   }
+   return(r);
+} // planarity
 
 struct Region
 {  // Expect multiple fields, common def & stride
    size_t   nElem;
    FieldDef elemDef[3];
-   int      grdDef0;
-   uint16_t blkDef0;
-   uint8_t  nD, nF;
+   int      grdDef0, blkDef0;
+   uint8_t  nD, nF, nS, flags;
 
+#define REG_AS1D (0x01)
 //public:
    bool validate (const BMFieldInfo *pI) // TODO: SubRegion/Box ???
    {
@@ -54,13 +70,19 @@ struct Region
             //if (blkDim0...
             grdDef0= (elemDef[0] + (blkDef0-1) ) / blkDef0;
             nElem= prodNI(elemDef,3);
+            if ( (elemDef[0] == nElem) ||
+               ( (0 == (elemDef[0] & VT_WRDM)) &&
+                  ((NULL == pD->pS) || (3 == planarity(elemDef, pI->pS, 3)) ) ) )
+            {
+               flags|= REG_AS1D;
+            }
          }
          return((nD > 0) && (nF > 0));
       }
       return(false);
    } // validate (as conditional 'CTOR')
 
-   bool collapsable (void) const { return( (elemDef[0] == nElem) || (0 == (elemDef[0] & VT_WRDM)) ); }
+   bool collapsable (void) const { return(flags & REG_AS1D); }
 
    // 3D vs. 1D-collapsed launch params
    dim3 blkDef (void) const { return dim3(blkDef0, 1, 1); }
@@ -406,24 +428,23 @@ BMOrg *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
-         uint8_t nStrm= 4; // pI->profID & 0x0 ???
          //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
          switch (pI->profID & 0x70)
          {
             case 0x00 :
             if (reg.collapsable() && (1 == reg.nF))
             {
-               if (nStrm > 1)
+               if (reg.nS > 1)
                {
                   CUDAStrmBlk s;
                   //FieldStride stride; genStride(&stride, 1, 2, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
                   CUDAFieldMap<float> map(pI, pM);
                   const int blkStrm= reg.blkDefColl();
-                  const int grdStrm= reg.grdDefColl() / nStrm;
+                  const int grdStrm= reg.grdDefColl() / reg.nS;
                   const FieldStride stride= blkStrm * grdStrm;
                   const int wStride= stride / 32;
                   const int resid= reg.grdDefColl() - (nStrm * grdStrm);
-                  int i, n= nStrm - (resid > 0);
+                  int i, n= reg.nS - (resid > 0);
                   for (i=0; i<n; i++)
                   {
                      mapField<<< grdStrm, blkStrm, 0, s[i] >>>(pW+(i*wStride), map, stride);
