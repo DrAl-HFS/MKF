@@ -101,6 +101,8 @@ extern int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
 // Returns number generated (zero for bad inputs)
 extern int genStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, FieldStride stride);
 
+extern int copyOrGenStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, const FieldStride *pS);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

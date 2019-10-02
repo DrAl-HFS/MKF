@@ -140,6 +140,17 @@ int genStride (FieldStride fs[], const int n, const int start, const FieldDef *p
    return(r);
 } // genStride
 
+int copyOrGenStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, const FieldStride *pS)
+{
+   int nR= 0;
+   if (pS)
+   {
+      for (int i=0; i<n; i++) { fs[nR++]= pS[i+start]; }
+   }
+   else { nR= genStride(fs, n, start, pD, 1); }
+   return(nR);
+} // copyOrGenStride
+
 #if 0
 testBMC (const float f0, const float fs, const int n, const BinMapF32 *pC)
 {

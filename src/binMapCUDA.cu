@@ -122,6 +122,7 @@ public:
    CUDAOrg (const BMOrg *pO, const BMFieldInfo *pI)
    {
       setDS(pI->pS, pI->pD);
+         //copyOrGenStride(stepF, 1, 2, pI->pD, pI->pS);
       rowElem= pO->rowElem;
       rowWS=   pO->rowWS;
       planeWS= pO->planeWS;
@@ -146,20 +147,20 @@ struct GridSlab
    FieldStride stepF[2];
    BMStride    stepW[2];
 
-   GridSlab (const Region& reg, const CUDAOrg& org)
+   GridSlab (const Region& reg, const CUDAOrg& org)//, const BMOrg *pO, const BMFieldInfo *pI)
    {
       grid[0]= reg.grdDef0;
       grid[1]= reg.elemDef[1];
       if (reg.nSlab > 1)
       {
          const size_t nElemPlane= prodNI(reg.elemDef, 2);
-
+         //copyOrGenStride(stepF, 1, 2, pI->pD, pI->pS);
          grid[2]= reg.elemDef[2] / reg.nSlab;
          grid[3]= reg.elemDef[2] - (reg.nSlab * grid[2]);
          nElem[0]=  nElemPlane * grid[2];
 
          stepF[0]= org.planeStrideField() * grid[2];
-         stepW[0]= org.planeStrideBM() * grid[2];
+         stepW[0]= org.planeStrideBM() * grid[2]; // pO->planeWS
          if (grid[3] > 0)
          {
             stepF[1]= org.planeStrideField() * grid[3];
