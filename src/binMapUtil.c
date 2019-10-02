@@ -83,6 +83,21 @@ size_t setBMO (BMOrg *pO, const int def[3], const char profID)
    return((size_t)planeStride * maxPlane);
 } // setBMSD
 
+int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD)
+{
+   int rD= 0;
+   if (pD)
+   {
+      for (int i=0; i<nD; i++)
+      {
+         d[rD]= pD[i];
+         rD+= (d[rD] > 1);
+      }
+   }
+   FieldDef pad= (rD>0);
+   for (int i=rD; i<nD; i++) { d[i]= pad; }
+   return(rD);
+} // copyNonZeroDef
 
 int validPtr (const void *p) { return(NULL != p); } // Type code, address range ??
 

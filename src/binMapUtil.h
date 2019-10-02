@@ -91,6 +91,8 @@ extern BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const fl
 
 extern size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
 
+extern int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD);
+
 extern int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask);
 
 extern int countValidPtrByMask (const ConstFieldPtr a[], uint mask);

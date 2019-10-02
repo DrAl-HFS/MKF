@@ -180,10 +180,11 @@ size_t genBlock (float f[], const int def[3], const float r[3])
 } // genBlock
 */
 
-float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const float param)
+float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const float param[])
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);
+   const float size= param[0];
    float r[3], scale= 1.0 / midRangeNI(def,3);
    Ball3D b[2];
    GeomParam gp;
@@ -204,8 +205,8 @@ float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const fl
    switch(id)
    {
       case 4 :
-         b[0].r= 0.2 * param;
-         b[1].r= 0.3 * param;
+         b[0].r= 0.2 * size;
+         b[1].r= 0.3 * size;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.4 * def[d]; b[1].c[d]= 0.6 * def[d]; }
          t= measureScaledBB(&m, b, scale);
          // set rasterisation param
@@ -217,13 +218,13 @@ float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const fl
          copyNF(gp.vF+gp.nF, 3, b[1].c); gp.nF+= 3;
          break;
       case 3 :
-         setKNF(r,3,0.5*param*scale);
+         setKNF(r,3,0.5*size*scale);
          m.a= blockArea(r);
          m.v= blockVol(r);
          // set rasterisation param
          gp.id= 0x5; //GEOM_BOX
          gp.nObj= 1;
-         setKNF(gp.vF+gp.nF, 3, 0.5*param); gp.nF+= 3; // {r(x,y,z),c(x,y,z)}
+         setKNF(gp.vF+gp.nF, 3, 0.5*size); gp.nF+= 3; // {r(x,y,z),c(x,y,z)}
          scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
          break;
       case 2 :
@@ -231,13 +232,13 @@ float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const fl
          memset(pV, -1, n);
          break;
       case 1 :
-         b[0].r= 0.5 * param;
+         b[0].r= 0.5 * size;
          m.a= sphereArea(b[0].r*scale);
          m.v= sphereVol(b[0].r*scale);
-         // set rasterisation param
+         // set rasterisation parameters
          gp.id= 0x3; //GEOM_BALL
          gp.nObj= 1;
-         gp.vF[gp.nF++]= 0.5 * param; // {r,c(x,y,z)}
+         gp.vF[gp.nF++]= 0.5 * size; // {r,c(x,y,z)}
          scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
          break;
       default :
@@ -249,7 +250,7 @@ float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const fl
    {  LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
       n= rasterise(pV, def, &gp, &rp);
    }
-   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], param, t, n, nE, (F64)n / nE, m.v);
+   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], size, t, n, nE, (F64)n / nE, m.v);
    return(m.v);
 } // genPattern
 
