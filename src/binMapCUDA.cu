@@ -140,10 +140,8 @@ public:
    size_t stepW (void) const { return(depth * stepWBM); }
    size_t stepF (void) const { return(depth * GridPlane::stepF); }
 
-   dim3 def (int iS=0) const
-   {
-      return dim3(GridPlane::grid[0], GridPlane::grid[1], depth);
-   } // def
+   dim3 def (void) const { return dim3(GridPlane::grid[0], GridPlane::grid[1], depth); }
+   dim3 defColl (void) const { return(GridPlane::grid[0] * GridPlane::grid[1] * depth); }
 }; // class GridSlab
 
 
@@ -486,7 +484,7 @@ BMOrg *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
-         reg.nSlab= 4;
+         reg.nSlab= 3;
          //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
          switch (pI->profID & 0x70)
          {
@@ -503,14 +501,14 @@ BMOrg *binMapCUDA
                   for (int i=0; i<reg.nSlab; i++)
                   {
                      LOG("%d %d 0x%x %d %zu\n", i, slab.depth, wOffset, map.iOff, slab.nElem());
-                     mapField<<< slab.def(), reg.blkDefColl(), 0, s[i] >>>(pW+wOffset, map, slab.nElem());
+                     mapField<<< slab.defColl(), reg.blkDefColl(), 0, s[i] >>>(pW+wOffset, map, slab.nElem());
                      wOffset+= slab.stepW();
                      map.addOffset(slab.stepF());
                   }
                   if (slab.setDepth(slab.getResid(reg)))
                   {
                      LOG("*R: %d 0x%x %d %zu\n", slab.depth, wOffset, map.iOff, slab.nElem());
-                     mapField<<< slab.def(), reg.blkDefColl(), 0, s[0] >>>(pW+wOffset, map, slab.nElem());
+                     mapField<<< slab.defColl(), reg.blkDefColl(), 0, s[0] >>>(pW+wOffset, map, slab.nElem());
                   }
 #else
                   //FieldStride stride; genStride(&stride, 1, 2, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
