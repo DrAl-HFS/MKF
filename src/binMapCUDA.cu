@@ -495,42 +495,18 @@ BMOrg *binMapCUDA
                {
                   CUDAStrmBlk s;
                   CUDAFieldMap<float> map(pI, pM);
-#if 1
                   GridSlab slab(reg, pO, pI);
                   size_t wOffset= 0;
                   for (int i=0; i<reg.nSlab; i++)
-                  {
-                     LOG("%d %d 0x%x %d %zu\n", i, slab.depth, wOffset, map.iOff, slab.nElem());
+                  {  //LOG("%d %d 0x%x %d %zu\n", i, slab.depth, wOffset, map.iOff, slab.nElem());
                      mapField<<< slab.defColl(), reg.blkDefColl(), 0, s[i] >>>(pW+wOffset, map, slab.nElem());
                      wOffset+= slab.stepW();
                      map.addOffset(slab.stepF());
                   }
                   if (slab.setDepth(slab.getResid(reg)))
-                  {
-                     LOG("*R: %d 0x%x %d %zu\n", slab.depth, wOffset, map.iOff, slab.nElem());
+                  {  //LOG("*R: %d 0x%x %d %zu\n", slab.depth, wOffset, map.iOff, slab.nElem());
                      mapField<<< slab.defColl(), reg.blkDefColl(), 0, s[0] >>>(pW+wOffset, map, slab.nElem());
                   }
-#else
-                  //FieldStride stride; genStride(&stride, 1, 2, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
-                  const int blkStrm= reg.blkDefColl();
-                  const int grdStrm= reg.grdDefColl() / reg.nSlab;
-                  const FieldStride stride= blkStrm * grdStrm;
-                  const int wStride= stride / 32;
-                  const int resid= reg.grdDefColl() - (reg.nSlab * grdStrm);
-                  int i, n= reg.nSlab - (resid > 0);
-                  for (i=0; i<n; i++)
-                  {
-                     mapField<<< grdStrm, blkStrm, 0, s[i] >>>(pW+(i*wStride), map, stride);
-                     ctuErr(NULL, "mapField");
-                     map.addOffset(stride);
-                     //map.setOffset((1+i) * stride);
-                  }
-                  if (resid > 0)
-                  {
-                     mapField<<< grdStrm+resid, blkStrm, 0, s[i] >>>(pW+(i*wStride), map, reg.nElem-(i*stride));
-                     ctuErr(NULL, "mapField (resid)");
-                  }
-#endif
                   pID= "nSlab*mapField()";
                }
                else
