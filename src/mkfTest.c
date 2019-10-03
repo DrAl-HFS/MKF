@@ -126,7 +126,7 @@ int main (int argc, char *argv[])
    {
       const float param[]= {256-64, 1}; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
-      float vfR= genPattern(cux.pHF, def, 32, id, param);
+      float vfR= genPattern(cux.pHF, def, ENC_F32, id, param);
 
       if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 

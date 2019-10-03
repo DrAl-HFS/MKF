@@ -10,8 +10,9 @@ LIBDEF := -lm
 
 ifdef NVCCPATH
 NVCC := nvcc
-NVOPT := -arch=sm_50 -ccbin=pgc++ -O3
-#-g -G
+NVOPT := -arch=sm_50 -ccbin=pgc++ 
+#NVOPT += -g -G
+NVOPT += -O3
 endif
 
 ifdef PGCCPATH
@@ -19,8 +20,6 @@ BUILD := NCRMNTL
 CC := pgcc
 CCPP := pgc++ -std=c++11
 LIBDEF += -lstdc++
-#OPT := -O3
-OPT := -g -O0
 ACC := -Mautoinline -acc=verystrict -ta=multicore,tesla
 # -Minfo=all
 # multicore,tesla:cc50
@@ -30,17 +29,18 @@ else # Default compiler gcc / clang, assume no ACC
 CC := gcc -Wall
 CCPP := g++
 LIBDEF += -lstdc++
-OPT := -march=native -g -Og
-# -O3
-# -g -O0 FLL_DBG
-# -Os O2_MN_SZ
+OPT := -march=native
 # problematic...
 # -std=c11 -D__USE_MISC -pedantic
 # defaults
 #CC := clang -Wall # Code gen errors ?
-#OPT := -Oz SIZE
+# -Os O2_MN_SZ
+# -Oz SIZE
 endif
 ACC ?=
+
+OPT += -O3
+#OPT += -g -O0
 
 TARGET := mkft
 MAKEFILE := $(TARGET).make
@@ -78,7 +78,7 @@ OBJ += $(CU_OBJ)
 
 LIBDEF += -L$(CULBPATH) -lcudart
 
-#INCDEF += -DMKF_CUDA
+INCDEF += -DMKF_CUDA
 INCDEF += -DMKF_ACC_CUDA_INTEROP
 
 %.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h

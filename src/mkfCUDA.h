@@ -7,6 +7,7 @@
 
 #include "binMapCUDA.h"
 #include "mkfUtil.h"
+#include "encoding.h"
 
 
 #ifdef __cplusplus

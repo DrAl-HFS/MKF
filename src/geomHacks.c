@@ -180,7 +180,7 @@ size_t genBlock (float f[], const int def[3], const float r[3])
 } // genBlock
 */
 
-float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const float param[])
+float genPattern (void *pV, const int def[3], NumEnc elemID, uint8_t id, const float param[])
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);
@@ -190,13 +190,13 @@ float genPattern (void *pV, const int def[3], uint8_t bits, uint8_t id, const fl
    GeomParam gp;
    RasParam rp={0,}; // {{0.0, 1.0}},RAS_FLAG_FLOAT|32};
    VA3D m={0,0};
-   int t=0;
+   int t=0, bits=0;
 
+   n= encSizeN(&bits, nE, elemID);
    if (bits <= 32) { rp.flags= (RAS_MASK_BITS & bits); }
    if (bits < 32) { rp.wI[0]= 0; rp.wI[1]= 1; }
    else { rp.wF[0]= 0.0; rp.wF[1]= 1.0; rp.flags|= RAS_FLAG_FLOAT; }
 
-   n= BITS_TO_BYTES(bits * nE);
    memset(&gp, 0, sizeof(gp));
    if (0 == (rp.flags & RAS_FLAG_WRAL))
    {  // Lazy write needs clean buffer...

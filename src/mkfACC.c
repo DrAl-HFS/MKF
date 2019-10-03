@@ -213,7 +213,7 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
 
       LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
       fi.fieldTableMask=  0x01;
-      fi.elemID=     BMFI_EIDT_FPB|4;
+      fi.elemID= ENC_F32;
       //fi.opr=
       //fi.profID=
       fi.pD= def;

@@ -279,15 +279,11 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
    return(MKF_BINS);
 } // mkfCUDAGetBPFD
 
-ConstFieldPtr *asFieldTab (const void **pp, const U8 id)
+ConstFieldPtr *asFieldTab (const void **pp, const NumEnc id)
 {
    ConstFieldPtr *pFP= (ConstFieldPtr*)pp;
-   if (BMFI_EIDT_FPB == (id & BMFI_EIDM_TYP))
-   {
-      const U8 n= id & BMFI_EIDM_NUM;
-      const U8 m= (n-1); // BIT_MASK(n);
-      if (0 != (pFP->w & m)) { WARN("[mkfCUDA] alignment %u %p\n", n, pFP->p); }
-   }
+   int a= encAlignment(id);
+   if (0 != (pFP->w & (a-1))) { WARN("[mkfCUDA] alignment %u %p\n", a, pFP->p); }
    return(pFP);
 } // asFieldTab
 
@@ -296,7 +292,7 @@ const BMFieldInfo *setup1F32 (BMFieldInfo *pI, float **ppF, const int def[3], co
    if (pI)
    {
       pI->fieldTableMask= 0x1;
-      pI->elemID= BMFI_F32;
+      pI->elemID= ENC_F32;
       pI->oprID= 0;
       pI->profID= profile;
       pI->flags= 0;

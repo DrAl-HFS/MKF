@@ -6,7 +6,7 @@
 #define BIN_MAP_UTIL_H
 
 #include "geomSVU.h"
-//#include "report.h"
+#include "encoding.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,17 +54,6 @@ typedef struct
    BMStride rowWS, planeWS;   // 32b word strides
 } BMOrg;
 
-#define BMFI_EIDM_TYP 0xF0
-#define BMFI_EIDT_FPB 0xF0
-#define BMFI_EIDM_NUM 0x0F
-
-// Common data types
-#define BMFI_F32 (BMFI_EIDT_FPB|4)
-#define BMFI_F64 (BMFI_EIDT_FPB|8)
-// Aliases
-#define BMFI_FLOAT  BMFI_F32
-#define BMFI_DOUBLE BMFI_F64
-
 #define BMFI_FIELD_MAX 4   // Number of fields actually supported
 
 // Could add "const half *pF16;" if relevant headers included, but perhaps not useful?
@@ -76,7 +65,8 @@ typedef struct
 {
    struct { // anon struct used to influence packing
       uint32_t  fieldTableMask; // Bits 0..31 enable/disable entries in field device pointer table
-      uint8_t   elemID, oprID, profID, flags;
+      NumEnc   elemID;
+      uint8_t  oprID, profID, flags;
    };
    const FieldDef     *pD;
    const FieldStride *pS;  // NULL => assume fully planar fields
