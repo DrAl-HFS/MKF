@@ -44,7 +44,7 @@ int planarity (const FieldDef def[], const FieldStride stride[], int n)
 #define REGION_NDIM   3
 #define REGION_F_AS1D (0x01)
 
-struct Region
+struct GridRegion
 {  // Expect multiple fields, common def & stride
    size_t   nElem;
    FieldDef  elemDef[REGION_NDIM];
@@ -57,7 +57,7 @@ struct Region
       if (pI)
       {
          nDim= 0; nField= 0;
-         nSlab= 2; // ??
+         nSlab= 0; // ??
          if (pI->pFieldDevPtrTable)
          {
             nField= countValidPtrByMask(pI->pFieldDevPtrTable, pI->fieldTableMask);
@@ -95,8 +95,56 @@ struct Region
 #else
    size_t blkShMem (void) { return(0); }
 #endif
-}; // struct Region
+}; // struct GridRegion
 
+class GridPlane
+{
+protected:
+   size_t     nElem;
+   FieldDef    grid[2];
+   FieldStride stepF;
+
+   GridPlane (const GridRegion& reg, const BMFieldInfo *pI)
+   {
+      grid[0]= reg.grdDef0;
+      grid[1]= reg.elemDef[1];
+      nElem= prodNI(reg.elemDef, 2);
+      copyOrGenStride(&stepF, 1, 2, pI->pD, pI->pS);
+   } // CTOR
+}; // class GridPlane
+
+class GridSlab : private GridPlane
+{
+//protected:
+public:
+   BMStride stepWBM;
+   FieldDef depth;
+
+public:
+   GridSlab (const GridRegion& reg, const BMOrg *pO, const BMFieldInfo *pI) : GridPlane(reg, pI)
+   {
+      stepWBM= pO->planeWS;
+      if (reg.nSlab > 1) { depth= reg.elemDef[2] / reg.nSlab; }
+      else { depth= reg.elemDef[2]; }
+   } // CTOR
+
+   FieldDef getResid (const GridRegion& reg) const
+   {
+      FieldDef r= reg.elemDef[2] - (reg.nSlab * depth);
+      return MAX(0, r);
+   } // setResid
+
+   bool setDepth (FieldDef d) { if (d > 0) { depth= d; } return(d > 0); }
+
+   size_t nElem (void) const { return(depth * GridPlane::nElem); }
+   size_t stepW (void) const { return(depth * stepWBM); }
+   size_t stepF (void) const { return(depth * GridPlane::stepF); }
+
+   dim3 def (int iS=0) const
+   {
+      return dim3(GridPlane::grid[0], GridPlane::grid[1], depth);
+   } // def
+}; // class GridSlab
 
 
 /* Device classes */
@@ -137,44 +185,6 @@ public:
 
 }; // CUDAOrg
 
-
-/* Dependant host class*/
-
-struct GridSlab
-{
-   size_t     nElem[2];
-   FieldDef    grid[4];
-   FieldStride stepF[2];
-   BMStride    stepW[2];
-
-   GridSlab (const Region& reg, const CUDAOrg& org)//, const BMOrg *pO, const BMFieldInfo *pI)
-   {
-      grid[0]= reg.grdDef0;
-      grid[1]= reg.elemDef[1];
-      if (reg.nSlab > 1)
-      {
-         const size_t nElemPlane= prodNI(reg.elemDef, 2);
-         //copyOrGenStride(stepF, 1, 2, pI->pD, pI->pS);
-         grid[2]= reg.elemDef[2] / reg.nSlab;
-         grid[3]= reg.elemDef[2] - (reg.nSlab * grid[2]);
-         nElem[0]=  nElemPlane * grid[2];
-
-         stepF[0]= org.planeStrideField() * grid[2];
-         stepW[0]= org.planeStrideBM() * grid[2]; // pO->planeWS
-         if (grid[3] > 0)
-         {
-            stepF[1]= org.planeStrideField() * grid[3];
-            stepW[1]= org.planeStrideBM() * grid[3];
-            nElem[1]= nElemPlane * grid[3];
-         }
-      }
-      else { grid[2]= grid[3]= reg.elemDef[2]; }
-   }
-   dim3 def (int iS=0) const
-   {
-      return dim3(grid[0], grid[1], grid[2 + (iS & 0x1)]);
-   } // def
-}; // struct GridSlab
 
 /* Templated device classes */
 
@@ -255,7 +265,7 @@ public:
 
    __device__ uint eval (const T_Elem f) const
    {
-      const uint d= (1 + (f > t[0]) - (f < t[0]));
+      const uint d= (1 - (f < t[0]) + (f > t[0])); // t[1]
       return( (m >> d) & 0x1 );
    } // eval
    __device__ uint operator () (const T_Elem f) const { eval(f); }
@@ -266,9 +276,11 @@ class CUDAFieldMap : protected CUDAMap<T_Elem>
 {
 protected:
    const T_Elem * pF;
-   size_t iOff; // Hacky debug/test aid
 
 public:                 // static_cast< const T_Elem * >() - irrelevant so why bother?
+   size_t iOff; // Hacky debug/test aid
+
+
    CUDAFieldMap (const BMFieldInfo *pI, const BinMapF32 *pM) : CUDAMap<T_Elem>(pM)
    { copyValidPtrByMask( (ConstFieldPtr*)&pF, 1, pI->pFieldDevPtrTable, pI->fieldTableMask); iOff= 0; }
    CUDAFieldMap (const BMFieldInfo *pI, const BinMapF64 *pM) : CUDAMap<T_Elem>(pM)
@@ -464,7 +476,7 @@ BMOrg *binMapCUDA
    const BinMapF32   * pM
 )
 {
-   Region reg;
+   GridRegion reg;
 
    //if (32 != warpSize) { WARN("[binMapCUDA] warpSize=%d\n", warpSize); }
    if (reg.validate(pI))
@@ -474,6 +486,7 @@ BMOrg *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
+         reg.nSlab= 4;
          //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
          switch (pI->profID & 0x70)
          {
@@ -484,14 +497,20 @@ BMOrg *binMapCUDA
                {
                   CUDAStrmBlk s;
                   CUDAFieldMap<float> map(pI, pM);
-#if 0
-                  GridSlab slab(reg,CUDAOrg(pO, pI));
+#if 1
+                  GridSlab slab(reg, pO, pI);
+                  size_t wOffset= 0;
                   for (int i=0; i<reg.nSlab; i++)
                   {
-                     //LOG("slab.nElem=%zu\n", slab.nElem[0]);
-                     mapField<<< slab.def(), reg.blkDefColl(), 0, s[i] >>>(pW+(i*slab.stepW[0]), map, slab.nElem[0]);
-                     map.addOffset(slab.stepF[0]);
-                     //map.setOffset((1+i) * stride);
+                     LOG("%d %d 0x%x %d %zu\n", i, slab.depth, wOffset, map.iOff, slab.nElem());
+                     mapField<<< slab.def(), reg.blkDefColl(), 0, s[i] >>>(pW+wOffset, map, slab.nElem());
+                     wOffset+= slab.stepW();
+                     map.addOffset(slab.stepF());
+                  }
+                  if (slab.setDepth(slab.getResid(reg)))
+                  {
+                     LOG("*R: %d 0x%x %d %zu\n", slab.depth, wOffset, map.iOff, slab.nElem());
+                     mapField<<< slab.def(), reg.blkDefColl(), 0, s[0] >>>(pW+wOffset, map, slab.nElem());
                   }
 #else
                   //FieldStride stride; genStride(&stride, 1, 2, pI->pD, 1); // LOG("rowStride=%d\n", rowStride);
