@@ -124,7 +124,7 @@ int main (int argc, char *argv[])
    //printf("long int = %dbytes\n", sizeof(long int));
    if (buffAlloc(&cux,def))
    {
-      const float param= 256-64; //midRangeHNI(def,3)-3;
+      const float param[]= {256-64, 1}; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
       float vfR= genPattern(cux.pHF, def, 32, id, param);
 
