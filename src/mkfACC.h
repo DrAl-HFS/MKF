@@ -15,12 +15,32 @@ extern "C" {
 
 /***/
 
-// Simple version for basic testing
-extern int mkfAccGetBPFDSimple (size_t rBPFD[MKF_BINS], U32 * restrict pBM, const F32 * restrict pF, const int def[3], const BinMapF32 *pC);
+// Original version for reference / testing, can be used for host side computation* but features
+// are presently limited:
+//    no multi-field,
+//    no sub-buffering of intermediate data (simple non-overlapped processing),
+//    no strided access (i.e. planar only, no region-of-interest or borders).
+// *NB - OpenAcc GPU acceleration DOES NOT WORK on this code for reasons yet to be determined.
+extern int mkfAccGetBPFDSimple
+(
+   size_t   rBPFD[MKF_BINS],   // Result (Binary Pattern Frequency Distribution)
+   BMPackWord * restrict pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
+   const MKFAccScalar * restrict pF, // Scalar field (input)
+   const FieldDef def[3],             // Definition (dimensions) of scalar field
+   const MKFAccBinMap * pM // Mapping (binarisation)
+);
 
 #ifdef MKF_ACC_CUDA_INTEROP
 
-extern int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const int def[3], const BinMapF32 * const pC);
+// As above except launches CUDA kernels to process OpenACC buffers
+extern int mkfAccCUDAGetBPFD
+(
+   size_t     rBPFD[MKF_BINS],
+   BMPackWord           * pW,
+   const MKFAccScalar  * pF,
+   const FieldDef       def[3],
+   const MKFAccBinMap  * const pM
+);
 
 #endif // MKF_ACC_CUDA_INTEROP
 

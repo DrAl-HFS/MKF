@@ -21,8 +21,8 @@
 ACC_INLINE void loadChunkSh0
 (
    U64 bufChunk[4],     // chunk buffer
-   const U32 * restrict pR0, // Location within row of first -
-   const U32 * restrict pR1, //  - and second planes
+   const BMPackWord * restrict pR0, // Location within row of first -
+   const BMPackWord * restrict pR1, //  - and second planes
    const U32 rowStride       // stride between successive rows within each plane
 )
 {  // vect
@@ -36,8 +36,8 @@ ACC_INLINE void loadChunkSh0
 ACC_INLINE void loadChunkSh1
 (
    U64 bufChunk[4],     // chunk buffer
-   const U32 * restrict pR0, // Location within row of first -
-   const U32 * restrict pR1, //  - and second planes
+   const BMPackWord * restrict pR0, // Location within row of first -
+   const BMPackWord * restrict pR1, //  - and second planes
    const U32 rowStride       // stride between successive rows within each plane
 )
 {  // vect
@@ -114,7 +114,7 @@ ACC_INLINE void addPatternOM (size_t rBPFD[256], U64 bufChunk[4], const int n)
 ACC_INLINE void addRowBPFD
 (
    size_t rBPFD[256], // result pattern distribution
-   const U32 * restrict pRow[2],
+   const BMPackWord * restrict pRow[2],
    const int rowStride,
    const int n    // Number of single bit elements packed in row
 )
@@ -149,10 +149,10 @@ ACC_INLINE void addRowBPFD
 int mkfAccGetBPFDSimple
 (
    size_t   rBPFD[MKF_BINS],
-   U32          * restrict pBM,
-   const F32   * restrict pF,
-   const int   def[3],
-   const BinMapF32   * const pC
+   BMPackWord * restrict pW,
+   const MKFAccScalar * restrict pF,
+   const FieldDef def[3],
+   const MKFAccBinMap *pM
 )
 {
    const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
@@ -160,24 +160,24 @@ int mkfAccGetBPFDSimple
    //const int volStride= planeStride * def[2];
    const int nF= prodNI(def,3);
 
-   #pragma acc data  present_or_create( pBM[:(planeStride * def[2])] ) \
-                     present_or_copyin( pF[:nF], def[:3], pC[:1] )  \
+   #pragma acc data  present_or_create( pW[:(planeStride * def[2])] ) \
+                     present_or_copyin( pF[:nF], def[:3], pM[:1] )  \
                      copy( rBPFD[:MKF_BINS] )
    {  // #pragma acc parallel vector ???
       if ((rowStride<<5) == def[0])
       {  // Multiple of 32
-         binMapNF32(pBM, pF, nF, pC);
+         binMapAcc(pW, pF, nF, pM);
       }
       else
       {
-         binMapRowsF32(pBM, pF, def[0], rowStride, def[1]*def[2], pC);
+         binMapRowsAcc(pW, pF, def[0], rowStride, def[1]*def[2], pM);
       }
 
       for (int j= 0; j < (def[2]-1); j++)
       {
-         const U32 * restrict pPlane[2];
-         pPlane[0]= pBM + j * planeStride;
-         pPlane[1]= pBM + (j+1) * planeStride;
+         const BMPackWord * restrict pPlane[2];
+         pPlane[0]= pW + j * planeStride;
+         pPlane[1]= pW + (j+1) * planeStride;
          #pragma acc loop seq
          for (int i= 0; i < (def[1]-1); i++)
          {
@@ -198,7 +198,14 @@ int mkfAccGetBPFDSimple
 #include "mkfCUDA.h"
 //#include "binMapCUDA.h"
 
-int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const int def[3], const BinMapF32 * const pMC)
+int mkfAccCUDAGetBPFD
+(
+   size_t   rBPFD[MKF_BINS],  // Result (Binary Pattern Frequency Distribution)
+   BMPackWord * restrict pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
+   const MKFAccScalar * restrict pF,   // Scalar field (input)
+   const FieldDef def[3],          // Definition (dimensions) of scalar field
+   const MKFAccBinMap *pM
+)
 {
    int r= 0;
 
@@ -220,18 +227,18 @@ int mkfAccCUDAGetBPFD (size_t rBPFD[MKF_BINS], U32 * pBM, const F32 * pF, const 
       //fi.pS= NULL; // auto stride
       fi.pFieldDevPtrTable= table;
       //LOG("* row, plane = %u, %u\n", sd.row, sd.plane);
-      #pragma acc data present_or_create( pBM[:nBM] ) present_or_copyin( pF[:nF] ) copy( rBPFD[:MKF_BINS] )
+      #pragma acc data present_or_create( pW[:nBM] ) present_or_copyin( pF[:nF] ) copy( rBPFD[:MKF_BINS] )
       {
          // Do some OpenACC stuff here...
          // ...then invoke CUDA routines
-         #pragma acc host_data use_device( rBPFD, pBM, pF ) // get device memory pointers
+         #pragma acc host_data use_device( rBPFD, pW, pF ) // get device memory pointers
          {  // allocated via OpenACC for CUDA access to array/field data (others passed to
             // kernels using API "value parameter auto-marshalling" into const memory)
             table[0].pF32= pF;
-            if (binMapCUDA(pBM, &bmo, &fi, pMC))
+            if (binMapCUDA(pW, &bmo, &fi, pM))
             {
                //LOG("\tsd= %u %u\n", sd.row, sd.plane);
-               r= mkfCUDAGetBPFD(rBPFD, &bmo, pBM, 3);
+               r= mkfCUDAGetBPFD(rBPFD, &bmo, pW, 3);
             }
          }
       }

@@ -13,6 +13,15 @@
 #define ACC_INLINE inline
 #endif
 
+#if 0
+typedef double MKFAccScalar;
+typedef BinMapF64 MKFAccBinMap;
+#else
+typedef float MKFAccScalar;
+typedef BinMapF32 MKFAccBinMap;
+#endif
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,21 +29,21 @@ extern "C" {
 
 /***/
 
-// Apply a map without considering alignment - assumes row length is a multiple of 8.
+// Apply a map without considering alignment - assumes row length is a multiple of 32 (bits in BMPackWord).
 // nF is the product of scalar field (X, Y, Z) "dimensions": this number of packed bits will be generated.
-extern void binMapNF32 (U32 * restrict pBM, const F32 * restrict pF, const size_t nF, const BinMapF32 *pC);
+extern void binMapAcc (BMPackWord * restrict pBM, const MKFAccScalar * restrict pF, const size_t nF, const MKFAccBinMap *pC);
 
 // Apply a map to a planar organised 32bit Scalar field.
 // Ensures row alignment of the resulting packed binary map.
 // Caller to ensure: rowStrideBM >= BITS_TO_BYTES(rowLenF)
-extern void binMapRowsF32
+extern void binMapRowsAcc
 (
-   U32 * restrict pBM,      // destination for packed binary map
-   const F32 * restrict pF,// source scalar field
+   BMPackWord * restrict pBM,      // destination for packed binary map
+   const MKFAccScalar * restrict pF,// source scalar field
    const int rowLenF,      // row length ie. "X dimension"
    const int rowStrideBM,  // 32bit word stride of rows of packed binary map, should be >=
    const int nRows,        // product of other "dimensions" (Y * Z)
-   const BinMapF32 *pC
+   const MKFAccBinMap *pC
 );
 
 #ifdef __cplusplus
