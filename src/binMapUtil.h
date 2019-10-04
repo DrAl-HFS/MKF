@@ -14,6 +14,8 @@ extern "C" {
 
 // Number of threshold values per mapping: 1 (simple threshold) or 2 (interval / hysteresis)
 #define BM_NUMT   (1)
+#define BM_TLB   (0)
+#define BM_TUB   (0) // BM_TLB+1
 #define BM_FLAG_T2IVL  (1<<15)
 
 // Comparison operation descriptor (single threshold).
@@ -29,7 +31,7 @@ typedef struct
    uint   m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
 } BinMapF64;
 
-// DEPRECATE
+// DEPRECATE?
 typedef struct
 {
    float t[BM_NUMT];
