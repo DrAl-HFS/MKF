@@ -5,6 +5,8 @@
 #ifndef GEOM_RASTER_HPP
 #define GEOM_RASTER_HPP
 
+#include "encoding.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -19,14 +21,13 @@ typedef struct
    int   nF;
 } GeomParam;
 
-#define RAS_MASK_BITS   (0x3F)
-#define RAS_FLAG_FLOAT  (0x40)
 #define RAS_FLAG_WRAL   (0x80)
 
 typedef struct
 {
    union { float wF[2]; int wI[2]; }; // indices from geometry membership test (bool) 0=out, 1=in
-   int flags;
+   NumEnc  enc;
+   uint8_t flags, pad[2];
 } RasParam;
 
 //extern "C"

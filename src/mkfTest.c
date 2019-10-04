@@ -23,13 +23,13 @@ int setupAcc (int id)
    return(r);
 } // setupAcc
 
-B32 buffAlloc (Context *pC, const int def[3])
+B32 buffAlloc (Context *pC, const int def[3], int n)
 {
    //const int nC= prodOffsetNI(def, 3, -1);
    //const int lines= def[1]*def[2];
    int r=0;
 
-   pC->nF= prodOffsetNI(def,3,0);
+   pC->nF= prodNI(def,3) * MAX(1,n);
    pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
    pC->nU= setBMO(&(pC->bmo), def, 0);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
@@ -122,9 +122,9 @@ int main (int argc, char *argv[])
    //c8sTest();
    mkfuTest(0);
    //printf("long int = %dbytes\n", sizeof(long int));
-   if (buffAlloc(&cux,def))
+   if (buffAlloc(&cux,def,2))
    {
-      const float param[]= {256-64, 1}; //midRangeHNI(def,3)-3;
+      const float param[]= {256-64, 1, 0}; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
       float vfR= genPattern(cux.pHF, def, ENC_F32, id, param);
 

@@ -180,7 +180,7 @@ size_t genBlock (float f[], const int def[3], const float r[3])
 } // genBlock
 */
 
-float genPattern (void *pV, const int def[3], NumEnc elemID, uint8_t id, const float param[])
+float genPattern (void *pV, const int def[3], NumEnc enc, uint8_t id, const float param[3])
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);
@@ -192,10 +192,23 @@ float genPattern (void *pV, const int def[3], NumEnc elemID, uint8_t id, const f
    VA3D m={0,0};
    int t=0, bits=0;
 
-   n= encSizeN(&bits, nE, elemID);
-   if (bits <= 32) { rp.flags= (RAS_MASK_BITS & bits); }
-   if (bits < 32) { rp.wI[0]= 0; rp.wI[1]= 1; }
-   else { rp.wF[0]= 0.0; rp.wF[1]= 1.0; rp.flags|= RAS_FLAG_FLOAT; }
+   n= encSizeN(&bits, nE, enc);
+   rp.enc= enc;
+   switch(enc)
+   {
+      case ENC_F32 :
+      case ENC_F64 :
+         rp.wF[0]= param[2]; rp.wF[1]= param[1];
+         break;
+
+      default : // WARN_CALL();
+         rp.wI[0]= param[2]; rp.wI[1]= param[1];
+         break;
+
+      case ENC_U1 :
+         rp.wI[0]= 0; rp.wI[1]= 1;
+         break;
+   }
 
    memset(&gp, 0, sizeof(gp));
    if (0 == (rp.flags & RAS_FLAG_WRAL))

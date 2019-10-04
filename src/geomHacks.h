@@ -66,7 +66,7 @@ extern size_t genNBall (float f[], const int def[3], const Ball3D *pB, const int
 
 extern size_t genBlock (float f[], const int def[3], const float r[3]);
 */
-extern float genPattern (void *pV, const int def[3], uint8_t elemID, uint8_t id, const float param[]);
+extern float genPattern (void *pV, const int def[3], NumEnc enc, uint8_t id, const float param[3]);
 
 extern void geomTest (float, float);
 
