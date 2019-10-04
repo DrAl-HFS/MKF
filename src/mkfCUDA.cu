@@ -487,7 +487,7 @@ int main (int argc, char *argv[])
       if (cux.pHF)
       {
          BinMapF32 mc={0};
-         genPattern(cux.pHF, def, 32, 4, param);
+         genPattern(cux.pHF, def, ENC_F32, 4, param);
          mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x20);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
@@ -522,7 +522,7 @@ int main (int argc, char *argv[])
             LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
 #endif
-         genPattern(cux.pHU, def, 1, 4, param);
+         genPattern(cux.pHU, def, ENC_U1, 4, param);
          mkft(&cux,def,mScale,2);
          mkft(&cux,def,mScale,3);
       }

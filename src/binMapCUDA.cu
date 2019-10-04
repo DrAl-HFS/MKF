@@ -145,7 +145,7 @@ public:
 }; // class GridSlab
 
 
-/* Device classes */
+/******************** Device classes ********************/
 
 class CUDAOrg
 {
@@ -184,7 +184,7 @@ public:
 }; // CUDAOrg
 
 
-/* Templated device classes */
+/********** Templated device class hierrachy **********/
 
 template <typename T_Elem>
 class CUDAImgMom
@@ -194,7 +194,8 @@ protected:
 
    CUDAImgMom (void *p) { pM2= static_cast<T_Elem*>(p); }
 
-   __device__ void sum (T_Elem *pR, const T_Elem v) // Block-wide sum reduction
+   // Block-wide sum reduction
+   __device__ void sumRB (T_Elem *pR, const T_Elem v)
    {
       __shared__ T_Elem t[VT_BLKN];
       t[threadIdx.x]= v;
@@ -205,9 +206,10 @@ protected:
       }
       if (0 == threadIdx.x) { atomicAdd( pR, t[0] ); }
       __syncthreads();
-   } // sum
+   } // sumRB
 
-   __device__ void sumCat (T_Elem *pR, const int strideR, const T_Elem v, const int c) // Block-wide categorical sum reduction
+   // Block-wide categorical sum reduction
+   __device__ void sumCatRB (T_Elem *pR, const int strideR, const T_Elem v, const int c)
    {
       __shared__ T_Elem t[CAT_NUM][VT_BLKN];
 #if CAT_NUM > 2
@@ -231,22 +233,19 @@ protected:
          for (int i=0; i<CAT_NUM; i++) { atomicAdd( pR+i*strideR, t[i][0] ); }
       }
       __syncthreads();
-   } // sumCat
+   } // sumCatRB
 
-   __device__ void add (int x, int y, int z, T_Elem m)
+   __device__ void add (T_Elem m)
    {
-      T_Elem s, m2= m * m;
+      sumRB(m);
+      sumRB(m*m);
+   } // add
 
-      s= sum(m);
-      if (0 == threadIdx.x) { atomicAdd( pM2+0, s); }
-      s= sum(m2);
-      if (0 == threadIdx.x) { atomicAdd( pM2+1, s); }
-   }
-   __device__ void addCat (int x, int y, int z, T_Elem m, uint c)
+   __device__ void addCat (T_Elem m, uint c)
    {
-      sumCat(pM2+0, 2, m, c);
-      sumCat(pM2+1, 2, m*m, c);
-   }
+      sumCatRB(pM2+0, 2, m, c);
+      sumCatRB(pM2+1, 2, m*m, c);
+   } // addCat
 
 }; // class CUDAImgMom
 
@@ -263,10 +262,10 @@ public:
 
    __device__ uint eval (const T_Elem f) const
    {
-      const uint d= (1 - (f < t[0]) + (f > t[0])); // t[1]
+      const uint d= (1 - (f < t[BM_TLB]) + (f > t[BM_TUB])); // t[1]
       return( (m >> d) & 0x1 );
    } // eval
-   __device__ uint operator () (const T_Elem f) const { eval(f); }
+   //__device__ uint operator () (const T_Elem f) const { eval(f); }
 }; // template class CUDAMap
 
 template <typename T_Elem>
@@ -314,15 +313,13 @@ public:
       }
    } // CTOR
 
-   //__device__ size_t index (uint x, uint y, uint z) const { return(x * stride[0] + y * stride[1] + z * stride[2]); }
-
    __device__ T_Elem sum (const size_t i) const
    {
       T_Elem s= (fPtrTab[0])[i];
       for (int iF=1; iF < nF; iF++) { s+= (fPtrTab[iF])[i]; }
       return(s);
    } // sum
-   __device__ T_Elem operator () (const size_t i) const { return sum(i); }
+   //__device__ T_Elem operator () (const size_t i) const { return sum(i); }
 }; // template class CUDAMultiField
 
 // TODO: polymorphisation of CUDAFieldMap & CUDAMultiFieldMap ... ?
@@ -333,7 +330,6 @@ public:
    CUDAMultiFieldMap (const BMFieldInfo *pI, const BinMapF32 *pM) : CUDAMultiField<T_Elem>(pI), CUDAMap<T_Elem>(pM) {;}
    CUDAMultiFieldMap (const BMFieldInfo *pI, const BinMapF64 *pM) : CUDAMultiField<T_Elem>(pI), CUDAMap<T_Elem>(pM) {;}
 
-   //__device__ size_t index (uint x, uint y, uint z) const { return CUDAMultiField<T_Elem>::index(x,y,z); }
    __device__ uint operator () (const size_t i) const { return CUDAMap<T_Elem>::eval( CUDAMultiField<T_Elem>::sum(i) ); }
 }; // template class CUDAMultiFieldMap
 
