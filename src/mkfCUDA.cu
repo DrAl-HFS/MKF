@@ -1,6 +1,6 @@
 // mkfCUDA.cu - Minkowski Functional pattern processing using CUDA NB: .cu assumes c++ style compilation
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Jan-Sept 2019
+// (c) Project Contributors Jan-Oct 2019
 
 #include "mkfCUDA.h"
 #include "utilCUDA.hpp"

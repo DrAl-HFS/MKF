@@ -1,6 +1,6 @@
 // geomHacks.h - basic 3D geometry hacks.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June-August 2019
+// (c) Project Contributors June-October 2019
 
 #ifndef GEOM_HACKS_H
 #define GEOM_HACKS_H

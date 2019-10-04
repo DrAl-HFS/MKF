@@ -1,3 +1,6 @@
+// mkfTest.c - main() entry-point for test code.
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors Jan-Oct 2019
 
 #include "mkfACC.h"
 #include "mkfCUDA.h"

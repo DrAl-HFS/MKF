@@ -1,3 +1,6 @@
+// encoding.c - Numeric encoding descriptor for scalar field flexibility
+// https://github.com/DrAl-HFS/MKF.git
+// (c) Project Contributors Oct. 2019
 
 #include "encoding.h"
 

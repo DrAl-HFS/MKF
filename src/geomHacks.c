@@ -1,6 +1,6 @@
 // geomHacks.c - basic 3D geometry hacks.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June-August 2019
+// (c) Project Contributors June-October 2019
 
 #include "geomHacks.h"
 #include "geomRaster.hpp"

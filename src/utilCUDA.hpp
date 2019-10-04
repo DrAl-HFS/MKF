@@ -1,6 +1,6 @@
 // utilCUDA.hpp - CUDA API utils
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Sept 2019
+// (c) Project Contributors Sept-Oct 2019
 
 #ifndef CUDA_UTIL_HPP
 #define CUDA_UTIL_HPP
