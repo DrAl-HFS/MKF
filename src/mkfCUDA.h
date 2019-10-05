@@ -14,10 +14,14 @@
 extern "C" {
 #endif
 
-int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const uint8_t profHack);
+// Just hacky placeholders for now...
+#define MKFCU_PROFILE_FAST (3)
+#define MKFCU_PROFILE_FLEX (2)
+
+int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
 
 //extern "C"
-int mkfCUDAGetBPFDautoCtx (Context *pC, const FieldDef def[3], const BinMapF32 *pMC, const uint8_t profHack);
+int mkfCUDAGetBPFDautoCtx (Context *pC, const FieldDef def[3], const BinMapF32 *pMC, const int profile);
 
 #ifdef __cplusplus
 } // extern "C"

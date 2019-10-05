@@ -220,7 +220,7 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
 /***/
 
 extern "C"
-int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const uint8_t profHack)
+int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
 {
    const int blkD= BPFD_BLKD;
    const int nBlk= (pO->rowPairs + blkD-1) / blkD;
@@ -229,9 +229,9 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
    //t.stampStream();
    //LOG("\tsd= %u, %u\n", pO->rowWS, pO->planeWS);
 
-   switch (profHack)
+   switch (profile)
    {
-      case 3 :
+      case MKFCU_PROFILE_FAST :
       {
          dim3 grd(nBlk,pO->planePairs,1);
          dim3 blk(blkD,1,1);
@@ -241,7 +241,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
          break;
       }
 
-      case 2 :
+      case MKFCU_PROFILE_FLEX :
       {
          dim3 grd(nBlk,pO->planePairs,1);
          dim3 blk(blkD,1,1);
@@ -279,32 +279,8 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
    return(MKF_BINS);
 } // mkfCUDAGetBPFD
 
-ConstFieldPtr *asFieldTab (const void **pp, const NumEnc id)
-{
-   ConstFieldPtr *pFP= (ConstFieldPtr*)pp;
-   int a= encAlignment(id);
-   if (0 != (pFP->w & (a-1))) { WARN("[mkfCUDA] alignment %u %p\n", a, pFP->p); }
-   return(pFP);
-} // asFieldTab
-
-const BMFieldInfo *setup1F32 (BMFieldInfo *pI, float **ppF, const int def[3], const uint8_t profile)
-{  // field arg should be const float **ppF, but pgc++ appears to have defective const-ness rule for multiple indirection
-   if (pI)
-   {
-      pI->fieldTableMask= 0x1;
-      pI->elemID= ENC_F32;
-      pI->oprID= 0;
-      pI->profID= profile;
-      pI->flags= 0;
-      pI->pD= def;
-      pI->pS= NULL;  // NULL => assume fully planar fields
-      pI->pFieldDevPtrTable= asFieldTab((const void**)ppF, pI->elemID);
-   }
-   return(pI);
-} // setup1F32
-
 extern "C"
-int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, const uint8_t profHack)
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, const int profHack)
 {
    cudaError_t r;
 
@@ -331,9 +307,10 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, c
 
       if (pC->pDF && pC->pDU)
       {
-         if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
+         ConstFieldPtr fieldPtr[BMCU_FIELD_MAX];
          BMFieldInfo fi;
-         BMOrg *pO= binMapCUDA(pC->pDU, &(pC->bmo), setup1F32(&fi, &(pC->pDF), def, profHack), pM);
+         setupFields(&fi, autoFieldPtr(fieldPtr, pC), pC->nField, def, pC->bytesElem, profHack);
+         BMOrg *pO= binMapCUDA(pC->pDU, &(pC->bmo), &fi, pM);
          if (NULL == pO)
          {
             LOG("\tpC= %p; pC->pDF= %p; &(pC->pDF)= %p\n\tpFDPT= %p; pFDPT->p= %p\n", pC, pC->pDF, &(pC->pDF),
@@ -377,14 +354,20 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, c
 #include "geomHacks.h"
 #include "mkfUtil.h"
 
-int buffAlloc (Context *pC, const int def[3], int flags)
+int buffAlloc (Context *pC, const int def[3], const NumEnc e, int flags)
 {
-   if (flags & 0x01)
-   {
-      pC->nF= prodNI(def,3);
-      pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
+  pC->nField= 1; //MAX(1,n);
+  if (flags & 0x01)
+  {
+      int b;
+      pC->nElem= prodNI(def,3);
+      pC->bytesF= encSizeN(&b, pC->nElem * pC->nField, e);
+      if (b <= 0) { return(FALSE); }
+      //else
+      pC->enc= e;
+      pC->bytesElem= BITS_TO_BYTES(b);
    }
-   else { pC->nF= 0; pC->bytesF= 0; }
+   else { pC->nElem= 0; pC->bytesF= 0; }
    if (flags & 0x02)
    {
       pC->nU= setBMO(&(pC->bmo), def, 0);
@@ -394,7 +377,7 @@ int buffAlloc (Context *pC, const int def[3], int flags)
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ;
 
-   LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
+   LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nElem, pC->bytesF, pC->nU, pC->bytesU);
 
    return cuBuffAlloc(pC,0);
 } // buffAlloc
@@ -472,6 +455,7 @@ size_t mkft (const Context *pC, const int def[3], const float mScale, const uint
    return(sum);
 } // mkft
 
+#define PAT_ID 4
 int main (int argc, char *argv[])
 {
    const int def[3]= {256, 256, 256}; // {64,64,2}; //{96,9,9};
@@ -479,7 +463,7 @@ int main (int argc, char *argv[])
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
 
-   if (buffAlloc(&cux, def, 0x02))
+   if (buffAlloc(&cux, def, ENC_F32, 0x02))
    {
       const size_t nC= prodOffsetNI(def,3,-1);
       LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
@@ -487,7 +471,7 @@ int main (int argc, char *argv[])
       if (cux.pHF)
       {
          BinMapF32 mc={0};
-         genPattern(cux.pHF, def, ENC_F32, 4, param);
+         genPattern(cux.pHF, def, ENC_F32, 1, PAT_ID, param);
          mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x20);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
@@ -522,7 +506,7 @@ int main (int argc, char *argv[])
             LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
 #endif
-         genPattern(cux.pHU, def, ENC_U1, 4, param);
+         genPattern(cux.pHU, def, ENC_U1, 1, PAT_ID, param);
          mkft(&cux,def,mScale,2);
          mkft(&cux,def,mScale,3);
       }

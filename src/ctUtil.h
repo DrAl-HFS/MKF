@@ -12,16 +12,6 @@
 extern "C" {
 #endif
 
-typedef struct
-{
-   long nF, bytesF;
-   long nU, bytesU;
-   long nZ, bytesZ;
-   float *pDF, *pHF;  // Device / Host ptrs
-   BMPackWord  *pDU, *pHU;
-   void *pDZ, *pHZ;
-   BMOrg bmo;
-} Context;
 
 extern void ctuInfo (void);
 

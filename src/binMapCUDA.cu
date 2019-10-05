@@ -301,7 +301,7 @@ template <typename T_Elem>
 class CUDAMultiField
 {  // Multiple fields with common stride
 protected:
-   const T_Elem   * fPtrTab[BMFI_FIELD_MAX];
+   const T_Elem   * fPtrTab[BMCU_FIELD_MAX];
    uint           nF;
 
 public:
@@ -309,7 +309,7 @@ public:
    {
       if (pI->pD)
       {
-         nF= copyValidPtrByMask( (ConstFieldPtr*)fPtrTab, BMFI_FIELD_MAX, pI->pFieldDevPtrTable, pI->fieldTableMask);
+         nF= copyValidPtrByMask( (ConstFieldPtr*)fPtrTab, BMCU_FIELD_MAX, pI->pFieldDevPtrTable, pI->fieldTableMask);
       }
    } // CTOR
 

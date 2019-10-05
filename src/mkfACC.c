@@ -201,9 +201,10 @@ int mkfAccGetBPFDSimple
 int mkfAccCUDAGetBPFD
 (
    size_t   rBPFD[MKF_BINS],  // Result (Binary Pattern Frequency Distribution)
-   BMPackWord * restrict pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
-   const MKFAccScalar * restrict pF,   // Scalar field (input)
-   const FieldDef def[3],          // Definition (dimensions) of scalar field
+   BMPackWord        * restrict pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
+   const MKFAccScalar * restrict pF,  // Scalar field (input)
+   const FieldDef    def[3],          // Definition (dimensions) of scalar field
+   const NumEnc      enc,
    const MKFAccBinMap *pM
 )
 {
@@ -220,7 +221,7 @@ int mkfAccCUDAGetBPFD
 
       LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
       fi.fieldTableMask=  0x01;
-      fi.elemID= ENC_F32;
+      fi.elemID= enc;
       //fi.opr=
       //fi.profID=
       fi.pD= def;
@@ -238,7 +239,7 @@ int mkfAccCUDAGetBPFD
             if (binMapCUDA(pW, &bmo, &fi, pM))
             {
                //LOG("\tsd= %u %u\n", sd.row, sd.plane);
-               r= mkfCUDAGetBPFD(rBPFD, &bmo, pW, 3);
+               r= mkfCUDAGetBPFD(rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
             }
          }
       }

@@ -180,7 +180,7 @@ size_t genBlock (float f[], const int def[3], const float r[3])
 } // genBlock
 */
 
-float genPattern (void *pV, const int def[3], NumEnc enc, uint8_t id, const float param[3])
+float genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, const float param[3])
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);

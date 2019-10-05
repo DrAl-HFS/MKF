@@ -26,20 +26,23 @@ int setupAcc (int id)
    return(r);
 } // setupAcc
 
-B32 buffAlloc (Context *pC, const int def[3], int n)
+B32 buffAlloc (Context *pC, const int def[3], const NumEnc e, const int n)
 {
-   //const int nC= prodOffsetNI(def, 3, -1);
-   //const int lines= def[1]*def[2];
-   int r=0;
+   int b, r=0;
 
-   pC->nF= prodNI(def,3) * MAX(1,n);
-   pC->bytesF= sizeof(*(pC->pHF)) * pC->nF;
+   pC->nElem=  prodNI(def,3);
+   pC->nField= MAX(1,n);
+   pC->bytesF= encSizeN(&b, pC->nElem * pC->nField, e);
+   if (b <= 0) { return(FALSE); }
+   //else
+   pC->enc= e;
+   pC->bytesElem= BITS_TO_BYTES(b);
    pC->nU= setBMO(&(pC->bmo), def, 0);
    pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ; // void * sizeof(*(pC->pHZ))
 
-   LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nF, pC->bytesF, pC->nU, pC->bytesU);
+   LOG("F: %d * %d * %d -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nElem, pC->nField, pC->bytesElem, pC->bytesF, pC->nU, pC->bytesU);
 
 #ifdef MKF_CUDA
    if (cuBuffAlloc(pC,0)) { r= 2; }
@@ -125,19 +128,22 @@ int main (int argc, char *argv[])
    //c8sTest();
    mkfuTest(0);
    //printf("long int = %dbytes\n", sizeof(long int));
-   if (buffAlloc(&cux,def,2))
+   if (buffAlloc(&cux, def, ENC_F32, 2))
    {
       const float param[]= {256-64, 1, 0}; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
-      float vfR= genPattern(cux.pHF, def, ENC_F32, id, param);
+      float vfR= genPattern(cux.pHF, def, cux.enc, cux.nField, id, param);
 
       if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 
       setBinMapF32(&bmc,">=",0.5);
       setupAcc(0);
-      LOG("***\nmkfAccGetBPFDSimple(%p) - \n", aBPFD1);
-      mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
-      reportMeasures(aBPFD1, mScale);
+      if (ENC_F32 == cux.enc)
+      {
+         LOG("***\nmkfAccGetBPFDSimple(%p) - \n", aBPFD1);
+         mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
+         reportMeasures(aBPFD1, mScale);
+      }
 
       if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
@@ -152,7 +158,7 @@ int main (int argc, char *argv[])
 
 #ifdef MKF_ACC_CUDA_INTEROP
       LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
-      if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, &bmc))
+      if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, cux.enc, &bmc))
       {
          reportMeasures(aBPFD2, mScale);
          compareNZ(aBPFD1, aBPFD2, MKF_BINS, 1);
@@ -163,7 +169,7 @@ int main (int argc, char *argv[])
       {
          LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", aBPFD2);
          SWAP(int,def[0],def[2]);
-         vfR= genPattern(cux.pHF, def, 32, id, param);
+         vfR= genPattern(cux.pHF, def, cux.enc, cux.nField, id, param);
          mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
          reportMeasures(aBPFD2, mScale);
          compareNZ(aBPFD1, aBPFD2, MKF_BINS, 0x0);

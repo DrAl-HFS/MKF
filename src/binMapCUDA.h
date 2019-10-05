@@ -12,6 +12,7 @@
 extern "C" {
 #endif
 
+
 BMOrg *binMapCUDA
 (
    BMPackWord        * pW,

@@ -56,13 +56,16 @@ typedef struct
    BMStride rowWS, planeWS;   // 32b word strides
 } BMOrg;
 
-#define BMFI_FIELD_MAX 4   // Number of fields actually supported
+// To handle various buffer arrangements (parallel arrays vs. element/line/plane interleaving)
+// declared in C or whatever, "type punned" pointers are used. This requires deep understanding
+// of the machine representation of arrays, and as such is likely traumatic for non-CompSci folks.
+// Helper functions are available for this reason (but in need of better organisation).
 
 // Could add "const half *pF16;" if relevant headers included, but perhaps not useful?
 typedef union { const void *p; const float *pF32; const double *pF64; size_t w; } ConstFieldPtr;
 
-typedef long int FieldStride;
-typedef int    FieldDef;
+typedef long int FieldStride; // 64bit just in case
+typedef int    FieldDef;       // 32bit most compatible?
 typedef struct
 {
    struct { // anon struct used to influence packing
@@ -94,6 +97,30 @@ extern int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
 extern int genStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, FieldStride stride);
 
 extern int copyOrGenStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, const FieldStride *pS);
+
+// HACKY REFACTORING #include "ctUtil.h"
+
+#define BMCU_FIELD_MAX 4   // Number of fields actually supported
+
+typedef struct
+{
+   int nField, nElem;
+   struct { NumEnc enc; uint8_t bytesElem, pad[2]; };
+   long bytesF;
+   long nU, bytesU;
+   long nZ, bytesZ;
+   void *pDF, *pHF;  // Device / Host ptrs
+   BMPackWord  *pDU, *pHU;
+   void *pDZ, *pHZ;
+   BMOrg bmo;
+} Context;
+
+extern ConstFieldPtr *asFieldTab (const void **pp, const NumEnc id);
+
+extern const BMFieldInfo *setupFields (BMFieldInfo *pI, void **ppF, const int nF, const int def[3], const int elemBytes, const int profile);
+
+extern void **autoFieldPtr (ConstFieldPtr ptr[BMCU_FIELD_MAX], const Context *pC);
+
 
 #ifdef __cplusplus
 } // extern "C"

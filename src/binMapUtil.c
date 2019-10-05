@@ -151,6 +151,57 @@ int copyOrGenStride (FieldStride fs[], const int n, const int start, const Field
    return(nR);
 } // copyOrGenStride
 
+
+ConstFieldPtr *asFieldTab (const void **pp, const NumEnc id)
+{
+   ConstFieldPtr *pFP= (ConstFieldPtr*)pp;
+   int a= encAlignment(id);
+   if (0 != (pFP->w & (a-1))) { WARN("[mkfCUDA] alignment %u %p\n", a, pFP->p); }
+   return(pFP);
+} // asFieldTab
+
+const BMFieldInfo *setupFields (BMFieldInfo *pI, void **ppF, const int n, const int def[3], const int b, const int profile)
+{  // field arg should be const float **ppF, but pgc++ appears to have defective const-ness rule for multiple indirection
+   if (pI && (n > 0) && (n < 32))
+   {
+      switch(b)
+      {
+         case sizeof(float) : pI->elemID= ENC_F32; break;
+         case sizeof(double) : pI->elemID= ENC_F64; break;
+         default : return(NULL);
+      }
+      pI->fieldTableMask= BIT_MASK(n);
+      pI->oprID= 0;
+      pI->profID= profile;
+      pI->flags= 0;
+      pI->pD= def;
+      pI->pS= NULL;  // NULL => assume fully planar fields
+      pI->pFieldDevPtrTable= asFieldTab((const void**)ppF, pI->elemID);
+      return(pI);
+   }
+   return(NULL);
+} // setupFields
+
+void **autoFieldPtr (ConstFieldPtr ptr[BMCU_FIELD_MAX], const Context *pC)
+{
+   if (pC->nField > 1)
+   {
+      const FieldStride stride= pC->nElem * pC->bytesElem;
+      ConstFieldPtr t={pC->pDF};//t.p= pC->pDF;
+
+      int max= MIN(BMCU_FIELD_MAX, pC->nField);
+      for (int i=0; i<max; i++)
+      {
+         ptr[i].w= t.w;
+         t.w+= stride;
+      }
+      return((void**)ptr); // &((void*)(ptr[0].p));
+   }
+   //else
+   return((void**)&(pC->pDF));
+} // autoFieldPtr
+
+
 #if 0
 testBMC (const float f0, const float fs, const int n, const BinMapF32 *pC)
 {

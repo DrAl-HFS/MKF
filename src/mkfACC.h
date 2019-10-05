@@ -32,13 +32,14 @@ extern int mkfAccGetBPFDSimple
 
 #ifdef MKF_ACC_CUDA_INTEROP
 
-// As above except launches CUDA kernels to process OpenACC buffers
+// Launch CUDA kernels to process OpenACC buffers - more features avail...
 extern int mkfAccCUDAGetBPFD
 (
    size_t     rBPFD[MKF_BINS],
-   BMPackWord           * pW,
+   BMPackWord         * pW,
    const MKFAccScalar  * pF,
    const FieldDef       def[3],
+   const NumEnc       enc,
    const MKFAccBinMap  * const pM
 );
 
