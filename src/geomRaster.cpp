@@ -25,8 +25,8 @@ struct Trav3Inf
 }; // struct Trav3Inf
 
 //void operator () (size_t idx, const float fVal) { pF32[idx]= fVal; }
-
-size_t traverseF (float f[], const IGeomObj *pG, const Trav3Inf& t, const float wF[2], const bool wral)
+template <typename T_Elem>
+size_t traverseF (T_Elem f[], const IGeomObj *pG, const Trav3Inf& t, const T_Elem wF[2], const bool wral)
 {
    size_t n=0;
    int i[3];
@@ -44,7 +44,7 @@ size_t traverseF (float f[], const IGeomObj *pG, const Trav3Inf& t, const float 
    }
    return(n);
 } // traverseF
-
+/*
 size_t traverseF (double f[], const IGeomObj *pG, const Trav3Inf& t, const double wF[2], const bool wral)
 {
    size_t n=0;
@@ -63,7 +63,7 @@ size_t traverseF (double f[], const IGeomObj *pG, const Trav3Inf& t, const doubl
    }
    return(n);
 } // traverseF
-
+*/
 size_t traverseI (IWriteI& w, const IGeomObj *pG, const Trav3Inf& t, const int wI[2], const bool wral)
 {
    size_t n=0;

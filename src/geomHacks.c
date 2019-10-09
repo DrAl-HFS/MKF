@@ -44,12 +44,14 @@ int intersectSS1 (IntersectSS *pI, const float rA, const float rB, const float s
    return(ID_DISTINCT);
 } // intersectSS1
 
+
 typedef struct
 {
-   float v, a;
-} VA3D;
+   float r, c[3];
+} Ball3D;
 
-int measureScaledBB (VA3D m[1], const Ball3D b[2], const float mScale)
+
+int measureScaledBB (float m[2], const Ball3D b[2], const float mScale)
 {
    const float r0= b[0].r * mScale;
    const float r1= b[1].r * mScale;
@@ -60,20 +62,20 @@ int measureScaledBB (VA3D m[1], const Ball3D b[2], const float mScale)
    if (ID_ENCLOSE == t)
    {
       float r= MAX(r0, r1);
-      m[0].v= sphereVol(r);
-      m[0].a= sphereArea(r);
+      m[GHM_V]= sphereVol(r);
+      m[GHM_S]= sphereArea(r);
    }
    else
    {
-      m[0].a= sphereArea(r0) + sphereArea(r1);
-      m[0].v= sphereVol(r0) + sphereVol(r1);
+      m[GHM_S]= sphereArea(r0) + sphereArea(r1);
+      m[GHM_V]= sphereVol(r0) + sphereVol(r1);
       if (ID_INTERSECT == t)
       {
          float h0, h1;
          h0= r0 - ss.dA;
          h1= r1 - (s - ss.dA);
-         m[0].v-= sphereCapVol(ss.a, h0) + sphereCapVol(ss.a, h1);
-         m[0].a-= sphereCapArea(ss.a, h0) + sphereCapArea(ss.a, h1);
+         m[GHM_V]-= sphereCapVol(ss.a, h0) + sphereCapVol(ss.a, h1);
+         m[GHM_S]-= sphereCapArea(ss.a, h0) + sphereCapArea(ss.a, h1);
       }
    }
    return(t);
@@ -128,7 +130,7 @@ I64 prodOffsetNI (const int x[], const int n, const int o)
 
 //int dummyBrk (void) { static int nd=0; return(++nd); }
 
-size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, const float param[3])
+size_t genPattern (GHMeasure *pM, void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, const float param[3])
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);
@@ -137,10 +139,10 @@ size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, c
    Ball3D b[2];
    GeomParam gp;
    RasParam rp={0,}; // {{0.0, 1.0}},RAS_FLAG_FLOAT|32};
-   VA3D m={0,0};
+   GHMeasure ghm={0,0};
    int t=0, bits=0;
 
-   n= encSizeN(&bits, nE, enc);
+   n= encSizeN(&bits, nE * MAX(1,nF), enc);
    rp.enc= enc;
    switch(enc)
    {
@@ -166,7 +168,7 @@ size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, c
          b[0].r= 0.2 * size;
          b[1].r= 0.3 * size;
          for (int d=0; d<3; d++) { b[0].c[d]= 0.4 * def[d]; b[1].c[d]= 0.6 * def[d]; }
-         t= measureScaledBB(&m, b, scale);
+         t= measureScaledBB(ghm.m, b, scale);
          // set rasterisation param
          gp.id= 0x3; //GEOM_BALL
          gp.nObj= 2;
@@ -177,8 +179,8 @@ size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, c
          break;
       case 3 :
          setKNF(r,3,0.5*size*scale);
-         m.a= blockArea(r);
-         m.v= blockVol(r);
+         ghm.m[GHM_S]= blockArea(r);
+         ghm.m[GHM_V]= blockVol(r);
          // set rasterisation param
          gp.id= 0x5; //GEOM_BOX
          gp.nObj= 1;
@@ -186,13 +188,13 @@ size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, c
          scaleFNI(gp.vF+gp.nF, 3, def, 0.5); gp.nF+= 3;
          break;
       case 2 :
-         m.v= 1;
+         ghm.m[GHM_V]= 1;
          memset(pV, -1, n);
          break;
       case 1 :
          b[0].r= 0.5 * size;
-         m.a= sphereArea(b[0].r*scale);
-         m.v= sphereVol(b[0].r*scale);
+         ghm.m[GHM_S]= sphereArea(b[0].r*scale);
+         ghm.m[GHM_V]= sphereVol(b[0].r*scale);
          // set rasterisation parameters
          gp.id= 0x3; //GEOM_BALL
          gp.nObj= 1;
@@ -206,7 +208,7 @@ size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, c
    }
    //n= 0;
    //dummyBrk();
-   LOG("gp: id=%d, n=%d, nF=%d\n", gp.id, gp.nObj, gp.nF);
+   //LOG("gp: id=%d, n=%d, nF=%d\n", gp.id, gp.nObj, gp.nF);
    if ((gp.id > 0) && (gp.nObj > 0))
    {
       if (0 == (rp.flags & RAS_FLAG_WRAL))
@@ -215,14 +217,15 @@ size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, c
       }
       n= rasterise(pV, def, &gp, &rp);
    }
-   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], size, t, n, nE, (F64)n / nE, m.v);
+   LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), anyl.meas.: S%G V%G\n", def[0], def[1], def[2], name[id], size, t, n, nE, (F64)n / nE, ghm.m[GHM_S], ghm.m[GHM_V]);
+   if (pM) { *pM= ghm; }
    return(n);
 } // genPattern
 
 void geomTest (float rA, float rB)
 {
+   GHMeasure ghm;
    Ball3D b[2]={0};
-   VA3D m;
    int t;
 
 geomObjTest();
@@ -234,7 +237,7 @@ geomObjTest();
    for (float sAB= rA + rB + 0.5; sAB>=-0.5; sAB-= 0.5)
    {
       b[1].c[0]= sAB;
-      t= measureScaledBB(&m, b, 1);
-      LOG("%G -> t=%d A=%G V=%G\n", sAB, t, m.a, m.v);
+      t= measureScaledBB(ghm.m, b, 1);
+      LOG("%G -> t=%d S%G V%G\n", sAB, t, ghm.m[GHM_S], ghm.m[GHM_V]);
    }
 } // geomTest

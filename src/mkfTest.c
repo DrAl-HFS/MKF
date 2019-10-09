@@ -132,7 +132,7 @@ int main (int argc, char *argv[])
    {
       const float param[]= {256-64, 1, 0}; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
-      float vfR= genPattern(cux.pHF, def, cux.enc, cux.nField, id, param);
+      float vfR= genPattern(NULL, cux.pHF, def, cux.enc, cux.nField, id, param);
 
       if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 
@@ -169,7 +169,7 @@ int main (int argc, char *argv[])
       {
          LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", aBPFD2);
          SWAP(int,def[0],def[2]);
-         vfR= genPattern(cux.pHF, def, cux.enc, cux.nField, id, param);
+         vfR= genPattern(NULL, cux.pHF, def, cux.enc, cux.nField, id, param);
          mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
          reportMeasures(aBPFD2, mScale);
          compareNZ(aBPFD1, aBPFD2, MKF_BINS, 0x0);

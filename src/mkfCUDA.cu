@@ -473,7 +473,7 @@ int main (int argc, char *argv[])
       if (cux.pHF)
       {
          BinMapF32 mc={0};//ENC_F32, 1,
-         n= genPattern(cux.pHF, def, cux.enc, cux.nField, PAT_ID, param);
+         n= genPattern(NULL, cux.pHF, def, cux.enc, cux.nField, PAT_ID, param);
          LOG("genPattern(.. ENC_F32 ..) - n=%zu PCVF=%G\n", n, (float)n / cux.nElem);
          mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x00);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
@@ -512,7 +512,7 @@ int main (int argc, char *argv[])
          }
 #endif
          if (0 != (def[0] & 0x1F)) { WARN("MKF_CUDA_MAIN / genPattern() - unpadded def[0]=%d\n", def[0]); }
-         n= genPattern(cux.pHU, def, ENC_U1, 1, PAT_ID, param);
+         n= genPattern(NULL, cux.pHU, def, ENC_U1, 1, PAT_ID, param);
          LOG("genPattern(.. ENC_U1 ..) - n=%zu\n", n);
          mkftu(&cux,def,mScale,2);
          mkftu(&cux,def,mScale,3);
