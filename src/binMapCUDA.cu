@@ -484,6 +484,7 @@ BMOrg *binMapCUDA
          //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
          switch (pI->profID & 0x70)
          {
+            default : WARN("binMapCUDA() - profID=0x%02X, defaulting...\n", pI->profID);
             case 0x00 :
             if (reg.collapsable() && (1 == reg.nField))
             {

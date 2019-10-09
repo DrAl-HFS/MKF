@@ -91,7 +91,8 @@ extern "C" size_t rasterise (void *pB, const int def[3], const GeomParam *pGP, c
    size_t n= 0;
    int bits;
 
-   if (encSizeN(&bits, 1, pRP->enc))
+   encSizeN(&bits, 1, pRP->enc);
+   if (bits > 0)
    {
       CGeomFactory fG;
       IGeomObj *pG= fG.createN(GeomID(pGP->id & 0x7), pGP->nObj, pGP->vF, pGP->nF);
@@ -104,9 +105,12 @@ extern "C" size_t rasterise (void *pB, const int def[3], const GeomParam *pGP, c
             case ENC_F32 :
                n= traverseF((float*)pB, pG, t, pRP->wF, pRP->flags & RAS_FLAG_WRAL);
                break;
-            //case ENC_F64 :
-            //   n= traverseF((double*)pB, pG, t, pRP->wF, pRP->flags & RAS_FLAG_WRAL);
-            //   break;
+            case ENC_F64 :
+            {
+               const double wF[2]= { pRP->wF[0], pRP->wF[1] };
+               n= traverseF((double*)pB, pG, t, wF, pRP->flags & RAS_FLAG_WRAL);
+               break;
+            }
             default :
                // if (bits > 32) { WARN_CALL(); } else
                CWriteRL32P2B wr(pB, bits);

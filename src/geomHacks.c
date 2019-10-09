@@ -125,62 +125,10 @@ I64 prodOffsetNI (const int x[], const int n, const int o)
 
 /***/
 
-/* DEPRECATE
-B32 inBall (const float x[3], const Ball3D *pB)
-{
-   return( sqrMag3D(x[0]-pB->c[0], x[1]-pB->c[1], x[2]-pB->c[2]) <= (pB->r * pB->r) );
-} // inBall
 
-size_t genNBall (float f[], const int def[3], const Ball3D *pB, const int nB)
-{
-   size_t i= 0, n= 0;
-   int c[3];
+//int dummyBrk (void) { static int nd=0; return(++nd); }
 
-   for (c[2]= 0; c[2]<def[2]; c[2]++)
-   {
-      for (c[1]= 0; c[1]<def[1]; c[1]++)
-      {
-         for (c[0]= 0; c[0]<def[0]; c[0]++)
-         {
-            float d[3]={c[0],c[1],c[2]};
-            for (int b= 0; b < nB; b++)
-            {
-               if (inBall(d,pB+b))
-               {
-                  f[i]= 1.0; ++n;
-                  break;
-               }
-            }
-            ++i;
-         }
-      }
-   }
-   return(n);
-} // genNBall
-
-size_t genBlock (float f[], const int def[3], const float r[3])
-{
-   size_t i= 0, n= 0;
-   float c[3];
-
-   for (int d=0; d<3; d++) { c[d]= 0.5 * def[d]; }
-
-   for (int j= 0; j<def[2]; j++)
-   {
-      for (int k= 0; k<def[1]; k++)
-      {
-         for (int l= 0; l<def[0]; l++)
-         {
-            if ( (abs(j-c[2]) <= r[2]) && (abs(k-c[1]) <= r[1]) && (abs(l-c[0]) <= r[0]) ) { f[i]= 1.0; ++n; }
-            ++i;
-         }
-      }
-   }
-   return(n);
-} // genBlock
-*/
-
-float genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, const float param[3])
+size_t genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, const float param[3])
 {
    const char *name[]={"empty","ball","solid","box","balls"};
    size_t n, nE= prodNI(def,3);
@@ -207,14 +155,11 @@ float genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, co
 
       case ENC_U1 :
          rp.wI[0]= 0; rp.wI[1]= 1;
+         rp.flags= RAS_FLAG_WRAL;
          break;
    }
 
    memset(&gp, 0, sizeof(gp));
-   if (0 == (rp.flags & RAS_FLAG_WRAL))
-   {  // Lazy write needs clean buffer...
-      memset(pV, 0, n);
-   }
    switch(id)
    {
       case 4 :
@@ -259,12 +204,19 @@ float genPattern (void *pV, const int def[3], NumEnc enc, int nF, uint8_t id, co
          memset(pV, 0, n);
          break;
    }
+   //n= 0;
+   //dummyBrk();
+   LOG("gp: id=%d, n=%d, nF=%d\n", gp.id, gp.nObj, gp.nF);
    if ((gp.id > 0) && (gp.nObj > 0))
-   {  LOG("gp: id=%d, nF=%d\n", gp.id, gp.nF);
+   {
+      if (0 == (rp.flags & RAS_FLAG_WRAL))
+      {  // Lazy write needs clean buffer...
+         memset(pV, rp.wI[0], n);
+      }
       n= rasterise(pV, def, &gp, &rp);
    }
    LOG("def[%d,%d,%d] %s(%G)->%d,%zu (/%d=%G(PC), ref=%G(Anl.))\n", def[0], def[1], def[2], name[id], size, t, n, nE, (F64)n / nE, m.v);
-   return(m.v);
+   return(n);
 } // genPattern
 
 void geomTest (float rA, float rB)

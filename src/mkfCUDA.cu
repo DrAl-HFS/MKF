@@ -356,28 +356,29 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, c
 
 int buffAlloc (Context *pC, const int def[3], const NumEnc e, int flags)
 {
-  pC->nField= 1; //MAX(1,n);
-  if (flags & 0x01)
-  {
-      int b;
-      pC->nElem= prodNI(def,3);
-      pC->bytesF= encSizeN(&b, pC->nElem * pC->nField, e);
-      if (b <= 0) { return(FALSE); }
-      //else
-      pC->enc= e;
+   int b;
+
+   pC->enc= e;
+   pC->nElem= prodNI(def,3);
+   pC->nField= 1; //MAX(1,n);
+   pC->bytesF= encSizeN(&b, pC->nElem * pC->nField, e);
+   if ((flags & 0x01) && (b > 0))
+   {
       pC->bytesElem= BITS_TO_BYTES(b);
    }
-   else { pC->nElem= 0; pC->bytesF= 0; }
+   else { pC->nElem= 0; pC->nField= 0; pC->bytesElem= 0; pC->bytesF= 0; }
+
    if (flags & 0x02)
    {
       pC->nU= setBMO(&(pC->bmo), def, 0);
       pC->bytesU= sizeof(*(pC->pHU)) * pC->nU;
    }
    else { pC->nU= 0; pC->bytesU= 0; }
+
    pC->nZ= MKF_BINS;
    pC->bytesZ= sizeof(size_t) * pC->nZ;
 
-   LOG("F: %zu -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nElem, pC->bytesF, pC->nU, pC->bytesU);
+   LOG("F: %d * %d -> %zu Bytes\nU: %zu -> %zu Bytes\n", pC->nField, pC->nElem, pC->bytesF, pC->nU, pC->bytesU);
 
    return cuBuffAlloc(pC,0);
 } // buffAlloc
@@ -430,7 +431,7 @@ checkHU ()
    dumpUX(pC->pHU+3*n, n, m);
 }
 #endif
-size_t mkft (const Context *pC, const int def[3], const float mScale, const uint8_t profHack)
+size_t mkftu (const Context *pC, const int def[3], const float mScale, const uint8_t profHack)
 {
    cudaError_t r;
    size_t sum= 0;
@@ -453,35 +454,39 @@ size_t mkft (const Context *pC, const int def[3], const float mScale, const uint
       LOG("\tID%d: S=%zu\tK M S V: %G %G %G %G\n", profHack, sum, m[0],m[1],m[2],m[3]);
    }
    return(sum);
-} // mkft
+} // mkftu
 
-#define PAT_ID 4
+#define PAT_ID 3
 int main (int argc, char *argv[])
 {
    const int def[3]= {256, 256, 256}; // {64,64,2}; //{96,9,9};
-   const float param[]= { def[0] * 0.75, 1 }; //256-64;
+   const float param[]= { def[0] * 0.75, 1, 0 }; //256-64;
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
+   size_t n;
 
-   if (buffAlloc(&cux, def, ENC_F32, 0x02))
+   if (buffAlloc(&cux, def, ENC_F32, 0x03))
    {
       const size_t nC= prodOffsetNI(def,3,-1);
-      LOG("[%d][%d][%d] -> %zu\n", def[0],def[1],def[2],nC);
+      LOG("[%d][%d][%d] -> %zuCells\n", def[0],def[1],def[2],nC);
       //sanityTest(&cux);
       if (cux.pHF)
       {
-         BinMapF32 mc={0};
-         genPattern(cux.pHF, def, ENC_F32, 1, PAT_ID, param);
-         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x20);
+         BinMapF32 mc={0};//ENC_F32, 1,
+         n= genPattern(cux.pHF, def, cux.enc, cux.nField, PAT_ID, param);
+         LOG("genPattern(.. ENC_F32 ..) - n=%zu PCVF=%G\n", n, (float)n / cux.nElem);
+         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x00);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
          if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
          {
-            LOG(" K M S V: %G %G %G %G\n", m[0],m[1],m[2],m[3]);
+            LOG("\t[F]:\tK M S V: %G %G %G %G\n", m[0],m[1],m[2],m[3]);
+            LOG("\tbitCountNU32()=%zu\n", bitCountNU32(cux.pHU, cux.nU));
          }
       }
-      else if (cux.pHU)
+      if (cux.pHU)
       {
+         memset(cux.pHU, 0, cux.bytesU);
 #if 0    // word boundary test - should be factored into pattern gen
          const int wDef= cux.sd.row;
          const int lDef= def[1] * def[2];
@@ -492,7 +497,7 @@ int main (int argc, char *argv[])
             for (int j=0; j<wDef; j++) { cux.pHU[wDef * i + j]= 0xFFFFFFFF; }
             if (m) { cux.pHU[wDef * (i+1) - 1]= m; }
          }
-         mkft(&cux,def, mScale);
+         mkftu(&cux,def, mScale);
 
          int j= wDef/2;
          for (int i= 0; i < lDef; i++)
@@ -506,9 +511,11 @@ int main (int argc, char *argv[])
             LOG("%08X\n", cux.pHU[wDef * i + j]);
          }
 #endif
-         genPattern(cux.pHU, def, ENC_U1, 1, PAT_ID, param);
-         mkft(&cux,def,mScale,2);
-         mkft(&cux,def,mScale,3);
+         if (0 != (def[0] & 0x1F)) { WARN("MKF_CUDA_MAIN / genPattern() - unpadded def[0]=%d\n", def[0]); }
+         n= genPattern(cux.pHU, def, ENC_U1, 1, PAT_ID, param);
+         LOG("genPattern(.. ENC_U1 ..) - n=%zu\n", n);
+         mkftu(&cux,def,mScale,2);
+         mkftu(&cux,def,mScale,3);
       }
       cuBuffRelease(&cux);
    }
