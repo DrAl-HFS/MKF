@@ -280,7 +280,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
 } // mkfCUDAGetBPFD
 
 extern "C"
-int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, const int profHack)
+int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, const int profHack)
 {
    cudaError_t r;
 
@@ -310,14 +310,13 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF32 *pM, c
          ConstFieldPtr fieldPtr[BMCU_FIELD_MAX];
          BMFieldInfo fi;
          setupFields(&fi, autoFieldPtr(fieldPtr, pC), pC->nField, def, pC->bytesElem, profHack);
-         BMOrg *pO= binMapCUDA(pC->pDU, &(pC->bmo), &fi, pM);
-         if (NULL == pO)
+         if (NULL == binMapCUDA(pC->pDU, &(pC->bmo), &fi, pM))
          {
             LOG("\tpC= %p; pC->pDF= %p; &(pC->pDF)= %p\n\tpFDPT= %p; pFDPT->p= %p\n", pC, pC->pDF, &(pC->pDF),
                fi.pFieldDevPtrTable, fi.pFieldDevPtrTable->p);
             return(0);
          }
-         if (pO && pC->pHU)
+         else if (pC->pHU)
          {
             LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHU, pC->pDU, pC->bytesU);
             r= cudaMemcpy(pC->pHU, pC->pDU, pC->bytesU, cudaMemcpyDeviceToHost);

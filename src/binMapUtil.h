@@ -59,7 +59,7 @@ typedef struct
 // To handle various buffer arrangements (parallel arrays vs. element/line/plane interleaving)
 // declared in C or whatever, "type punned" pointers are used. This requires deep understanding
 // of the machine representation of arrays, and as such is likely traumatic for non-CompSci folks.
-// Helper functions are available for this reason (but in need of better organisation).
+// Helper functions are available below for this reason (but perhaps need better organisation).
 
 // Could add "const half *pF16;" if relevant headers included, but perhaps not useful?
 typedef union { const void *p; const float *pF32; const double *pF64; size_t w; } ConstFieldPtr;
@@ -82,7 +82,8 @@ typedef struct
 /***/
 
 // Define map (comparison operator) using a string
-extern BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t);
+extern BinMapF64 *setBinMapF64 (BinMapF64 *pBM64, const char relopChars[], const float t);
+//extern BinMapF32 *setBinMapF32 (BinMapF32 *pBM32, const char relopChars[], const float t);
 
 extern size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
 

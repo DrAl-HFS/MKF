@@ -42,7 +42,7 @@ int planarity (const FieldDef def[], const FieldStride stride[], int n)
 /* Host side utility class/struct */
 
 #define REGION_NDIM   3
-#define REGION_F_AS1D (0x01)
+#define REGION_F_AS1D (0x01) // collapsable
 
 struct GridRegion
 {  // Expect multiple fields, common def & stride
@@ -462,12 +462,12 @@ __global__ void mapStrideMultiField (BMPackWord rBM[], const CUDAOrg org, const 
 /* INTERFACE */
 
 extern "C"
-BMOrg *binMapCUDA
+BMPackWord *binMapCUDA
 (
    BMPackWord  * pW,
    BMOrg       * pO,
    const BMFieldInfo * pI,
-   const BinMapF32   * pM
+   const BinMapF64   * pM
 )
 {
    GridRegion reg;
@@ -480,14 +480,28 @@ BMOrg *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
-         reg.nSlab= 3;
-         //LOG("Region::validate() - D%d F%d\n", reg.nD, reg.nF);
+         if ((0 == pI->profID) && reg.collapsable() && (1 == reg.nField))
+         {
+            switch (pI->elemID)
+            {
+               case ENC_F32 :
+                  mapField<<< reg.grdDefColl(), reg.blkDefColl() >>>(pW, CUDAFieldMap<float>(pI, pM), reg.nElem);
+                  pID= "mapField<F32>()";
+                  break;
+               case ENC_F64 :
+                  mapField<<< reg.grdDefColl(), reg.blkDefColl() >>>(pW, CUDAFieldMap<double>(pI, pM), reg.nElem);
+                  pID= "mapField<F64>()";
+                  break;
+            }
+         }
+         else
          switch (pI->profID & 0x70)
          {
             default : WARN("binMapCUDA() - profID=0x%02X, defaulting...\n", pI->profID);
             case 0x00 :
             if (reg.collapsable() && (1 == reg.nField))
             {
+               //reg.nSlab= 3;
                if (reg.nSlab > 0)
                {
                   CUDAStrmBlk s;
@@ -551,7 +565,7 @@ BMOrg *binMapCUDA
             }
          }
          LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.blkDefColl(), t.elapsedms());
-         if (0 == ctuErr(NULL, pID)) { return(pO); }
+         if (0 == ctuErr(NULL, pID)) { return(pW); }
       }
    }
    return(NULL);

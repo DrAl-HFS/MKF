@@ -17,6 +17,7 @@ extern "C" {
 
 // Original version for reference / testing, can be used for host side computation* but features
 // are presently limited:
+//    no polymorphism,
 //    no multi-field,
 //    no sub-buffering of intermediate data (simple non-overlapped processing),
 //    no strided access (i.e. planar only, no region-of-interest or borders).
@@ -36,11 +37,11 @@ extern int mkfAccGetBPFDSimple
 extern int mkfAccCUDAGetBPFD
 (
    size_t     rBPFD[MKF_BINS],
-   BMPackWord         * pW,
-   const MKFAccScalar  * pF,
-   const FieldDef       def[3],
+   BMPackWord        * pW,
+   const void        * pF, // NB - opaque ("punned") element type!
+   const FieldDef    def[3],
    const NumEnc       enc,
-   const MKFAccBinMap  * const pM
+   const MKFAccBinMap * const pM
 );
 
 #endif // MKF_ACC_CUDA_INTEROP

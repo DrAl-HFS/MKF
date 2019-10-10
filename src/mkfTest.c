@@ -101,12 +101,12 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flag
    return(nDiff);
 } // compareNZ
 
-void reportMeasures (const size_t a[256], const float mScale)
+void reportMeasures (const size_t a[256], const float mScale, const SMVal dts)
 {
    float m[4];
    if (mkfMeasureBPFD(m, a, mScale, 0))
    {
-      LOG(" K M S V: %G %G %G %G\n", m[0], m[1], m[2], m[3]);
+      LOG(" K M S V: %G %G %G %G\t(%Gsec)\n", m[0], m[1], m[2], m[3], dts);
    }
 } // reportMeasures
 
@@ -118,17 +118,18 @@ size_t bitCountNZ (size_t z[], const int n)
 
 int main (int argc, char *argv[])
 {
-   int id=3, def[3]= {256, 256, 256}; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
-   BinMapF32 bmc;
-   size_t *pBPFD=NULL, aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,};
+   int id=3, def[3]= { 256, 256, 256 }; // ensure def[0] is "irregular" on first invocation or OpenACC has problems (caching?)
+   BinMapF64 bmc;
+   size_t aBPFD1[MKF_BINS]={0,}, aBPFD2[MKF_BINS]={0,}, *pBPFD= NULL;
+   const size_t *pKBPFD=NULL;
    Context cux={0};
-
+   SMVal dt;
    //ctuInfo();
    //geomTest(2,2);
    //c8sTest();
    mkfuTest(0);
    //printf("long int = %dbytes\n", sizeof(long int));
-   if (buffAlloc(&cux, def, ENC_F32, 2))
+   if (buffAlloc(&cux, def, ENC_F64, 1))
    {
       const float param[]= {256-64, 1, 0}; //midRangeHNI(def,3)-3;
       const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
@@ -136,43 +137,54 @@ int main (int argc, char *argv[])
 
       if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 
-      setBinMapF32(&bmc,">=",0.5);
+      setBinMapF64(&bmc,">=",0.5);
       setupAcc(0);
-      if (ENC_F32 == cux.enc)
+      if (ENC_F64 == cux.enc)
       {
-         LOG("***\nmkfAccGetBPFDSimple(%p) - \n", aBPFD1);
+         LOG("***\nmkfAccGetBPFDSimple(%p) - \n", pBPFD);
+         deltaT();
          mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
-         reportMeasures(aBPFD1, mScale);
+         dt= deltaT();
+         pKBPFD= aBPFD1;
+         reportMeasures(pKBPFD, mScale, dt);
       }
 
-      if (NULL == pBPFD) { pBPFD= cux.pHZ; }
 #ifdef MKF_CUDA
+      pBPFD= cux.pHZ;
       LOG("***\nMKF_CUDA: mkfCUDAGetBPFDautoCtx(%p) - \n", pBPFD);
+      deltaT();
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x00))
       {
+         dt= deltaT();
          //LOG("bc=%zu\n", bitCountNZ(cux.pHU, cux.bytesU/sizeof(size_t)));
-         reportMeasures(pBPFD, mScale);
-         compareNZ(aBPFD1, pBPFD, MKF_BINS, 1);
+         reportMeasures(pBPFD, mScale, dt);
+         if (pKBPFD) { compareNZ(pBPFD, pKBPFD, MKF_BINS, 1); }
       } else { cudaDeviceReset(); }
 #endif // MKF_CUDA
 
 #ifdef MKF_ACC_CUDA_INTEROP
-      LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", aBPFD2);
-      if (mkfAccCUDAGetBPFD(aBPFD2, cux.pHU, cux.pHF, def, cux.enc, &bmc))
+      pBPFD= aBPFD2;
+      LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", pBPFD);
+      deltaT();
+      if (mkfAccCUDAGetBPFD(pBPFD, cux.pHU, cux.pHF, def, cux.enc, &bmc))
       {
-         reportMeasures(aBPFD2, mScale);
-         compareNZ(aBPFD1, aBPFD2, MKF_BINS, 1);
+         dt= deltaT();
+         reportMeasures(pBPFD, mScale, dt);
+         if (pKBPFD) { compareNZ(pBPFD, pKBPFD, MKF_BINS, 1); }
       } else { cudaDeviceReset(); }
 #endif // MKF_ACC_CUDA_INTEROP
 
-      if (def[0] != def[2])
+      if (pKBPFD && (def[0] != def[2]))
       {
-         LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", aBPFD2);
+         pBPFD= aBPFD2;
+         LOG("***\nSWAP() - mkfAccGetBPFDSimple(%p) - \n", pBPFD);
          SWAP(int,def[0],def[2]);
          vfR= genPattern(NULL, cux.pHF, def, cux.enc, cux.nField, id, param);
-         mkfAccGetBPFDSimple(aBPFD2, cux.pHU, cux.pHF, def, &bmc);
-         reportMeasures(aBPFD2, mScale);
-         compareNZ(aBPFD1, aBPFD2, MKF_BINS, 0x0);
+         deltaT();
+         mkfAccGetBPFDSimple(pBPFD, cux.pHU, cux.pHF, def, &bmc);
+         dt= deltaT();
+         reportMeasures(aBPFD2, mScale, dt);
+         compareNZ(pKBPFD, pBPFD, MKF_BINS, 0x0);
       }
    }
    buffRelease(&cux);

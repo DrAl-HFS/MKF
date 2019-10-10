@@ -44,26 +44,7 @@ size_t traverseF (T_Elem f[], const IGeomObj *pG, const Trav3Inf& t, const T_Ele
    }
    return(n);
 } // traverseF
-/*
-size_t traverseF (double f[], const IGeomObj *pG, const Trav3Inf& t, const double wF[2], const bool wral)
-{
-   size_t n=0;
-   int i[3];
 
-   for (i[2]= t.lb[2]; i[2] <= t.ub[2]; i[2]++)
-   {
-      for (i[1]= t.lb[1]; i[1] <= t.ub[1]; i[1]++)
-      {
-         for (i[0]= t.lb[0]; i[0] <= t.ub[0]; i[0]++)
-         {
-            bool k= pG->inI(i); n+= k;
-            if (wral|k) { f[t.index(i)]= wF[k]; }
-         }
-      }
-   }
-   return(n);
-} // traverseF
-*/
 size_t traverseI (IWriteI& w, const IGeomObj *pG, const Trav3Inf& t, const int wI[2], const bool wral)
 {
    size_t n=0;
@@ -86,7 +67,7 @@ size_t traverseI (IWriteI& w, const IGeomObj *pG, const Trav3Inf& t, const int w
 
 /* C INTERFACE */
 
-extern "C" size_t rasterise (void *pB, const int def[3], const GeomParam *pGP, const RasParam *pRP)
+extern "C" size_t rasterise (void *pV, const int def[3], const GeomParam *pGP, const RasParam *pRP)
 {
    size_t n= 0;
    int bits;
@@ -103,17 +84,17 @@ extern "C" size_t rasterise (void *pB, const int def[3], const GeomParam *pGP, c
          switch (pRP->enc)
          {
             case ENC_F32 :
-               n= traverseF((float*)pB, pG, t, pRP->wF, pRP->flags & RAS_FLAG_WRAL);
+               n= traverseF((float*)pV, pG, t, pRP->wF, pRP->flags & RAS_FLAG_WRAL);
                break;
             case ENC_F64 :
             {
                const double wF[2]= { pRP->wF[0], pRP->wF[1] };
-               n= traverseF((double*)pB, pG, t, wF, pRP->flags & RAS_FLAG_WRAL);
+               n= traverseF((double*)pV, pG, t, wF, pRP->flags & RAS_FLAG_WRAL);
                break;
             }
             default :
                // if (bits > 32) { WARN_CALL(); } else
-               CWriteRL32P2B wr(pB, bits);
+               CWriteRL32P2B wr(pV, bits);
                n= traverseI(wr, pG, t, pRP->wI, pRP->flags & RAS_FLAG_WRAL);
                break;
          }

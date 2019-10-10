@@ -13,7 +13,7 @@
 #define ACC_INLINE inline
 #endif
 
-#if 0
+#if 1
 typedef double MKFAccScalar;
 typedef BinMapF64 MKFAccBinMap;
 #else

@@ -34,27 +34,27 @@ U8 bm2F32 (const F32 f, const BinMapCtxF32 *pC)
 
 /***/
 
-BinMapF32 *setBinMapF32 (BinMapF32 *pC, const char relopChars[], const float t)
+BinMapF64 *setBinMapF64 (BinMapF64 *pM, const char relopChars[], const float t)
 {
    int i= 0, inv= 0, valid= 1;
-   pC->t[0]= t;
-   pC->m= BMC_NV;
+   pM->t[0]= t;
+   pM->m= BMC_NV;
 
    do
    {
       switch(relopChars[i])
       {
-         case '<' : pC->m|= BMC_LT; break;
-         case '=' : pC->m|= BMC_EQ; break;
-         case '>' : pC->m|= BMC_GT; break;
+         case '<' : pM->m|= BMC_LT; break;
+         case '=' : pM->m|= BMC_EQ; break;
+         case '>' : pM->m|= BMC_GT; break;
          case '!' : if (0 == i) { inv= 1; break; } // else...
          default : valid= 0;
       }
       ++i;
    } while (valid);
-   if (inv) { pC->m^= BMC_AL; }
-   //LOG_CALL("(%p, %s, %G) - m=0x%X\n", pC, relopChars, t, pC->m);
-   return(pC);
+   if (inv) { pM->m^= BMC_AL; }
+   //LOG_CALL("(%p, %s, %G) - m=0x%X\n", pM, relopChars, t, pM->m);
+   return(pM);
 } // setBinMapF32
 
 size_t setBMO (BMOrg *pO, const int def[3], const char profID)
