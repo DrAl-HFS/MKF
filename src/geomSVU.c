@@ -24,18 +24,18 @@ int *addKNI (int r[], const int a[], const int n, const int k)
 } // addKNI
 
 int sumNI (const int v[], int n)
-{
-   long int s= v[0];
+{  //long
+   int s= v[0];
    for (int i=1; i<n; i++) { s+= v[i]; }
-   if ((int)s != s) { ERROR_CALL("() - overflow (0x%x)\n", s); }
+   //if ((int)s != s) { ERROR_CALL("() - overflow (0x%x)\n", s); }
    return(s);
 } // sumNI
 
 int prodNI (const int v[], int n)
-{
-   long int x= v[0];
+{  //long
+   int x= v[0];
    for (int i=1; i<n; i++) { x*= v[i]; }
-   if ((int)x != x) { ERROR_CALL("() - overflow (0x%x)\n", x); }
+   //if ((int)x != x) { ERROR_CALL("() - overflow (0x%x)\n", x); }
    return(x);
 } // prodNI
 
@@ -45,6 +45,17 @@ int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], c
    for (int i=0; i<n; i++) { rMin[i]= MIN(minA[i], minB[i]); rMax[i]= MAX(maxA[i], maxB[i]); d+= rMax[i] > rMin[i]; }
    return(d);
 } // mergeMinMaxNI
+
+
+/***/
+
+size_t sumNZ (const size_t a[], const size_t n)
+{
+   size_t s= a[0];   // assumes n>0 !
+   for (size_t i=1; i<n; i++) { s+= a[i]; }
+   return(s);
+} // sumNZ
+
 
 /***/
 

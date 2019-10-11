@@ -16,7 +16,7 @@ extern "C" {
 BMPackWord *binMapCUDA
 (
    BMPackWord        * pW,
-   BMOrg               * pO,
+   BMOrg             * pO,
    const BMFieldInfo * pF,
    const BinMapF64   * pM
 );

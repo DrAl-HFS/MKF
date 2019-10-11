@@ -127,7 +127,10 @@ int main (int argc, char *argv[])
    //ctuInfo();
    //geomTest(2,2);
    //c8sTest();
-   mkfuTest(0);
+   //mkfuTest(0);
+   {  float m[4];
+      mkfMeasureBPFD(m,aBPFD1,1,1);
+   }
    //printf("long int = %dbytes\n", sizeof(long int));
    if (buffAlloc(&cux, def, ENC_F64, 1))
    {
@@ -139,14 +142,15 @@ int main (int argc, char *argv[])
 
       setBinMapF64(&bmc,">=",0.5);
       setupAcc(0);
+      pBPFD= aBPFD1;
       if (ENC_F64 == cux.enc)
       {
          LOG("***\nmkfAccGetBPFDSimple(%p) - \n", pBPFD);
          deltaT();
-         mkfAccGetBPFDSimple(aBPFD1, cux.pHU, cux.pHF, def, &bmc);
+         mkfAccGetBPFDSimple(pBPFD, cux.pHU, cux.pHF, def, &bmc);
          dt= deltaT();
-         pKBPFD= aBPFD1;
-         reportMeasures(pKBPFD, mScale, dt);
+         pKBPFD= pBPFD;
+         reportMeasures(pBPFD, mScale, dt);
       }
 
 #ifdef MKF_CUDA
@@ -156,7 +160,6 @@ int main (int argc, char *argv[])
       if (mkfCUDAGetBPFDautoCtx(&cux, def, &bmc, 0x00))
       {
          dt= deltaT();
-         //LOG("bc=%zu\n", bitCountNZ(cux.pHU, cux.bytesU/sizeof(size_t)));
          reportMeasures(pBPFD, mScale, dt);
          if (pKBPFD) { compareNZ(pBPFD, pKBPFD, MKF_BINS, 1); }
       } else { cudaDeviceReset(); }
@@ -183,7 +186,7 @@ int main (int argc, char *argv[])
          deltaT();
          mkfAccGetBPFDSimple(pBPFD, cux.pHU, cux.pHF, def, &bmc);
          dt= deltaT();
-         reportMeasures(aBPFD2, mScale, dt);
+         reportMeasures(pBPFD, mScale, dt);
          compareNZ(pKBPFD, pBPFD, MKF_BINS, 0x0);
       }
    }

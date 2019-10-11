@@ -4,19 +4,21 @@
 
 #include "ctUtil.h"
 
-void ctuInfo (void)
+
+int ctuInfo (void)
 {
    cudaError_t r;
-   cudaDeviceProp prop;
    int n=0, rv=0, dv=0;
 
    r= cudaRuntimeGetVersion(&rv);
    r= cudaDriverGetVersion(&dv);
-   LOG("----\ncuda runtimeV%d driverV%d\n----\n", rv, dv);
+   //LOG("----\ncuda runtimeV%d driverV%d\n----\n", rv, dv);
 
    r= cudaGetDeviceCount(&n);
+   /*
    for (int i= 0; i<n; i++)
    {
+      cudaDeviceProp prop;
       r= cudaGetDeviceProperties(&prop,i);
       if (0 == r)
       {
@@ -35,6 +37,8 @@ void ctuInfo (void)
          LOG("Map=%d Overlap=%d\n----\n", prop.canMapHostMemory, prop.deviceOverlap);
       }
    }
+   */
+   return(n);
 } // ctuInfo
 
 /*
@@ -123,7 +127,7 @@ void sanityTest (Context *pC)
    }
    LOG(" [%d]=%G\n", i, pC->pHF[i]);
 
-   printf("*e=%d*\n", e);
+   //printf("*e=%d*\n", e);
 } // sanityTest();
 #endif
 

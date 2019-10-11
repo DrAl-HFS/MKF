@@ -18,7 +18,7 @@ extern "C" {
 #define MKFCU_PROFILE_FAST (3)
 #define MKFCU_PROFILE_FLEX (2)
 
-int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
+size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
 
 //extern "C"
 int mkfCUDAGetBPFDautoCtx (Context *pC, const FieldDef def[3], const BinMapF64 *pMC, const int profile);

@@ -220,7 +220,7 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
 /***/
 
 extern "C"
-int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
+size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
 {
    const int blkD= BPFD_BLKD;
    const int nBlk= (pO->rowPairs + blkD-1) / blkD;
@@ -228,6 +228,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
    CTimerCUDA t;
    //t.stampStream();
    //LOG("\tsd= %u, %u\n", pO->rowWS, pO->planeWS);
+   if (NULL == pBPFD) { return(NULL); }
 
    switch (profile)
    {
@@ -276,7 +277,7 @@ int mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, cons
    }
    LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms());
    //cudaDeviceSynchronize();
-   return(MKF_BINS);
+   return(pBPFD);
 } // mkfCUDAGetBPFD
 
 extern "C"
@@ -332,13 +333,14 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
          r= cudaMalloc(&(pC->pDZ), pC->bytesZ);
          ctuErr(&r, "cudaMalloc()");
       }
-      if (pC->pDZ) { cudaMemset(pC->pDZ, 0, pC->bytesZ); }
    }
    if (pC->pDU && pC->pDZ)
    {
+      cudaMemset(pC->pDZ, 0, pC->bytesZ); // Kernel will add to BPFD so start clean
       mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, 2);
       if (pC->pHZ)
       {
+         LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHZ, pC->pDZ, pC->bytesZ);
          r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost);
          ctuErr(&r, "{mkfCUDAGetBPFD+} cudaMemcpy()");
       }
@@ -346,9 +348,8 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
    return(1);
 } // mkfCUDAGetBPFDautoCtx
 
-
+// Internal test code
 #ifdef MKF_CUDA_MAIN
-
 
 #include "geomHacks.h"
 #include "mkfUtil.h"

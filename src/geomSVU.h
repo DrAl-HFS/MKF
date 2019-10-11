@@ -26,6 +26,10 @@ extern int prodNI (const int v[], int n);
 
 extern int mergeMinMaxNI (int rMin[], int rMax[], const int minA[], const int maxA[], const int minB[], const int maxB[], const int n);
 
+/* size_t */
+
+extern size_t sumNZ (const size_t v[], size_t n); // Beware unsigned count!
+
 /* Hybrid */
 
 extern float *scaleFNI (float r[], const int n, const int v[], const float s);

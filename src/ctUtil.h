@@ -13,7 +13,7 @@ extern "C" {
 #endif
 
 
-extern void ctuInfo (void);
+extern int ctuInfo (void);
 
 extern int cuBuffAlloc (Context *pC, uint n);
 extern int cuBuffRelease (Context *pC);

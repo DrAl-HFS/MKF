@@ -35,12 +35,13 @@ extern int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float
 // Volume fraction
 extern float volFrac (const size_t hBPD[MKF_BINS]);
 
+#ifdef MKF_TEST
+
 extern float volFrac8 (const size_t hBPD[MKF_BINS]);
 
 extern void mkfuTest (int m);
 
-// DISPLACE - where ?
-extern size_t sumNZ (const size_t a[], const int n);
+#endif
 
 #ifdef __cplusplus
 } // extern "C"

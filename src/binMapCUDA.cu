@@ -472,6 +472,7 @@ BMPackWord *binMapCUDA
 {
    GridRegion reg;
 
+   if (NULL == pW) { return(NULL); }
    //if (32 != warpSize) { WARN("[binMapCUDA] warpSize=%d\n", warpSize); }
    if (reg.validate(pI))
    {
