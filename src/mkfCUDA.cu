@@ -218,6 +218,8 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
 } // addMultiPlaneSeqBPFD
 
 /***/
+// Global ptr to dev mem for lazy init hack
+static ULL *gpDevBPFD= NULL;
 
 extern "C"
 size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
@@ -228,7 +230,15 @@ size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW,
    CTimerCUDA t;
    //t.stampStream();
    //LOG("\tsd= %u, %u\n", pO->rowWS, pO->planeWS);
-   if (NULL == pBPFD) { return(NULL); }
+   if (NULL == pBPFD)
+   {  // Lazy init hack...
+      if (NULL == gpDevBPFD)
+      {
+         cudaMalloc(&(gpDevBPFD), sizeof(size_t)*MKF_BINS);
+         if (NULL == gpDevBPFD) { return(NULL); } // else...
+      }
+      pBPFD= (size_t*)gpDevBPFD;
+   }
 
    switch (profile)
    {
@@ -472,10 +482,10 @@ int main (int argc, char *argv[])
       //sanityTest(&cux);
       if (cux.pHF)
       {
-         BinMapF32 mc={0};//ENC_F32, 1,
+         BinMapF64 mc={0};//ENC_F32, 1,
          n= genPattern(NULL, cux.pHF, def, cux.enc, cux.nField, PAT_ID, param);
          LOG("genPattern(.. ENC_F32 ..) - n=%zu PCVF=%G\n", n, (float)n / cux.nElem);
-         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF32(&mc,">=",0.5), 0x00);
+         mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF64(&mc,">=",0.5), 0x00);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
          if (mkfMeasureBPFD(m, pBPFD, mScale, 0))

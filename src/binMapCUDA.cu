@@ -400,9 +400,10 @@ __device__ uint bitMergeWarp (uint w)
 
 /* KERNELS */
 
+//<T_Map>
 template <typename T_Elem>
 __global__ void mapField (BMPackWord rBM[], const CUDAFieldMap<T_Elem> f, const size_t n)
-{
+{  //
    const size_t i= blockIdx.x * blockDim.x + threadIdx.x;
    if (i < n)
    {
@@ -460,6 +461,7 @@ __global__ void mapStrideMultiField (BMPackWord rBM[], const CUDAOrg org, const 
 
 
 /* INTERFACE */
+static BMPackWord * gpDevW= NULL;
 
 extern "C"
 BMPackWord *binMapCUDA
@@ -472,7 +474,6 @@ BMPackWord *binMapCUDA
 {
    GridRegion reg;
 
-   if (NULL == pW) { return(NULL); }
    //if (32 != warpSize) { WARN("[binMapCUDA] warpSize=%d\n", warpSize); }
    if (reg.validate(pI))
    {
@@ -481,6 +482,16 @@ BMPackWord *binMapCUDA
 
       if ( setBMO(pO, reg.elemDef, pI->profID) )
       {
+         if (NULL == pW)
+         {
+            if (NULL == gpDevW)
+            {
+               cudaMalloc(&(gpDevW), sizeof(BMPackWord) * pO->planeWS * (pO->planePairs+1));
+               if (NULL == gpDevW) { return(NULL); } // else...
+            }
+            pW= gpDevW;
+         }
+
          if ((0 == pI->profID) && reg.collapsable() && (1 == reg.nField))
          {
             switch (pI->elemID)
