@@ -104,7 +104,7 @@ int compareNZ (const size_t u0[], const size_t u1[], const int n, const int flag
 void reportMeasures (const size_t a[256], const float mScale, const SMVal dts)
 {
    float m[4];
-   if (mkfMeasureBPFD(m, a, mScale, 0))
+   if (mkfMeasureBPFD(m, a, mScale, 4))
    {
       LOG(" K M S V: %G %G %G %G\t(%Gsec)\n", m[0], m[1], m[2], m[3], dts);
    }

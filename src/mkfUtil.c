@@ -78,35 +78,32 @@ static void addZMapU8 (size_t r[], const size_t vA[], const int nA, const uint8_
 
 int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID)
 {
-   switch (profID)
-   {
 #ifndef NO_REF_MEASURES
-      case 0 : return refMeasures(m, aBPFD, s); }
+   if (profID <= 4) { return refMeasures(m, aBPFD, s, profID);}
+   //else...
 #endif
-      default :
-      {
-         size_t t, rBPFD[CELL8_SYMM_GROUPS]={0,};
-         t= sumNZ(aBPFD, MKF_BINS);
+   {
+      size_t t, rBPFD[CELL8_SYMM_GROUPS]={0,};
+      t= sumNZ(aBPFD, MKF_BINS);
 #ifdef MKF_TEST
-         if (0x01 != c8sMap[1]) { c8sGetMap(c8sMap); } // Lazy init
-         //reportBytes(0,c8sMap,CELL8_PATTERNS);
-         //for (int i=0; i<CELL8_PATTERNS; i++) { printf("0x%02X,", c8sMap[i]); } printf("\n\n");
+      if (0x01 != c8sMap[1]) { c8sGetMap(c8sMap); } // Lazy init
+      //reportBytes(0,c8sMap,CELL8_PATTERNS);
+      //for (int i=0; i<CELL8_PATTERNS; i++) { printf("0x%02X,", c8sMap[i]); } printf("\n\n");
 #endif
-         addZMapU8(rBPFD, aBPFD, MKF_BINS, c8sMap);
-         m[0]= symK(rBPFD); // symMS(m+1, rBPFD);
-         m[3]= volFrac(aBPFD);
-         m[1]= m[2]= -1; // not yet defined
-         if ((t == sumNZ(rBPFD, CELL8_SYMM_GROUPS)) && (s > 0))
-         {
-            float rkV= 1.0 / (s * s * s * t); //sumNZ(rBPFD, CELL8_PATTERNS);
-            m[0]*= rkV;
-            //m[1]*= s;
-            //m[2]*= s * s;
-         }
-         return(1);
+      addZMapU8(rBPFD, aBPFD, MKF_BINS, c8sMap);
+      m[0]= symK(rBPFD); // symMS(m+1, rBPFD);
+      m[3]= volFrac(aBPFD);
+      m[1]= m[2]= -1; // not yet defined
+      if ((t == sumNZ(rBPFD, CELL8_SYMM_GROUPS)) && (s > 0))
+      {
+         float rkV= 1.0 / (s * s * s * t); //sumNZ(rBPFD, CELL8_PATTERNS);
+         m[0]*= rkV;
+         //m[1]*= s;
+         //m[2]*= s * s;
       }
+      return(2);
    }
-   return(0);
+   //return(0);
 } // mkfMeasureBPFD
 
 float volFrac (const size_t aBPFD[MKF_BINS])
