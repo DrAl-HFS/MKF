@@ -81,7 +81,7 @@ int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, con
    switch (profID)
    {
 #ifndef NO_REF_MEASURES
-      case 0 : return refMeasures(m, aBPFD, s);
+      case 0 : return refMeasures(m, aBPFD, s); }
 #endif
       default :
       {

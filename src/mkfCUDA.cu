@@ -218,8 +218,6 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
 } // addMultiPlaneSeqBPFD
 
 /***/
-// Global ptr to dev mem for lazy init hack
-static ULL *gpDevBPFD= NULL;
 
 extern "C"
 size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
@@ -230,65 +228,76 @@ size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW,
    CTimerCUDA t;
    //t.stampStream();
    //LOG("\tsd= %u, %u\n", pO->rowWS, pO->planeWS);
-   if (NULL == pBPFD)
-   {  // Lazy init hack...
-      if (NULL == gpDevBPFD)
-      {
-         cudaMalloc(&(gpDevBPFD), sizeof(size_t)*MKF_BINS);
-         if (NULL == gpDevBPFD) { return(NULL); } // else...
-      }
-      pBPFD= (size_t*)gpDevBPFD;
-   }
-
-   switch (profile)
+   if (pBPFD)
    {
-      case MKFCU_PROFILE_FAST :
-      {
-         dim3 grd(nBlk,pO->planePairs,1);
-         dim3 blk(blkD,1,1);
-         addMultiPlaneSeqBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, *pO);
-         if (0 != ctuErr(NULL, "addMultiPlaneSeqBPFD"))
-         { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW); }
-         break;
-      }
 
-      case MKFCU_PROFILE_FLEX :
+      switch (profile)
       {
-         dim3 grd(nBlk,pO->planePairs,1);
-         dim3 blk(blkD,1,1);
-         addPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, pW + pO->planeWS, *pO); //, pBPFD+256);
-         if (0 != ctuErr(NULL, "addPlaneBPFD"))
-         { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW, pW + pO->planeWS); }
-         break;
-      }
-
-      default :
-      {
-         for (int i= 0; i < pO->planePairs; i++)
+         case MKFCU_PROFILE_FAST :
          {
-            const BMPackWord *pP0= pW + i * pO->planeWS;
-            const BMPackWord *pP1= pW + (i+1) * pO->planeWS;
-            //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
-            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO); //, pBPFD+256);
-            if (0 != ctuErr(NULL, "addPlaneBPFD"))
-            { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+            dim3 grd(nBlk,pO->planePairs,1);
+            dim3 blk(blkD,1,1);
+            addMultiPlaneSeqBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, *pO);
+            if (0 != ctuErr(NULL, "addMultiPlaneSeqBPFD"))
+            { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW); }
+            break;
          }
-/*         const BMPackWord *pP0= pW;
-         const BMPackWord *pP1= pP0 + pO->planeWS;
 
-         for (int i= 0; i < pO->planePairs; i++)
+         case MKFCU_PROFILE_FLEX :
          {
-            addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO);
-            { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-            pP0= pP1; pP1+= pO->planeWS;
-         }*/
-         break;
+            dim3 grd(nBlk,pO->planePairs,1);
+            dim3 blk(blkD,1,1);
+            addPlaneBPFD<<<grd,blk>>>((ULL*)pBPFD, pW, pW + pO->planeWS, *pO); //, pBPFD+256);
+            if (0 != ctuErr(NULL, "addPlaneBPFD"))
+            { LOG(" .. <<<(%d,%d)(%d)>>>(%p, %p, %p ..)\n", grd.x, grd.y, blk.x, pBPFD, pW, pW + pO->planeWS); }
+            break;
+         }
+
+         default :
+         {
+            for (int i= 0; i < pO->planePairs; i++)
+            {
+               const BMPackWord *pP0= pW + i * pO->planeWS;
+               const BMPackWord *pP1= pW + (i+1) * pO->planeWS;
+               //LOG(" RP: %d %d*%d=0x%08X, %p, %p \n", rowStride, planeStride, sizeof(*pP0), planeStride*sizeof(*pP0), pP0, pP1);
+               addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO); //, pBPFD+256);
+               if (0 != ctuErr(NULL, "addPlaneBPFD"))
+               { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+            }
+   /*         const BMPackWord *pP0= pW;
+            const BMPackWord *pP1= pP0 + pO->planeWS;
+
+            for (int i= 0; i < pO->planePairs; i++)
+            {
+               addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO);
+               { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
+               pP0= pP1; pP1+= pO->planeWS;
+            }*/
+            break;
+         }
       }
+      LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms());
    }
-   LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms());
-   //cudaDeviceSynchronize();
    return(pBPFD);
 } // mkfCUDAGetBPFD
+
+// Global ptr to dev mem for lazy init hack
+static ULL *gpDevBPFD= NULL;
+#define BPFD_BYTES (sizeof(size_t)*MKF_BINS)
+
+extern "C"
+size_t * mkfCUDAGetBPFDH (size_t * pBPFDH, const BMOrg *pO, const BMPackWord * pW, const int profile)
+{
+   if (NULL == gpDevBPFD) { cudaMalloc(&(gpDevBPFD), BPFD_BYTES); }
+   if (gpDevBPFD)
+   {
+      cudaMemset(gpDevBPFD, 0, BPFD_BYTES); // Kernel will add to BPFD so start clean
+      mkfCUDAGetBPFD((size_t*)gpDevBPFD, pO, pW, profile);
+      cudaMemcpy(pBPFDH, gpDevBPFD, BPFD_BYTES, cudaMemcpyDeviceToHost);
+      return(pBPFDH);
+   }
+   return(NULL);
+} // mkfCUDAGetBPFDH
 
 extern "C"
 int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, const int profHack)
@@ -347,7 +356,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
    if (pC->pDU && pC->pDZ)
    {
       cudaMemset(pC->pDZ, 0, pC->bytesZ); // Kernel will add to BPFD so start clean
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, 2);
+      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, MKFCU_PROFILE_FAST);
       if (pC->pHZ)
       {
          LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHZ, pC->pDZ, pC->bytesZ);
