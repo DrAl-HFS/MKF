@@ -30,7 +30,7 @@ extern "C" {
 /***/
 // Compute measures on previously obtained Binary Pattern Distributions.
 
-extern int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID);
+extern int mkfMeasureBPFD (float m[4], char symCh[12], const size_t aBPFD[MKF_BINS], const float s, const int profID);
 
 // Volume fraction
 extern float volFrac (const size_t hBPD[MKF_BINS]);

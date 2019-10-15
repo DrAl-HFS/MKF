@@ -19,7 +19,7 @@
 //    Microstructures in Materials Science" pp.116-123,
 //    Wiley, ISBN-0471974862.
 
-#include "refMeasures.inc"
+#include "refMeasures.c"
 
 #endif
 
@@ -76,10 +76,10 @@ static void addZMapU8 (size_t r[], const size_t vA[], const int nA, const uint8_
 
 /***/
 
-int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, const int profID)
+int mkfMeasureBPFD (float m[4], char symCh[12], const size_t aBPFD[MKF_BINS], const float s, const int profID)
 {
 #ifndef NO_REF_MEASURES
-   if (profID <= 4) { return refMeasures(m, aBPFD, s, profID);}
+   if (profID <= 4) { return refMeasures(m, symCh, aBPFD, s, profID);}
    //else...
 #endif
    {
@@ -101,6 +101,7 @@ int mkfMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s, con
          //m[1]*= s;
          //m[2]*= s * s;
       }
+      memcpy(symCh,"Kv       Vv",12);
       return(2);
    }
    //return(0);
@@ -114,7 +115,7 @@ float volFrac (const size_t aBPFD[MKF_BINS])
       s[0]+= aBPFD[i];
       s[1]+= aBPFD[i+1];
    }
-   LOG_CALL("() - s[]={%zu, %zu} (%zu)\n", s[0], s[1], s[0]+s[1]);
+   //LOG_CALL("() - s[]={%zu, %zu} (%zu)\n", s[0], s[1], s[0]+s[1]);
    return( s[1] / (float)(s[0] + s[1]) );
 } // volFrac
 
