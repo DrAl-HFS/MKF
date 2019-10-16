@@ -201,7 +201,6 @@ int mkfAccGetBPFDSimple
 int mkfAccCUDAGetBPFD
 (
    size_t   rBPFD[MKF_BINS],  // Result (Binary Pattern Frequency Distribution)
-   BMPackWord        * pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
    const void        * pF,  // Scalar field (input) as opaque element type (see enc)
    const FieldDef    def[3],          // Definition (dimensions) of scalar field
    const NumEnc       enc,    // elemnt type
@@ -213,6 +212,7 @@ int mkfAccCUDAGetBPFD
    acc_set_device_type( acc_device_nvidia ); // HACKY
    if (acc_device_nvidia == acc_get_device_type())
    {
+      BMPackWord * pW;
       BMOrg bmo;
       const size_t nF= prodNI(def,3);
       const size_t nBM= setBMO(&bmo, def, 0); //(planeStride * def[2])
@@ -221,7 +221,7 @@ int mkfAccCUDAGetBPFD
 
       // allocated via OpenACC for CUDA access to array/field data (others passed to
       // kernels using API "value parameter auto-marshalling" into const memory)
-      LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
+      //LOG("mkfAccCUDAGetBPFD() - sizeof(BMFieldInfo)=%d\n", sizeof(BMFieldInfo));
       fi.fieldTableMask=  0x01;
       fi.elemID= enc;
       //fi.opr=
@@ -229,46 +229,43 @@ int mkfAccCUDAGetBPFD
       fi.pD= def;
       //fi.pS= NULL; // auto stride
       fi.pFieldDevPtrTable= table;
-      #pragma acc data present_or_create( pW[:nBM] ) copy( rBPFD[:MKF_BINS] )
+      switch(enc)
       {
-         switch(enc)
+         case ENC_F32 :
          {
-            case ENC_F32 :
+            const float * restrict pF32= (const float *)pF;
+            #pragma acc data present_or_copyin( pF32[:nF] )
             {
-               const float * restrict pF32= (const float *)pF;
-               #pragma acc data present_or_copyin( pF32[:nF] )
+               #pragma acc host_data use_device( pF32 ) // get OpenACC device memory pointers
                {
-                  #pragma acc host_data use_device( rBPFD, pW, pF32 ) // get OpenACC device memory pointers
+                  table[0].pF32= pF32;
+                  if (pW= binMapCUDA(NULL, NULL, &bmo, &fi, pM))
                   {
-                     table[0].pF32= pF32;
-                     if (binMapCUDA(pW, &bmo, &fi, pM))
-                     {
-                        r= mkfCUDAGetBPFD(rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
-                     }
+                     r= mkfCUDAGetBPFDH(NULL, rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
                   }
                }
-               break;
-            } // case ENC_F32
+            }
+            break;
+         } // case ENC_F32
 
-            case ENC_F64 :
+         case ENC_F64 :
+         {
+            const double * restrict pF64= (const double *)pF;
+            #pragma acc data present_or_copyin( pF64[:nF] )
             {
-               const double * restrict pF64= (const double *)pF;
-               #pragma acc data present_or_copyin( pF64[:nF] )
+               #pragma acc host_data use_device( pF64 ) // get OpenACC device memory pointers
                {
-                  #pragma acc host_data use_device( rBPFD, pW, pF64 ) // get OpenACC device memory pointers
+                  table[0].pF64= pF64;
+                  if (pW= binMapCUDA(NULL, NULL, &bmo, &fi, pM))
                   {
-                     table[0].pF64= pF64;
-                     if (binMapCUDA(pW, &bmo, &fi, pM))
-                     {
-                        r= mkfCUDAGetBPFD(rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
-                     }
+                     r= mkfCUDAGetBPFDH(NULL, rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
                   }
                }
-               break;
-            } // case ENC_F64
+            }
+            break;
+         } // case ENC_F64
 
-         } // switch
-      } // #pragma acc data
+      } // switch
    }
    return(r);
 } // mkfAccCUDAGetBPFD

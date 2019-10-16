@@ -37,7 +37,6 @@ extern int mkfAccGetBPFDSimple
 extern int mkfAccCUDAGetBPFD
 (
    size_t     rBPFD[MKF_BINS],
-   BMPackWord        * pW,
    const void        * pF, // NB - opaque ("punned") element type!
    const FieldDef    def[3],
    const NumEnc       enc,

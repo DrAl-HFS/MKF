@@ -21,6 +21,11 @@
 
 #include "refMeasures.c"
 
+// Other references:
+// Serra J, (1983) "Image Analysis and Mathematical Morphology, Volume 1"
+//    Academic Press (London)
+// Matheron G. (1967) "Elements pour une Theorie des Milieux Poreux"
+//    Masson et Cie. (Paris)
 #endif
 
 // Topological (total curvature) measure weights
@@ -31,7 +36,7 @@ static const int8_t gWK[CELL8_SYMM_GROUPS]=
    -3, -8, -3, -12, -6, 0, 3,
    0
 };
-// Mapping from BPFD to symmetry groups
+// Mapping from BPFD to symmetry groups i.e. the group index for each possible pattern
 static uint8_t c8sMap[CELL8_PATTERNS]=
 {
    0x00,0x01,0x01,0x02,0x01,0x02,0x03,0x05,0x01,0x03,0x02,0x05,0x02,0x05,0x05,0x08,
@@ -52,7 +57,7 @@ static uint8_t c8sMap[CELL8_PATTERNS]=
    0x08,0x10,0x10,0x13,0x10,0x13,0x12,0x14,0x10,0x12,0x13,0x14,0x13,0x14,0x14,0x15
 };
 
-//int refMeasures (float m[4], const size_t aBPFD[MKF_BINS], const float s) { ... }
+
 
 /***/
 
@@ -62,7 +67,6 @@ double symK (const size_t rBPFD[CELL8_SYMM_GROUPS])
    for (int i= 0; i<CELL8_SYMM_GROUPS; i++) { k+= gWK[i] * (signed)rBPFD[i]; }
    return( (double) k * M_PI / 6 );
 } // symK
-
 
 static void addZMapU8 (size_t r[], const size_t vA[], const int nA, const uint8_t map[])
 {
@@ -76,10 +80,19 @@ static void addZMapU8 (size_t r[], const size_t vA[], const int nA, const uint8_
 
 /***/
 
-int mkfMeasureBPFD (float m[4], char symCh[12], const size_t aBPFD[MKF_BINS], const float s, const int profID)
+void mkfRefMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s)
 {
 #ifndef NO_REF_MEASURES
-   if (profID <= 4) { return refMeasures(m, symCh, aBPFD, s, profID);}
+   refMeasures(m,aBPFD,s);
+#endif
+} // mkfRefMeasureBPFD
+
+//const char *mkfGetRefML (void) { return MKF_REFML; }
+
+int mkfSelectMeasuresBPFD (float m[4], char symCh[12], const size_t aBPFD[MKF_BINS], const float s, const int id)
+{
+#ifndef NO_REF_MEASURES
+   if (id <= 4) { return selectRefMeasures(m, symCh, aBPFD, s, id);}
    //else...
 #endif
    {
@@ -105,7 +118,7 @@ int mkfMeasureBPFD (float m[4], char symCh[12], const size_t aBPFD[MKF_BINS], co
       return(2);
    }
    //return(0);
-} // mkfMeasureBPFD
+} // mkfSelectMeasuresBPFD
 
 float volFrac (const size_t aBPFD[MKF_BINS])
 {

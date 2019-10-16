@@ -19,10 +19,10 @@ extern "C" {
 #define MKFCU_PROFILE_FLEX (2)
 
 // Device pointers: pBPFD, pW
-size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
+size_t * mkfCUDAGetBPFD (KernInfo * pK, size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
 
 // Host result address
-size_t * mkfCUDAGetBPFDH (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
+size_t * mkfCUDAGetBPFDH (KernInfo * pK, size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
 
 //extern "C"
 int mkfCUDAGetBPFDautoCtx (Context *pC, const FieldDef def[3], const BinMapF64 *pMC, const int profile);

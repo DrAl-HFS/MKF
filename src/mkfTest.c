@@ -105,7 +105,7 @@ void reportMeasures (const size_t a[256], const float mScale, const SMVal dts)
 {
    float m[4];
    char s[16]; s[13]= 0;
-   if (mkfMeasureBPFD(m, s, a, mScale, 4))
+   if (mkfSelectMeasuresBPFD(m, s, a, mScale, 4))
    {
       LOG(" %s: %G %G %G %G\t(%Gsec)\n", s, m[0], m[1], m[2], m[3], dts);
    }
@@ -168,7 +168,7 @@ int main (int argc, char *argv[])
       pBPFD= aBPFD2;
       LOG("***\nMKF_ACC_CUDA_INTEROP: mkfAccCUDAGetBPFD(%p) - \n", pBPFD);
       deltaT();
-      if (mkfAccCUDAGetBPFD(pBPFD, cux.pHU, cux.pHF, def, cux.enc, &bmc))
+      if (mkfAccCUDAGetBPFD(pBPFD, cux.pHF, def, cux.enc, &bmc))
       {
          dt= deltaT();
          reportMeasures(pBPFD, mScale, dt);

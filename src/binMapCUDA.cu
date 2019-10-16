@@ -6,8 +6,9 @@
 #include "utilCUDA.hpp"
 
 //#define NO_WLP
-//#define MERGE32_SAFE
-
+#ifdef NO_WLP
+#define MERGE32_SAFE
+#endif
 
 #define VT_WRDS 5
 #define VT_WRDN (1<<VT_WRDS)
@@ -466,6 +467,7 @@ static BMPackWord * gpDevW= NULL;
 extern "C"
 BMPackWord *binMapCUDA
 (
+   KernInfo * pK,
    BMPackWord  * pW,
    BMOrg       * pO,
    const BMFieldInfo * pI,
@@ -576,7 +578,8 @@ BMPackWord *binMapCUDA
                pID= "nRows*mapField()"; break;
             }
          }
-         LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.blkDefColl(), t.elapsedms());
+         if (pK) { pK->dt[0]= t.elapsedms(); }
+         else { LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.blkDefColl(), t.elapsedms()); }
          if (0 == ctuErr(NULL, pID)) { return(pW); }
       }
    }

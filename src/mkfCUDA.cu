@@ -219,18 +219,26 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
 
 /***/
 
+/* HOWTO: Enque dependant jobs
+   cudaStreamCreate( sk1, sk2 );
+   cudaEventCreate( e[N] );
+   for (i=0; i<N; i++)
+   {
+      k1<<<... sk1 >>>(...);
+      cudaEventRecord(e[i], sk1);
+      cudaStreamWaitEvent(sk2, e[i], 0);
+      k2<<<... sk2 >>>(...);
+   }
+*/
 extern "C"
-size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
+size_t * mkfCUDAGetBPFD (KernInfo *pK, size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
 {
    const int blkD= BPFD_BLKD;
    const int nBlk= (pO->rowPairs + blkD-1) / blkD;
-
-   CTimerCUDA t;
-   //t.stampStream();
    //LOG("\tsd= %u, %u\n", pO->rowWS, pO->planeWS);
    if (pBPFD)
    {
-
+      CTimerCUDA t;//t.stampStream();
       switch (profile)
       {
          case MKFCU_PROFILE_FAST :
@@ -264,19 +272,11 @@ size_t * mkfCUDAGetBPFD (size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW,
                if (0 != ctuErr(NULL, "addPlaneBPFD"))
                { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
             }
-   /*         const BMPackWord *pP0= pW;
-            const BMPackWord *pP1= pP0 + pO->planeWS;
-
-            for (int i= 0; i < pO->planePairs; i++)
-            {
-               addPlaneBPFD<<<nBlk,blkD>>>((ULL*)pBPFD, pP0, pP1, *pO);
-               { LOG(" .. <<<%d,%d>>>(%p, %p, %p ..)\n", nBlk, blkD, pBPFD, pP0, pP1); }
-               pP0= pP1; pP1+= pO->planeWS;
-            }*/
             break;
          }
       }
-      LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms());
+      if (pK) { pK->dt[1]= t.elapsedms(); }
+      else { LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms()); }
    }
    return(pBPFD);
 } // mkfCUDAGetBPFD
@@ -286,13 +286,13 @@ static ULL *gpDevBPFD= NULL;
 #define BPFD_BYTES (sizeof(size_t)*MKF_BINS)
 
 extern "C"
-size_t * mkfCUDAGetBPFDH (size_t * pBPFDH, const BMOrg *pO, const BMPackWord * pW, const int profile)
+size_t * mkfCUDAGetBPFDH (KernInfo *pK, size_t * pBPFDH, const BMOrg *pO, const BMPackWord * pW, const int profile)
 {
    if (NULL == gpDevBPFD) { cudaMalloc(&(gpDevBPFD), BPFD_BYTES); }
    if (gpDevBPFD)
    {
       cudaMemset(gpDevBPFD, 0, BPFD_BYTES); // Kernel will add to BPFD so start clean
-      mkfCUDAGetBPFD((size_t*)gpDevBPFD, pO, pW, profile);
+      mkfCUDAGetBPFD(pK, (size_t*)gpDevBPFD, pO, pW, profile);
       cudaMemcpy(pBPFDH, gpDevBPFD, BPFD_BYTES, cudaMemcpyDeviceToHost);
       return(pBPFDH);
    }
@@ -330,7 +330,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
          ConstFieldPtr fieldPtr[BMCU_FIELD_MAX];
          BMFieldInfo fi;
          setupFields(&fi, autoFieldPtr(fieldPtr, pC), pC->nField, def, pC->bytesElem, profHack);
-         if (NULL == binMapCUDA(pC->pDU, &(pC->bmo), &fi, pM))
+         if (NULL == binMapCUDA(NULL, pC->pDU, &(pC->bmo), &fi, pM))
          {
             LOG("\tpC= %p; pC->pDF= %p; &(pC->pDF)= %p\n\tpFDPT= %p; pFDPT->p= %p\n", pC, pC->pDF, &(pC->pDF),
                fi.pFieldDevPtrTable, fi.pFieldDevPtrTable->p);
@@ -356,7 +356,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
    if (pC->pDU && pC->pDZ)
    {
       cudaMemset(pC->pDZ, 0, pC->bytesZ); // Kernel will add to BPFD so start clean
-      mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, MKFCU_PROFILE_FAST);
+      mkfCUDAGetBPFD(NULL, (size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, MKFCU_PROFILE_FAST);
       if (pC->pHZ)
       {
          LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHZ, pC->pDZ, pC->bytesZ);
@@ -458,7 +458,7 @@ size_t mkftu (const Context *pC, const int def[3], const float mScale, const uin
 
    r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
    r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
-   mkfCUDAGetBPFD((size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, profHack);
+   mkfCUDAGetBPFD(NULL, (size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, profHack);
    r= cudaMemcpy(pC->pHZ, pC->pDZ, pC->bytesZ, cudaMemcpyDeviceToHost); ctuErr(&r, "cudaMemcpy(pHZ, pDZ)");
 
    const size_t *pBPFD= (size_t*)pC->pHZ;
@@ -468,10 +468,9 @@ size_t mkftu (const Context *pC, const int def[3], const float mScale, const uin
       sum+= pBPFD[i];
       if (verbose && (pBPFD[i] > 0)) { LOG("[0x%X]=%u\n", i, pBPFD[i]); }
    }
-   if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
-   {
-      LOG("\tID%d: S=%zu\tK M S V: %G %G %G %G\n", profHack, sum, m[0],m[1],m[2],m[3]);
-   }
+   mkfRefMeasureBPFD(m, pBPFD, mScale);
+   LOG("\tID%d: S=%zu\t%s: %G %G %G %G\n", profHack, sum, MKF_REFML, m[0],m[1],m[2],m[3]);
+
    return(sum);
 } // mkftu
 
@@ -483,6 +482,7 @@ int main (int argc, char *argv[])
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
    size_t n;
+   char s[16];
 
    if (buffAlloc(&cux, def, ENC_F32, 0x03))
    {
@@ -497,9 +497,9 @@ int main (int argc, char *argv[])
          mkfCUDAGetBPFDautoCtx(&cux, def, setBinMapF64(&mc,">=",0.5), 0x00);
          const size_t *pBPFD= (size_t*)(cux.pHZ);
          float m[4];
-         if (mkfMeasureBPFD(m, pBPFD, mScale, 0))
+         if (mkfSelectMeasuresBPFD(m, s, pBPFD, mScale, 2))
          {
-            LOG("\t[F]:\tK M S V: %G %G %G %G\n", m[0],m[1],m[2],m[3]);
+            LOG("\t[F]:\t%s: %G %G %G %G\n", s, m[0],m[1],m[2],m[3]);
             LOG("\tbitCountNU32()=%zu\n", bitCountNU32(cux.pHU, cux.nU));
          }
       }
