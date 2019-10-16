@@ -24,8 +24,11 @@ size_t * mkfCUDAGetBPFD (KernInfo * pK, size_t * pBPFD, const BMOrg *pO, const B
 // Host result address
 size_t * mkfCUDAGetBPFDH (KernInfo * pK, size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile);
 
-//extern "C"
+// Original test code now deprecated
 int mkfCUDAGetBPFDautoCtx (Context *pC, const FieldDef def[3], const BinMapF64 *pMC, const int profile);
+
+// Dispose of resources
+void mkfCUDACleanup (void);
 
 #ifdef __cplusplus
 } // extern "C"

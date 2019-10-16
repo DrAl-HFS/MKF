@@ -578,10 +578,16 @@ BMPackWord *binMapCUDA
                pID= "nRows*mapField()"; break;
             }
          }
-         if (pK) { pK->dt[0]= t.elapsedms(); }
+         if (pK) { pK->dtms[0]= t.elapsedms(); }
          else { LOG("binMapCUDA() - %s<<<%u>>>() - dt= %Gms\n", pID, reg.blkDefColl(), t.elapsedms()); }
          if (0 == ctuErr(NULL, pID)) { return(pW); }
       }
    }
    return(NULL);
 } // binMapCUDA
+
+extern "C"
+void binMapCUDACleanup (void)
+{
+   if (gpDevW) { cudaFree(gpDevW); gpDevW= NULL; }
+} // binMapCUDACleanup

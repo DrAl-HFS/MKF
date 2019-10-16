@@ -275,7 +275,7 @@ size_t * mkfCUDAGetBPFD (KernInfo *pK, size_t * pBPFD, const BMOrg *pO, const BM
             break;
          }
       }
-      if (pK) { pK->dt[1]= t.elapsedms(); }
+      if (pK) { pK->dtms[1]= t.elapsedms(); }
       else { LOG("mkfCUDAGetBPFD() - dt= %Gms\n", t.elapsedms()); }
    }
    return(pBPFD);
@@ -330,7 +330,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
          ConstFieldPtr fieldPtr[BMCU_FIELD_MAX];
          BMFieldInfo fi;
          setupFields(&fi, autoFieldPtr(fieldPtr, pC), pC->nField, def, pC->bytesElem, profHack);
-         if (NULL == binMapCUDA(NULL, pC->pDU, &(pC->bmo), &fi, pM))
+         if (NULL == binMapCUDA(&(pC->ki), pC->pDU, &(pC->bmo), &fi, pM))
          {
             LOG("\tpC= %p; pC->pDF= %p; &(pC->pDF)= %p\n\tpFDPT= %p; pFDPT->p= %p\n", pC, pC->pDF, &(pC->pDF),
                fi.pFieldDevPtrTable, fi.pFieldDevPtrTable->p);
@@ -356,7 +356,7 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
    if (pC->pDU && pC->pDZ)
    {
       cudaMemset(pC->pDZ, 0, pC->bytesZ); // Kernel will add to BPFD so start clean
-      mkfCUDAGetBPFD(NULL, (size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, MKFCU_PROFILE_FAST);
+      mkfCUDAGetBPFD(&(pC->ki), (size_t*)(pC->pDZ), &(pC->bmo), pC->pDU, MKFCU_PROFILE_FAST);
       if (pC->pHZ)
       {
          LOG("cudaMemcpy(%p, %p, %u)\n", pC->pHZ, pC->pDZ, pC->bytesZ);
@@ -366,6 +366,12 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
    }
    return(1);
 } // mkfCUDAGetBPFDautoCtx
+
+extern "C"
+void mkfCUDACleanup (void)
+{
+   if (gpDevBPFD) { cudaFree(gpDevBPFD); gpDevBPFD= NULL; }
+}
 
 // Internal test code
 #ifdef MKF_CUDA_MAIN

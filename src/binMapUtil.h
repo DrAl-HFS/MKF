@@ -82,26 +82,31 @@ typedef struct
 /***/
 
 // Define map (comparison operator) using a string
-extern BinMapF64 *setBinMapF64 (BinMapF64 *pBM64, const char relopChars[], const float t);
+BinMapF64 *setBinMapF64 (BinMapF64 *pBM64, const char relopChars[], const float t);
 //extern BinMapF32 *setBinMapF32 (BinMapF32 *pBM32, const char relopChars[], const float t);
 
-extern size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
+size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
 
-extern int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD);
+int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD);
 
-extern int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask);
+int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask);
 
-extern int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
+int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
 
 // Generate n stride values from definition and base stride, skipping some if required.
 // Returns number generated (zero for bad inputs)
-extern int genStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, FieldStride stride);
+int genStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, FieldStride stride);
 
-extern int copyOrGenStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, const FieldStride *pS);
+int copyOrGenStride (FieldStride fs[], const int n, const int start, const FieldDef *pD, const FieldStride *pS);
 
 // HACKY REFACTORING #include "ctUtil.h"
 
 #define BMCU_FIELD_MAX 4   // Number of fields actually supported
+
+typedef struct
+{  // Hacky perf/debug info
+   float dtms[2];
+} KernInfo;
 
 typedef struct
 {
@@ -114,13 +119,14 @@ typedef struct
    BMPackWord  *pDU, *pHU;
    void *pDZ, *pHZ;
    BMOrg bmo;
+   KernInfo ki;
 } Context;
 
-extern ConstFieldPtr *asFieldTab (const void **pp, const NumEnc id);
+ConstFieldPtr *asFieldTab (const void **pp, const NumEnc id);
 
-extern const BMFieldInfo *setupFields (BMFieldInfo *pI, void **ppF, const int nF, const int def[3], const int elemBytes, const int profile);
+const BMFieldInfo *setupFields (BMFieldInfo *pI, void **ppF, const int nF, const int def[3], const int elemBytes, const int profile);
 
-extern void **autoFieldPtr (ConstFieldPtr ptr[BMCU_FIELD_MAX], const Context *pC);
+void **autoFieldPtr (ConstFieldPtr ptr[BMCU_FIELD_MAX], const Context *pC);
 
 
 #ifdef __cplusplus

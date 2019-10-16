@@ -12,11 +12,6 @@
 extern "C" {
 #endif
 
-typedef struct
-{  // Hacky perf/debug info
-   float dt[2];
-} KernInfo;
-
 BMPackWord *binMapCUDA
 (
    KernInfo * pK, // optional
@@ -25,6 +20,8 @@ BMPackWord *binMapCUDA
    const BMFieldInfo * pF,
    const BinMapF64   * pM
 );
+
+void binMapCUDACleanup (void);
 
 #ifdef __cplusplus
 } // extern "C"

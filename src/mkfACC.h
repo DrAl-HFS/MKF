@@ -22,7 +22,7 @@ extern "C" {
 //    no sub-buffering of intermediate data (simple non-overlapped processing),
 //    no strided access (i.e. planar only, no region-of-interest or borders).
 // *NB - OpenAcc GPU acceleration DOES NOT WORK on this code for reasons yet to be determined.
-extern int mkfAccGetBPFDSimple
+int mkfAccGetBPFDSimple
 (
    size_t   rBPFD[MKF_BINS],   // Result (Binary Pattern Frequency Distribution)
    BMPackWord * restrict pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
@@ -34,7 +34,7 @@ extern int mkfAccGetBPFDSimple
 #ifdef MKF_ACC_CUDA_INTEROP
 
 // Launch CUDA kernels to process OpenACC buffers - more features avail...
-extern int mkfAccCUDAGetBPFD
+int mkfAccCUDAGetBPFD
 (
    size_t     rBPFD[MKF_BINS],
    const void        * pF, // NB - opaque ("punned") element type!
