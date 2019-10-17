@@ -5,26 +5,9 @@
 #include "mkfACC.h"
 #include "mkfCUDA.h"
 #include "geomHacks.h"
-#ifdef __PGI
-#include <openacc.h> // -> /opt/pgi/linux86-64/2019/include/openacc.h
-// PGI: _DEF_OPENACC
-// GNU: _OPENACC_H
-#define OPEN_ACC_API
-#endif
 
 /***/
 
-int setupAcc (int id)
-{  // Only multicore acceleration works presently: GPU produces garbage...
-   int r=-1;
-#ifdef OPEN_ACC_API
-   if (1 == id) { id= acc_device_nvidia; } else { id= acc_device_host; }
-   acc_set_device_type( id );
-   r= acc_get_device_type();
-   LOG_CALL("() - acc_set_device_type( * ) - 0x%X -> %d\n", "", id, r);
-#endif
-   return(r);
-} // setupAcc
 
 B32 buffAlloc (Context *pC, const int def[3], const NumEnc e, const int n)
 {

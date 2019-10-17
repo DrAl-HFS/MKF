@@ -1,6 +1,6 @@
 // binMapUtil.h - packed binary map general utility code.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June 2019
+// (c) Project Contributors June-October 2019
 
 #ifndef BIN_MAP_UTIL_H
 #define BIN_MAP_UTIL_H

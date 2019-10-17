@@ -15,6 +15,8 @@ extern "C" {
 
 /***/
 
+int setupAcc (int id); // 1=NVIDIA, 0=multicore
+
 // Original version for reference / testing, can be used for host side computation* but features
 // are presently limited:
 //    no polymorphism,
@@ -22,7 +24,7 @@ extern "C" {
 //    no sub-buffering of intermediate data (simple non-overlapped processing),
 //    no strided access (i.e. planar only, no region-of-interest or borders).
 // *NB - OpenAcc GPU acceleration DOES NOT WORK on this code for reasons yet to be determined.
-int mkfAccGetBPFDSimple
+Bool32 mkfAccGetBPFDSimple
 (
    size_t   rBPFD[MKF_BINS],   // Result (Binary Pattern Frequency Distribution)
    BMPackWord * restrict pW,  // Intermediate data (packed bitmap - result of binarising scalar field)
@@ -34,7 +36,7 @@ int mkfAccGetBPFDSimple
 #ifdef MKF_ACC_CUDA_INTEROP
 
 // Launch CUDA kernels to process OpenACC buffers - more features avail...
-int mkfAccCUDAGetBPFD
+Bool32 mkfAccCUDAGetBPFD
 (
    size_t     rBPFD[MKF_BINS],
    const void        * pF, // NB - opaque ("punned") element type!

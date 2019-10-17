@@ -4,6 +4,13 @@
 
 #include "mkfACC.h"
 
+#ifdef __PGI
+#include <openacc.h> // -> /opt/pgi/linux86-64/2019/include/openacc.h
+// PGI: _DEF_OPENACC
+// GNU: _OPENACC_H
+#define OPEN_ACC_API
+#endif
+
 #ifndef ACC_INLINE
 #define ACC_INLINE
 #endif
@@ -146,7 +153,19 @@ ACC_INLINE void addRowBPFD
 
 /***/
 
-int mkfAccGetBPFDSimple
+int setupAcc (int id)
+{  // Only multicore acceleration works presently: GPU produces garbage...
+   int r=-1;
+#ifdef OPEN_ACC_API
+   if (1 == id) { id= acc_device_nvidia; } else { id= acc_device_host; }
+   acc_set_device_type( id );
+   r= acc_get_device_type();
+   LOG_CALL("() - acc_set_device_type( * ) - 0x%X -> %d\n", "", id, r);
+#endif
+   return(r);
+} // setupAcc
+
+Bool32 mkfAccGetBPFDSimple
 (
    size_t   rBPFD[MKF_BINS],
    BMPackWord * restrict pW,
@@ -188,26 +207,26 @@ int mkfAccGetBPFDSimple
          }
       }
    }
-   return(1);
+   return(TRUE);
 } // mkfAccGetBPFDSimple
 
 #ifdef MKF_ACC_CUDA_INTEROP
 
-#include <openacc.h> // -> /opt/pgi/linux86-64/2019/include/openacc.h
+//include <openacc.h> // -> /opt/pgi/linux86-64/2019/include/openacc.h
 
 #include "mkfCUDA.h"
 //#include "binMapCUDA.h"
 
-int mkfAccCUDAGetBPFD
+Bool32 mkfAccCUDAGetBPFD
 (
    size_t   rBPFD[MKF_BINS],  // Result (Binary Pattern Frequency Distribution)
    const void        * pF,  // Scalar field (input) as opaque element type (see enc)
    const FieldDef    def[3],          // Definition (dimensions) of scalar field
-   const NumEnc       enc,    // elemnt type
+   const NumEnc       enc,    // element type
    const MKFAccBinMap * pM
 )
 {
-   int r= 0;
+   void *p= NULL;
 
    acc_set_device_type( acc_device_nvidia ); // HACKY
    if (acc_device_nvidia == acc_get_device_type())
@@ -241,7 +260,7 @@ int mkfAccCUDAGetBPFD
                   table[0].pF32= pF32;
                   if (pW= binMapCUDA(NULL, NULL, &bmo, &fi, pM))
                   {
-                     r= mkfCUDAGetBPFDH(NULL, rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
+                     p= mkfCUDAGetBPFDH(NULL, rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
                   }
                }
             }
@@ -258,7 +277,7 @@ int mkfAccCUDAGetBPFD
                   table[0].pF64= pF64;
                   if (pW= binMapCUDA(NULL, NULL, &bmo, &fi, pM))
                   {
-                     r= mkfCUDAGetBPFDH(NULL, rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
+                     p= mkfCUDAGetBPFDH(NULL, rBPFD, &bmo, pW, MKFCU_PROFILE_FAST);
                   }
                }
             }
@@ -267,7 +286,7 @@ int mkfAccCUDAGetBPFD
 
       } // switch
    }
-   return(r);
+   return(NULL != p);
 } // mkfAccCUDAGetBPFD
 
 #endif // MKF_ACC_CUDA_INTEROP
