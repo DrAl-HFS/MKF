@@ -155,12 +155,12 @@ ACC_INLINE void addRowBPFD
 
 int setupAcc (int id)
 {  // Only multicore acceleration works presently: GPU produces garbage...
-   int r=-1;
+   int t, r=-1;
 #ifdef OPEN_ACC_API
-   if (1 == id) { id= acc_device_nvidia; } else { id= acc_device_host; }
-   acc_set_device_type( id );
+   if (1 == id) { t= acc_device_nvidia; } else { t= acc_device_host; }
+   acc_set_device_type( t );
    r= acc_get_device_type();
-   LOG_CALL("() - acc_set_device_type( * ) - 0x%X -> %d\n", "", id, r);
+   LOG_CALL("(%d) - acc_*_device_type() - %d -> %d\n", id, t, r);
 #endif
    return(r);
 } // setupAcc
