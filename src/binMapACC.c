@@ -56,19 +56,28 @@ void binMapNF32G (BMPackWord * restrict pW, const MKFAccScalar * restrict pF, co
    }
 } // binMapNF32G
 
-#pragma acc routine vector
+//#pragma acc routine vector
 void binMapAcc (BMPackWord * restrict pW, const MKFAccScalar * restrict pF, const size_t nF, const MKFAccBinMap *pM)
-{
-   const size_t nB= nF>>5; // NB: truncates non multiple of 32!
-   #pragma acc data present( pW[:nB], pF[:nF], pM[:1] )
+{  // collapsable fields (rowLen%32 == 0) only!
+   const size_t nW= nF>>5; // NB: truncates non multiple of 32!
+   #pragma acc data present( pW[:nW], pF[:nF], pM[:1] )
    {
-      #pragma acc loop vector
-      for (size_t i= 0; i < nB; i++)
-      { //
-         U32 b= 0;
-         #pragma acc loop seq
-         for (int j= 0; j < 32; j++) { b|= binMap(pF[(i*32)+j], pM) << j; }
-         pW[i]= b;
+      #pragma acc parallel loop
+      for (size_t i= 0; i < nW; i++)
+      {
+         U32 w= 0;
+#if 0
+         U32 v[32];
+         #pragma acc parallel loop vector
+         for (int j= 0; j < 32; j++) { v[j]= binMap(pF[(i*32)+j], pM) << j; }
+
+         #pragma acc parallel reduction(+: w )
+         for (int j= 0; j < 32; j++) { w += v[j]; }
+#else
+         //#pragma acc reduction(+: w )
+         for (int j= 0; j < 32; j++) { w += binMap(pF[(i*32)+j], pM) << j; }
+#endif
+         pW[i]= w;
       }
    }
 } // binMapAcc
