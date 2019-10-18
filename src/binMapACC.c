@@ -62,19 +62,19 @@ void binMapAcc (BMPackWord * restrict pW, const MKFAccScalar * restrict pF, cons
    const size_t nW= nF>>5; // NB: truncates non multiple of 32!
    #pragma acc data present( pW[:nW], pF[:nF], pM[:1] )
    {
-      #pragma acc parallel loop
+      //U32 v[32], w;
+      #pragma acc parallel loop //private(v,w)
       for (size_t i= 0; i < nW; i++)
       {
-         U32 w= 0;
 #if 0
-         U32 v[32];
-         #pragma acc parallel loop vector
+         #pragma acc loop vector
          for (int j= 0; j < 32; j++) { v[j]= binMap(pF[(i*32)+j], pM) << j; }
 
-         #pragma acc parallel reduction(+: w )
+         #pragma acc loop reduction(+: w )
          for (int j= 0; j < 32; j++) { w += v[j]; }
 #else
-         //#pragma acc reduction(+: w )
+         U32 w= 0;
+         #pragma acc loop reduction(+: w )
          for (int j= 0; j < 32; j++) { w += binMap(pF[(i*32)+j], pM) << j; }
 #endif
          pW[i]= w;
