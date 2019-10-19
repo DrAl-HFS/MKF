@@ -80,8 +80,8 @@ size_t setBMO (BMOrg *pO, const int def[3], const char profID)
       pO->rowWS=   rowStride;
       pO->planeWS= planeStride;
    }
-   return((size_t)planeStride * maxPlane);
-} // setBMSD
+   return((size_t)planeStride * maxPlane); // Buffer stride
+} // setBMO
 
 int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD)
 {

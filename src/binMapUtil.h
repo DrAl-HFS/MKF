@@ -85,6 +85,7 @@ typedef struct
 BinMapF64 *setBinMapF64 (BinMapF64 *pBM64, const char relopChars[], const float t);
 //extern BinMapF32 *setBinMapF32 (BinMapF32 *pBM32, const char relopChars[], const float t);
 
+// Returns buffer stride (Multiply by sizeof(BMPackWord) to get bytes)
 size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
 
 int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD);

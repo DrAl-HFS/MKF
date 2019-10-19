@@ -56,14 +56,14 @@ void binMapNF32G (BMPackWord * restrict pW, const MKFAccScalar * restrict pF, co
    }
 } // binMapNF32G
 
-//#pragma acc routine vector
+#pragma acc routine vector
 void binMapAcc (BMPackWord * restrict pW, const MKFAccScalar * restrict pF, const size_t nF, const MKFAccBinMap *pM)
 {  // collapsable fields (rowLen%32 == 0) only!
    const size_t nW= nF>>5; // NB: truncates non multiple of 32!
    #pragma acc data present( pW[:nW], pF[:nF], pM[:1] )
    {
-      //U32 v[32], w;
-      #pragma acc parallel loop //private(v,w)
+      //U32 v[32], w; //parallel loop
+      #pragma acc loop vector// private(v,w)
       for (size_t i= 0; i < nW; i++)
       {
 #if 0
@@ -92,7 +92,7 @@ void binMapRowsAcc
    #pragma acc data present( pW[:rowStrideBM*nRows], pF[:rowLenF*nRows], pM[:1] )
    {
       const int rowLenBits= (rowLenF + 0x1F) & ~0x1F;
-      #pragma acc loop vector
+      #pragma acc parallel
       for (int i= 0; i < nRows; i++)
       {
          binMapAcc(pW + i * rowStrideBM, pF + i * rowLenF, rowLenBits, pM);

@@ -191,13 +191,15 @@ Bool32 mkfAccGetBPFDSimple
       {
          binMapRowsAcc(pW, pF, def[0], rowStride, def[1]*def[2], pM);
       }
-
+      //pragma acc parallel loop
       for (int j= 0; j < (def[2]-1); j++)
       {
          const BMPackWord * restrict pPlane[2];
          pPlane[0]= pW + j * planeStride;
          pPlane[1]= pW + (j+1) * planeStride;
-         #pragma acc loop seq
+         //pragma acc loop seq
+         //pragma acc loop vector
+         #pragma acc loop reduction(+: rBPFD )
          for (int i= 0; i < (def[1]-1); i++)
          {
             const U32 * restrict pRow[2];
