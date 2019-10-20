@@ -281,23 +281,42 @@ size_t * mkfCUDAGetBPFD (KernInfo *pK, size_t * pBPFD, const BMOrg *pO, const BM
    return(pBPFD);
 } // mkfCUDAGetBPFD
 
+typedef struct
+{
+   size_t *pH, *pD;
+} HostDevPtrs;
+
 // Global ptr to dev mem for lazy init hack
-static ULL *gpDevBPFD= NULL;
+static HostDevPtrs gHD= { NULL, NULL };
 #define BPFD_BYTES (sizeof(size_t)*MKF_BINS)
 
 extern "C"
 size_t * mkfCUDAGetBPFDH (KernInfo *pK, size_t * pBPFDH, const BMOrg *pO, const BMPackWord * pW, const int profile)
 {
-   if (NULL == gpDevBPFD) { cudaMalloc(&(gpDevBPFD), BPFD_BYTES); }
-   if (gpDevBPFD)
+   if (NULL == pBPFDH)
    {
-      cudaMemset(gpDevBPFD, 0, BPFD_BYTES); // Kernel will add to BPFD so start clean
-      mkfCUDAGetBPFD(pK, (size_t*)gpDevBPFD, pO, pW, profile);
-      cudaMemcpy(pBPFDH, gpDevBPFD, BPFD_BYTES, cudaMemcpyDeviceToHost);
-      return(pBPFDH);
+      if (NULL == gHD.pH) { cudaMallocHost(&(gHD.pH), BPFD_BYTES); }
+      pBPFDH= gHD.pH;
+   }
+   if (NULL == gHD.pD) { cudaMalloc(&(gHD.pD), BPFD_BYTES); }
+   if (pBPFDH && gHD.pD)
+   {
+      cudaMemset(gHD.pD, 0, BPFD_BYTES); // Kernel will add to BPFD so start clean
+      if (mkfCUDAGetBPFD(pK, (size_t*)(gHD.pD), pO, pW, profile))
+      {
+         cudaMemcpy(pBPFDH, gHD.pD, BPFD_BYTES, cudaMemcpyDeviceToHost);
+         return(pBPFDH);
+      }
    }
    return(NULL);
 } // mkfCUDAGetBPFDH
+
+extern "C"
+void mkfCUDACleanup (void)
+{
+   if (gHD.pH) { cudaFreeHost(gHD.pH); gHD.pH= NULL; }
+   if (gHD.pD) { cudaFree(gHD.pD); gHD.pD= NULL; }
+} // mkfCUDACleanup
 
 extern "C"
 int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, const int profHack)
@@ -367,11 +386,6 @@ int mkfCUDAGetBPFDautoCtx (Context *pC, const int def[3], const BinMapF64 *pM, c
    return(1);
 } // mkfCUDAGetBPFDautoCtx
 
-extern "C"
-void mkfCUDACleanup (void)
-{
-   if (gpDevBPFD) { cudaFree(gpDevBPFD); gpDevBPFD= NULL; }
-}
 
 // Internal test code
 #ifdef MKF_CUDA_MAIN
