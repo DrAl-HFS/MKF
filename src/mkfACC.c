@@ -153,14 +153,14 @@ ACC_INLINE void addRowBPFD
 
 /***/
 
-int setupAcc (int id)
+int setupAcc (int id, int flags)
 {  // Only multicore acceleration works presently: GPU produces garbage...
    int t, r=-1;
 #ifdef OPEN_ACC_API
    if (1 == id) { t= acc_device_nvidia; } else { t= acc_device_host; }
    acc_set_device_type( t );
    r= acc_get_device_type();
-   LOG_CALL("(%d) - acc_*_device_type() - %d -> %d\n", id, t, r);
+   if (flags & 1) { LOG_CALL("(%d) - acc_*_device_type() - %d -> %d\n", id, t, r); }
 #endif
    return(r);
 } // setupAcc
@@ -181,8 +181,9 @@ Bool32 mkfAccGetBPFDSimple
 
    #pragma acc data  present_or_create( pW[:(planeStride * def[2])] ) \
                      present_or_copyin( pF[:nF], def[:3], pM[:1] )  \
-                     copy( rBPFD[:MKF_BINS] )
+                     copyout( rBPFD[:MKF_BINS] )
    {  // #pragma acc parallel vector ???
+      memset(rBPFD, 0, sizeof(rBPFD[0])*MKF_BINS);
       if ((rowStride<<5) == def[0])
       {  // Multiple of 32
          binMapAcc(pW, pF, nF, pM);
@@ -197,8 +198,7 @@ Bool32 mkfAccGetBPFDSimple
          const BMPackWord * restrict pPlane[2];
          pPlane[0]= pW + j * planeStride;
          pPlane[1]= pW + (j+1) * planeStride;
-         //pragma acc loop seq
-         //pragma acc loop vector
+         //seq vector reduction()
          #pragma acc loop reduction(+: rBPFD )
          for (int i= 0; i < (def[1]-1); i++)
          {

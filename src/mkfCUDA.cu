@@ -312,10 +312,11 @@ size_t * mkfCUDAGetBPFDH (KernInfo *pK, size_t * pBPFDH, const BMOrg *pO, const 
 } // mkfCUDAGetBPFDH
 
 extern "C"
-void mkfCUDACleanup (void)
+void mkfCUDACleanup (int lvl)
 {
    if (gHD.pH) { cudaFreeHost(gHD.pH); gHD.pH= NULL; }
    if (gHD.pD) { cudaFree(gHD.pD); gHD.pD= NULL; }
+   if (lvl > 0) { cudaDeviceReset(); } // NUKE!
 } // mkfCUDACleanup
 
 extern "C"

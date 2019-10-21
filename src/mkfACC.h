@@ -15,7 +15,7 @@ extern "C" {
 
 /***/
 
-int setupAcc (int id); // 1=NVIDIA, 0=multicore
+int setupAcc (int id, int flags); // 1=NVIDIA, 0=multicore. flags&1= verbose
 
 // Original version for reference / testing, can be used for host side computation* but features
 // are presently limited:

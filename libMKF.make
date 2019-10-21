@@ -6,7 +6,7 @@ CUDA_PATH ?= /usr/local/cuda
 CULBPATH := $(CUDA_PATH)/lib64
 
 # GNU stuff
-GOPT := -Os -fPIC
+GOPT := -O4 -fPIC
 CC := gcc -std=c11
 COPT := $(GOPT)
 #99
@@ -16,7 +16,7 @@ CXOPT := $(GOPT)
 
 NVCC := nvcc -arch=sm_50
 # -gencode=arch=compute_50,code=sm_50
-NVOPT := -O3 --compiler-options '-fPIC' --shared
+NVOPT := -O4 --compiler-options '-fPIC' --shared
 #NVOPT := -O0 -g -G 
 # -dc ???
 ## NVCC is unfussy regarding standards compliance

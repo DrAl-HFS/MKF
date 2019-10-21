@@ -28,7 +28,7 @@ size_t * mkfCUDAGetBPFDH (KernInfo * pK, size_t * pBPFD, const BMOrg *pO, const 
 int mkfCUDAGetBPFDautoCtx (Context *pC, const FieldDef def[3], const BinMapF64 *pMC, const int profile);
 
 // Dispose of resources
-void mkfCUDACleanup (void);
+void mkfCUDACleanup (int lvl);
 
 #ifdef __cplusplus
 } // extern "C"
