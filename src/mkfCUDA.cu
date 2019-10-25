@@ -449,13 +449,6 @@ void dumpUX (const uint u[], const int n, const int wrap)
    }
 } // dumpUX
 
-size_t bitCountNU32 (U32 u[], const int n)
-{
-   size_t t= 0;
-   for (int i= 0; i<n; i++) { t+= BIT_COUNT_Z(u[i]); }
-   return(t);
-} // bitCountNU32
-
 #if 0
 checkHU ()
 {
