@@ -27,10 +27,10 @@
 // Load chunk from 4 adjacent rows within 2 neighbouring planes of binary map
 ACC_INLINE void loadChunkSh0
 (
-   U64 bufChunk[4],     // chunk buffer
+   uint64_t bufChunk[4],     // chunk buffer
    const BMPackWord * restrict pR0, // Location within row of first -
    const BMPackWord * restrict pR1, //  - and second planes
-   const U32 rowStride       // stride between successive rows within each plane
+   const int rowStride       // 32bit word stride between successive rows within each plane
 )
 {  // vect
    bufChunk[0]= pR0[0];
@@ -42,25 +42,25 @@ ACC_INLINE void loadChunkSh0
 // As above but appending to last bits of preceding chunk
 ACC_INLINE void loadChunkSh1
 (
-   U64 bufChunk[4],     // chunk buffer
+   uint64_t bufChunk[4],     // chunk buffer
    const BMPackWord * restrict pR0, // Location within row of first -
    const BMPackWord * restrict pR1, //  - and second planes
-   const U32 rowStride       // stride between successive rows within each plane
+   const int rowStride       // 32bit word stride between successive rows within each plane
 )
 {  // vect
-   bufChunk[0] |= ( (U64) pR0[0] ) << 1;
-   bufChunk[1] |= ( (U64) pR0[rowStride] ) << 1;
-   bufChunk[2] |= ( (U64) pR1[0] ) << 1;
-   bufChunk[3] |= ( (U64) pR1[rowStride] ) << 1;
+   bufChunk[0] |= ( (uint64_t) pR0[0] ) << 1;
+   bufChunk[1] |= ( (uint64_t) pR0[rowStride] ) << 1;
+   bufChunk[2] |= ( (uint64_t) pR1[0] ) << 1;
+   bufChunk[3] |= ( (uint64_t) pR1[rowStride] ) << 1;
 } // loadChunk
 
 #if 0
 // store binary patterns to temp
-ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
+ACC_INLINE int buildPattern (uint8_t bufPatt[], uint64_t bufChunk[4], const int n)
 {
    for (int i= 0; i < n; i++) // seq
    {
-      U8 r[4]; // temporary to permit/encourage vectorisation
+      uint8_t r[4]; // temporary to permit/encourage vectorisation
 
       for (int k= 0; k < 4; k++) // vect
       {
@@ -75,7 +75,7 @@ ACC_INLINE int buildPattern (U8 bufPatt[], U64 bufChunk[4], const int n)
 
 // Update frequency distribution of binary patterns
 // Transpose pattern assembly : better parallelisability?
-ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
+ACC_INLINE void addPattern (size_t rBPFD[256], uint64_t bufChunk[4], const int n)
 {
    for (int i= 0; i < n; i++) // seq
    {
@@ -91,7 +91,7 @@ ACC_INLINE void addPattern (size_t rBPFD[256], U64 bufChunk[4], const int n)
 } // addPattern
 
 // "Conventional" pattern assembly in 4bit slices
-ACC_INLINE void addPatternOM (size_t rBPFD[256], U64 bufChunk[4], const int n)
+ACC_INLINE void addPatternOM (size_t rBPFD[256], uint64_t bufChunk[4], const int n)
 {
    U8 r=0;
 
@@ -121,34 +121,68 @@ ACC_INLINE void addPatternOM (size_t rBPFD[256], U64 bufChunk[4], const int n)
 ACC_INLINE void addRowBPFD
 (
    size_t rBPFD[256], // result pattern distribution
-   const BMPackWord * restrict pRow[2],
+   const BMPackWord * restrict pRow0,
+   const BMPackWord * restrict pRow1,
    const int rowStride,
    const int n    // Number of single bit elements packed in row
 )
 {  // seq
    int m, k, i; // , j
-   U64 bufChunk[4]= { 0,0,0,0 };
+   uint64_t bufChunk[4]= { 0,0,0,0 };
    //U8 bufPatt[CHUNK_SIZE];
 
    // First chunk of n bits yields n-1 patterns
-   loadChunkSh0(bufChunk, pRow[0]+0, pRow[1]+0, rowStride);
+   loadChunkSh0(bufChunk, pRow0+0, pRow1+0, rowStride);
    ADD_PATTERN(rBPFD, bufChunk, MIN(CHUNK_SIZE-1, n-1));
    // Subsequent whole chunks yield n patterns
    i= 0;
    m= n>>CHUNK_SHIFT;
    while (++i < m)
    {
-      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
+      loadChunkSh1(bufChunk, pRow0+i, pRow1+i, rowStride);
       ADD_PATTERN(rBPFD, bufChunk, CHUNK_SIZE);
    }
    // Check for residual bits < CHUNK_SIZE
    k= n & CHUNK_MASK;
    if (k > 0)
    {
-      loadChunkSh1(bufChunk, pRow[0]+i, pRow[1]+i, rowStride);
+      loadChunkSh1(bufChunk, pRow0+i, pRow1+i, rowStride);
       ADD_PATTERN(rBPFD, bufChunk, k);
    }
 } // addRowBPFD
+
+// Add plane of cells defined by two bitplanes
+ACC_INLINE void addPlaneBPFD
+(
+   size_t rBPFD[256], // result pattern distribution
+   const BMPackWord * restrict pPlane0,
+   const BMPackWord * restrict pPlane1,
+   const int rowStride,
+   const int def[3]
+)
+{
+   #pragma acc loop reduction(+: rBPFD )
+   for (int i= 0; i < (def[1]-1); i++)
+   {
+      addRowBPFD(rBPFD, pPlane0 + i * rowStride, pPlane1 + i * rowStride, rowStride, def[0]);
+   }
+} // addPlaneBPFD
+
+ACC_INLINE void addVolBPFD
+(
+   size_t rBPFD[256], // result pattern distribution
+   const BMPackWord * restrict pW,
+   const int planeStride,
+   const int rowStride,
+   const int def[3]
+)
+{
+   #pragma acc loop reduction(+: rBPFD )
+   for (int j= 0; j < (def[2]-1); j++)
+   {
+      addPlaneBPFD(rBPFD, pW + j * planeStride, pW + (j+1) * planeStride, rowStride, def);
+   }
+} // addVolBPFD
 
 
 /***/
@@ -167,11 +201,11 @@ int setupAcc (int id, int flags)
 
 Bool32 mkfAccGetBPFDSimple
 (
-   size_t   rBPFD[MKF_BINS],
-   BMPackWord * restrict pW,
-   const MKFAccScalar * restrict pF,
-   const FieldDef def[3],
-   const MKFAccBinMap *pM
+   size_t   rBPFD[MKF_BINS],  // Binary Pattern Frequency Distribution
+   BMPackWord * restrict pW,  // Packed binary map
+   const MKFAccScalar * restrict pF,   // Planar organised (single) scalar field
+   const FieldDef def[3],              // Definition (dimensions) of sclalr field
+   const MKFAccBinMap *pM           // Mapping function (thresholds & relations)
 )
 {
    const int rowStride= BITS_TO_WRDSH(def[0],CHUNK_SHIFT);
@@ -179,35 +213,23 @@ Bool32 mkfAccGetBPFDSimple
    //const int volStride= planeStride * def[2];
    const int nF= prodNI(def,3);
 
-   #pragma acc data  present_or_create( pW[:(planeStride * def[2])] ) \
+   #pragma acc data  present_or_create( pW[:(planeStride * def[2]) ] ) \
                      present_or_copyin( pF[:nF], def[:3], pM[:1] )  \
-                     copyout( rBPFD[:MKF_BINS] )
+                     copyout( rBPFD[:MKF_BINS] ) \
+                     copyout( pW[:(planeStride * def[2])] ) // DEBUG
    {  // #pragma acc parallel vector ???
-      memset(rBPFD, 0, sizeof(rBPFD[0])*MKF_BINS);
+      memset(rBPFD, 0, sizeof(rBPFD[0])*MKF_BINS); // Zero FD bins, ready for accumulation
+
       if ((rowStride<<5) == def[0])
       {  // Multiple of 32
-         binMapAcc(pW, pF, nF, pM);
+         binMapAcc(pW, pF, nF, pM); // This first stage fails on GPU...
       }
       else
       {
          binMapRowsAcc(pW, pF, def[0], rowStride, def[1]*def[2], pM);
       }
-      //pragma acc parallel loop
-      for (int j= 0; j < (def[2]-1); j++)
-      {
-         const BMPackWord * restrict pPlane[2];
-         pPlane[0]= pW + j * planeStride;
-         pPlane[1]= pW + (j+1) * planeStride;
-         //seq vector reduction()
-         #pragma acc loop reduction(+: rBPFD )
-         for (int i= 0; i < (def[1]-1); i++)
-         {
-            const U32 * restrict pRow[2];
-            pRow[0]= pPlane[0] + i * rowStride;
-            pRow[1]= pPlane[1] + i * rowStride;
-            addRowBPFD(rBPFD, pRow, rowStride, def[0]);
-         }
-      }
+
+      addVolBPFD(rBPFD, pW, planeStride, rowStride, def);
    }
    return(TRUE);
 } // mkfAccGetBPFDSimple
