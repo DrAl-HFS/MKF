@@ -9,7 +9,7 @@
 
 // CUDA kernels and wrappers
 
-#define PACK16
+//define PACK16
 
 // Double warp if permitted by local mem & algorithm (16bit packed counters)
 #ifdef PACK16
@@ -80,7 +80,7 @@ public:
 #ifndef PACK16
    __device__ void add (uint bpfd[], const uint n)
    {
-      for (uint i= 0; i < n; i++) { bpfd[ buildNext() ]++; }
+      for (uint i= 0; i < n; i++) { atomicAdd( bpfd + buildNext(), 1); } // { bpfd[ buildNext() ]++; }
    } // add (uint)
 #else
    __device__ void add (U16P bpfd[], const uint n)
