@@ -28,14 +28,14 @@ extern "C" {
 typedef struct
 {
    double t[BM_NUMT];
-   uint   m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
+   uint32_t   m;   // 3 bits allow any relation: 1 bit for each of '<','=','>' combined as required.
 } BinMapF64;
 
 // DEPRECATE?
 typedef struct
 {
    float t[BM_NUMT];
-   uint  m;   // 3 bits for simple threshold, 3*3= 9 for interval, plus flags.
+   uint32_t  m;
    // NB: 32bit alignment (pre-NVIDIA-Pascal).
 } BinMapF32;
 
@@ -46,13 +46,13 @@ typedef struct
 #define BMC_NV (0x0)
 #define BMC_AL (0x7)
 
-typedef uint BMStride;
-typedef uint BMPackWord;
+typedef uint32_t BMStride;
+typedef uint32_t BMPackWord;
 
 typedef struct
 {  // Memory organisation of BM
-   uint  rowElem;
-   uint  rowPairs, planePairs; // paired (N-1) counts
+   uint32_t  rowElem;
+   uint32_t  rowPairs, planePairs; // paired (N-1) counts
    BMStride rowWS, planeWS;   // 32b word strides
 } BMOrg;
 
@@ -90,9 +90,9 @@ size_t setBMO (BMOrg *pO, const FieldDef def[3], const char profID);
 
 int copyNonZeroDef (FieldDef d[], const FieldDef *pD, const int nD);
 
-int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint mask);
+int copyValidPtrByMask (ConstFieldPtr r[], const int max, const ConstFieldPtr a[], const uint32_t mask);
 
-int countValidPtrByMask (const ConstFieldPtr a[], uint mask);
+int countValidPtrByMask (const ConstFieldPtr a[], uint32_t mask);
 
 // Generate n stride values from definition and base stride, skipping some if required.
 // Returns number generated (zero for bad inputs)
