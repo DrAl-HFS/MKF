@@ -88,10 +88,8 @@ void reportMeasures (const size_t a[256], const float mScale, const SMVal dts)
 {
    float m[4];
    char s[16]; s[13]= 0;
-   if (mkfSelectMeasuresBPFD(m, s, a, mScale, 4))
-   {
-      LOG(" %s: %G %G %G %G\t(%Gsec)\n", s, m[0], m[1], m[2], m[3], dts);
-   }
+   mkfSelectMeasuresBPFD(m, s, a, mScale, 2);
+   LOG(" %s: %G %G %G %G\t(%Gsec)\n", s, m[0], m[1], m[2], m[3], dts);
 } // reportMeasures
 
 size_t bitCountNZ (size_t z[], const int n)
@@ -123,13 +121,14 @@ int main (int argc, char *argv[])
       if (vfR <= 0) { WARN("genPattern() - vfR=%G\n", vfR); }
 
       setBinMapF64(&bmc,">=",0.5);
-      setupAcc(0);
+      setupAcc(0,1);
       pBPFD= aBPFD1;
       if (ENC_F64 == cux.enc)
       {
          LOG("***\nmkfAccGetBPFDSimple(%p) - \n", pBPFD);
          deltaT();
          mkfAccGetBPFDSimple(pBPFD, cux.pHU, cux.pHF, def, &bmc);
+         //LOG("bitCountNU32() - %zu\n", bitCountNU32(cux.pHU, cux.bytesU / sizeof(U32)));
          dt= deltaT();
          pKBPFD= pBPFD;
          reportMeasures(pBPFD, mScale, dt);

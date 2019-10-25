@@ -82,7 +82,9 @@ static void addZMapU8 (size_t r[], const size_t vA[], const int nA, const uint8_
 
 void mkfRefMeasureBPFD (float m[4], const size_t aBPFD[MKF_BINS], const float s)
 {
-#ifndef NO_REF_MEASURES
+#ifdef NO_REF_MEASURES
+   m[0]= m[1]= m[2]= m[3]= -1;
+#else
    refMeasures(m,aBPFD,s);
 #endif
 } // mkfRefMeasureBPFD
