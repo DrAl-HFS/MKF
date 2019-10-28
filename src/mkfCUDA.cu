@@ -10,20 +10,23 @@
 // CUDA kernels and wrappers
 
 #define PACK16
+#define WARP_SHIFT   (5)
+//if ((1<<WARP_SHIFT) != warpSize) ERROR!
 
-// Double warp if permitted by local mem & algorithm (16bit packed counters)
+// Double warp if permitted by local mem & algorithm
 #ifdef PACK16
+// Fully privatised (per thread) using 16bit packed counters (double warp -> 32KB sh.mem.)
 #define BPFD_W32_BINS (MKF_BINS/2)
 #define BPFD_BLKS 6
-#define BPFD_NSHD BPFD_BLKD
+#define BPFD_NSHD (1<<BPFD_BLKS)
 #else
+// Unpacked with warp-level privatisation (eight warps -> 32KB sh.mem.)
 #define BPFD_W32_BINS MKF_BINS
-#define BPFD_BLKS 5
-#define BPFD_NSHD BPFD_BLKD  //(BPFD_BLKD/32) //warpSize)
+#define BPFD_BLKS 8
+#define BPFD_NSHD (1<<(BPFD_BLKS-5)) // =(BPFD_BLKD/warpSize)
 #endif
 
-// Default single warp
-#ifndef BPFD_BLKS
+#ifndef BPFD_BLKS // Default is single warp privatised
 #define BPFD_BLKS 5
 #endif
 #define BPFD_BLKD (1<<BPFD_BLKS)
@@ -173,8 +176,10 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pWP0, cons
    const uint laneIdx= i & BPFD_BLKM;
 #ifdef PACK16
    __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 16KB/Warp -> 2W per SM
+   const uint distIdx= laneIdx*BPFD_W32_BINS;
 #else
    __shared__ uint bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 32KB/Warp -> 1W per SM
+   const uint distIdx= (laneIdx >> WARP_SHIFT) * BPFD_W32_BINS;
 #endif
    zeroW(bpfd, laneIdx, BPFD_W32_BINS*BPFD_NSHD);
    if (i < bmo.rowPairs)
@@ -182,7 +187,7 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pWP0, cons
       const BMPackWord * pRow[2];
       pRow[0]= pWP0 + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
       pRow[1]= pWP1 + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
-      addRowBPFD(bpfd+laneIdx*BPFD_W32_BINS, pRow, bmo.rowWS, bmo.rowElem);
+      addRowBPFD(bpfd+distIdx, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
    reduceBins(rBPFD, bpfd, laneIdx, BPFD_NSHD);
@@ -196,8 +201,10 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
    const uint laneIdx= i & BPFD_BLKM;
 #ifdef PACK16
    __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 16KB/Warp -> 2W per SM
+   const uint distIdx= laneIdx*BPFD_W32_BINS;
 #else
    __shared__ uint bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 32KB/Warp -> 1W per SM
+   const uint distIdx= (laneIdx >> WARP_SHIFT) * BPFD_W32_BINS;
 #endif
    zeroW(bpfd, laneIdx, BPFD_W32_BINS*BPFD_NSHD);
    if (i < bmo.rowPairs)
@@ -205,7 +212,7 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
       const BMPackWord * pRow[2];
       pRow[0]= pW + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
       pRow[1]= pRow[0] + bmo.planeWS;
-      addRowBPFD(bpfd+laneIdx*BPFD_W32_BINS, pRow, bmo.rowWS, bmo.rowElem);
+      addRowBPFD(bpfd+distIdx, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
    reduceBins(rBPFD, bpfd, laneIdx, BPFD_NSHD);
