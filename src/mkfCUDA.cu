@@ -9,7 +9,7 @@
 
 // CUDA kernels and wrappers
 
-#define PACK16
+//define PACK16
 #define WARP_SHIFT   (5)
 //if ((1<<WARP_SHIFT) != warpSize) ERROR!
 
@@ -44,7 +44,7 @@ typedef uint   U16P; // ushort2 ???
 
 class ChunkBuf
 {
-   ULL u00, u01, u10, u11;
+   ULL u00, u01, u10, u11; // 64bit not ideal as arch. is 32bit, but 8 or 16bit chunks need revised BinMap (complicated?)
 
    __device__ uint buildNext (void)
    {
@@ -171,6 +171,7 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pWP0, cons
    const uint distIdx= (laneIdx >> WARP_SHIFT) * BPFD_W32_BINS;
 #endif
    zeroW(bpfd, laneIdx, BPFD_W32_BINS*BPFD_NSHD);
+   __syncthreads();
    if (i < bmo.rowPairs)
    {
       const BMPackWord * pRow[2];
@@ -196,6 +197,7 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
    const uint distIdx= (laneIdx >> WARP_SHIFT) * BPFD_W32_BINS;
 #endif
    zeroW(bpfd, laneIdx, BPFD_W32_BINS*BPFD_NSHD);
+   __syncthreads();
    if (i < bmo.rowPairs)
    {
       const BMPackWord * pRow[2];
@@ -459,6 +461,7 @@ size_t mkftu (const Context *pC, const int def[3], const float mScale, const uin
    cudaError_t r;
    size_t sum= 0;
    int verbose= 0;
+   //KernInfo ki={0,0};
 
    r= cudaMemcpy(pC->pDU, pC->pHU, pC->bytesU, cudaMemcpyHostToDevice); ctuErr(&r, "cudaMemcpy(pDU, pHU)");
    r= cudaMemset(pC->pDZ, 0, pC->bytesZ); ctuErr(&r, "cudaMemset(pDZ)");
