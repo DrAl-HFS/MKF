@@ -41,20 +41,11 @@ typedef uint   U16P; // ushort2 ???
 #define CHUNK_SIZE (1<<CHUNK_SHIFT)
 #define CHUNK_MASK (CHUNK_SIZE-1)
 
-//__device__ static int gBrkCount=0;
-//__device__ void brk (void) { gBrkCount++; }
-__device__ void logErr (ULL c, ULL u00, ULL u01, ULL u10, ULL u11)
-{  // single printf unreliable, not sure this is either...
-   printf("%u:", c);
-   printf(" %016X",u00); printf(" %016X", u01);
-   printf(" %016X", u10); printf(" %016X\n", u11);
-} // logErr
 
 class ChunkBuf
 {
-   ULL u00, u01, u10, u11, c;
+   ULL u00, u01, u10, u11;
 
-   //friend logErr (ChunkBuf&);
    __device__ uint buildNext (void)
    {
       uint bp=  ( u00 & 0x3); u00 >>= 1;
@@ -71,12 +62,10 @@ public:
       u01= pR0[rowStride];
       u10= pR1[0];
       u11= pR1[rowStride];
-      c= 0;
    } // ChunkBuf
 
    __device__ void loadSh1 (const uint * __restrict__ pR0, const uint * __restrict__ pR1, const BMStride rowStride)
    {
-      //if (0 == pR1[rowStride]) { printf("%p+%x\n",pR1,rowStride); }
       u00|= ( (ULL) pR0[0] ) << 1;
       u01|= ( (ULL) pR0[rowStride] ) << 1;
       u10|= ( (ULL) pR1[0] ) << 1;
@@ -156,7 +145,7 @@ __device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const uint l
 } // reduceBins
 #else
 __device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const uint laneIdx, const uint nD)
-{  // if (laneIdx < MKF_BINS)
+{
    for (uint k= laneIdx; k < BPFD_W32_BINS; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
       ULL t= 0;
