@@ -9,15 +9,17 @@
 
 // CUDA kernels and wrappers
 
-//define PACK16
+#define PACK16
 
 // Double warp if permitted by local mem & algorithm (16bit packed counters)
 #ifdef PACK16
 #define BPFD_W32_BINS (MKF_BINS/2)
 #define BPFD_BLKS 6
+#define BPFD_NSHD BPFD_BLKD
 #else
 #define BPFD_W32_BINS MKF_BINS
-//#define BPFD_BLKS 5
+#define BPFD_BLKS 5
+#define BPFD_NSHD BPFD_BLKD  //(BPFD_BLKD/32) //warpSize)
 #endif
 
 // Default single warp
@@ -26,6 +28,7 @@
 #endif
 #define BPFD_BLKD (1<<BPFD_BLKS)
 #define BPFD_BLKM (BPFD_BLKD-1)
+
 
 // Wide counter for atomicAdd (nvcc dislikes size_t)
 typedef unsigned long long ULL;
@@ -77,14 +80,9 @@ public:
       u11|= ( (ULL) pR1[rowStride] ) << 1;
    } // loadSh1
 
-#ifndef PACK16
-   __device__ void add (uint bpfd[], const uint n)
-   {
-      for (uint i= 0; i < n; i++) { atomicAdd( bpfd + buildNext(), 1); } // { bpfd[ buildNext() ]++; }
-   } // add (uint)
-#else
+#ifdef PACK16
    __device__ void add (U16P bpfd[], const uint n)
-   {
+   {  // Fully privatised result
       //const ushort2 lh[2]={ushort2(1,0),ushort2(0,1)}; //
       const U16P lh[2]={1,1<<16}; // even -> lo, odd -> hi (16b)
 
@@ -95,6 +93,11 @@ public:
          bpfd[ bp >> 1 ]+= lh[bp & 1];
       }
    } // add (U16P)
+#else
+   __device__ void add (uint bpfd[], const uint n)
+   {  // Shared result
+      for (uint i= 0; i < n; i++) { atomicAdd( bpfd + buildNext(), 1); } // { bpfd[ buildNext() ]++; }
+   } // add (uint)
 #endif
 }; // class ChunkBuf
 
@@ -126,39 +129,36 @@ __device__ void addRowBPFD
    }
 } // addRowBPFD
 
-__device__ void zeroBins (uint bpfd[], const uint laneIdx, const uint bins)
+__device__ void zeroW (uint w[], const uint laneIdx, const uint nW)
 {
-   for (uint k= laneIdx; k < bins; k+= blockDim.x)
-   {  // (transposed zeroing for write coalescing)
-      for (uint j= 0; j < blockDim.x; j++) { bpfd[j*bins+k]= 0; }
-   }
-} // zeroBins
+   for (uint k= laneIdx; k < nW; k+= blockDim.x) { w[k]= 0; }
+} // zeroW
 
-#ifndef PACK16
-__device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const uint laneIdx, const uint bins)
+#ifdef PACK16
+__device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const uint laneIdx, const uint nD)
 {
-   for (uint k= laneIdx; k < bins; k+= blockDim.x)
-   {  // (transposed reduction for read coalescing)
-      ULL t= 0;
-      for (int j= 0; j < blockDim.x; j++) { t+= bpfd[j*bins+k]; }
-      atomicAdd( rBPFD+k, t );
-   }
-} // reduceBins
-#else
-__device__ void reduceBins (ULL rBPFD[MKF_BINS], const U16P bpfd[], const uint laneIdx, const uint bins)
-{
-   for (uint k= laneIdx; k < bins; k+= blockDim.x)
+   for (uint k= laneIdx; k < BPFD_W32_BINS; k+= blockDim.x)
    {  // (transposed reduction for read coalescing)
       ULL t[2]= {0,0};
-      for (int j= 0; j < blockDim.x; j++)
+      for (int j= 0; j < nD; j++)
       {
-         const U16P u= bpfd[j*bins+k];
+         const U16P u= bpfd[j*BPFD_W32_BINS+k];
          t[0]+= u & 0xFFFF;
          t[1]+= u >> 16;
       }
       const int i= k<<1;
       atomicAdd( rBPFD+i, t[0] );
       atomicAdd( rBPFD+i+1, t[1] );
+   }
+} // reduceBins
+#else
+__device__ void reduceBins (ULL rBPFD[MKF_BINS], const uint bpfd[], const uint laneIdx, const uint nD)
+{  // if (laneIdx < MKF_BINS)
+   for (uint k= laneIdx; k < BPFD_W32_BINS; k+= blockDim.x)
+   {  // (transposed reduction for read coalescing)
+      ULL t= 0;
+      for (int j= 0; j < nD; j++) { t+= bpfd[j*BPFD_W32_BINS+k]; }
+      atomicAdd( rBPFD+k, t );
    }
 } // reduceBins
 #endif
@@ -171,26 +171,21 @@ __global__ void addPlaneBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pWP0, cons
 {
    const uint i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    const uint laneIdx= i & BPFD_BLKM;
-   const uint bins= BPFD_W32_BINS;
-#ifndef PACK16
-   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB/Warp -> 1W per SM
+#ifdef PACK16
+   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 16KB/Warp -> 2W per SM
 #else
-   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB/Warp -> 2W per SM
+   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 32KB/Warp -> 1W per SM
 #endif
-   //if (blockDim.x > BLKD) { printf("ERROR: addPlaneBPFD() - blockDim=%d", blockDim.x); return; }
-   //else { printf(" - blockDim=%d,%d,%d\n", blockDim.x, blockDim.y, blockDim.z); }
-   zeroBins(bpfd, laneIdx, bins);
+   zeroW(bpfd, laneIdx, BPFD_W32_BINS*BPFD_NSHD);
    if (i < bmo.rowPairs)
    {
-      const BMPackWord * pRow[2]= {
-         pWP0 + blockIdx.y * bmo.planeWS + i * bmo.rowWS,
-         pWP1 + blockIdx.y * bmo.planeWS + i * bmo.rowWS
-         };
-
-      addRowBPFD(bpfd+laneIdx*bins, pRow, bmo.rowWS, bmo.rowElem);
+      const BMPackWord * pRow[2];
+      pRow[0]= pWP0 + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
+      pRow[1]= pWP1 + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
+      addRowBPFD(bpfd+laneIdx*BPFD_W32_BINS, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
-   reduceBins(rBPFD, bpfd, laneIdx, bins);
+   reduceBins(rBPFD, bpfd, laneIdx, BPFD_NSHD);
 } // addPlaneBPFD
 
 // Contiguous sequence of planes i.e. entire full size buffer
@@ -199,22 +194,21 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
    const uint i= blockIdx.x * blockDim.x + threadIdx.x; // ???
    //const uint j= blockIdx.y; // * blockDim.y + threadIdx.y;
    const uint laneIdx= i & BPFD_BLKM;
-   const uint bins= BPFD_W32_BINS;
-#ifndef PACK16
-   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 32KB/Warp -> 1W per SM
+#ifdef PACK16
+   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 16KB/Warp -> 2W per SM
 #else
-   __shared__ U16P bpfd[BPFD_W32_BINS*BPFD_BLKD]; // 16KB/Warp -> 2W per SM
+   __shared__ uint bpfd[BPFD_W32_BINS*BPFD_NSHD]; // 32KB/Warp -> 1W per SM
 #endif
-   zeroBins(bpfd, laneIdx, bins);
+   zeroW(bpfd, laneIdx, BPFD_W32_BINS*BPFD_NSHD);
    if (i < bmo.rowPairs)
    {
       const BMPackWord * pRow[2];
       pRow[0]= pW + blockIdx.y * bmo.planeWS + i * bmo.rowWS;
       pRow[1]= pRow[0] + bmo.planeWS;
-      addRowBPFD(bpfd+laneIdx*bins, pRow, bmo.rowWS, bmo.rowElem);
+      addRowBPFD(bpfd+laneIdx*BPFD_W32_BINS, pRow, bmo.rowWS, bmo.rowElem);
    }
    __syncthreads();
-   reduceBins(rBPFD, bpfd, laneIdx, bins);
+   reduceBins(rBPFD, bpfd, laneIdx, BPFD_NSHD);
 } // addMultiPlaneSeqBPFD
 
 /***/
