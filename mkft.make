@@ -53,7 +53,8 @@ CMN_DIR := ../Common/src
 INC_DIR := inc
 
 C_SRC := $(shell ls $(SRC_DIR)/*.c)
-CU_SRC := $(shell ls $(SRC_DIR)/*.cu)
+CU_SRC := $(SRC_DIR)/binMapCUDA.cu $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/ctUtil.cu
+#$(shell ls $(SRC_DIR)/*.cu)
 HDR := $(shell ls $(SRC_DIR)/*.h)
 CPP_SRC := $(shell ls $(SRC_DIR)/*.cpp)
 CPP_HDR := $(shell ls $(SRC_DIR)/*.hpp)

@@ -9,18 +9,6 @@
 
 #include "bpfdCUDA.cuh"
 
-
-/* HOWTO: Enque dependant jobs
-   cudaStreamCreate( sk1, sk2 );
-   cudaEventCreate( e[N] );
-   for (i=0; i<N; i++)
-   {
-      k1<<<... sk1 >>>(...);
-      cudaEventRecord(e[i], sk1);
-      cudaStreamWaitEvent(sk2, e[i], 0);
-      k2<<<... sk2 >>>(...);
-   }
-*/
 extern "C"
 size_t * mkfCUDAGetBPFD (KernInfo *pK, size_t * pBPFD, const BMOrg *pO, const BMPackWord * pW, const int profile)
 {
