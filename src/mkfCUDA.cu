@@ -7,6 +7,9 @@
 
 /***/
 
+#if 1
+#include "bpfdCUDA.cuh"
+#else
 // CUDA kernels and wrappers
 
 //define PACK16
@@ -208,6 +211,8 @@ __global__ void addMultiPlaneSeqBPFD (ULL rBPFD[MKF_BINS], const BMPackWord * pW
    __syncthreads();
    reduceBins(rBPFD, bpfd, laneIdx, BPFD_NSHD);
 } // addMultiPlaneSeqBPFD
+
+#endif // no bpfdCUDA.cuh
 
 /***/
 

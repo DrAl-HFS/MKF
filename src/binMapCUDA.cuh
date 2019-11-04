@@ -2,9 +2,6 @@
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors Jan-Nov 2019
 
-//include "binMapCUDA.h"
-//include "utilCUDA.hpp"
-
 #ifndef BIN_MAP_CUDA_CUH
 #define BIN_MAP_CUDA_CUH
 
