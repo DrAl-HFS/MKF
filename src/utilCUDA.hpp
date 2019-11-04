@@ -60,21 +60,21 @@ public:
 }; // CTimerCUDA
 
 // PO2 defs
-#define CDSM_BLK_S 2
-#define CDSM_BLK_N (1<<CDSM_BLK_S)
-#define CDSM_BLK_M (CDSM_BLK_N-1)
+#define CDSM_BLK_SH 1
+#define CDSM_BLK_NS (1<<CDSM_BLK_SH)
+#define CDSM_BLK_MS (CDSM_BLK_NS-1)
 
 struct CUDAStrmBlk
 {
 //public:
    cudaError_t r; // For debug
-   cudaStream_t s[CDSM_BLK_N];
+   cudaStream_t s[CDSM_BLK_NS];
 
-   CUDAStrmBlk (void) { for (int i=0; i<CDSM_BLK_N; i++) { r= cudaStreamCreate(s+i); } }
+   CUDAStrmBlk (void) { for (int i=0; i<CDSM_BLK_NS; i++) { r= cudaStreamCreate(s+i); } }
 
-   ~CUDAStrmBlk () { for (int i=0; i<CDSM_BLK_N; i++) { r= cudaStreamDestroy(s[i]); } }
+   ~CUDAStrmBlk () { for (int i=0; i<CDSM_BLK_NS; i++) { r= cudaStreamDestroy(s[i]); } }
 
-   const cudaStream_t& operator [] (int i) const { return( s[ i & CDSM_BLK_M ] ); }
+   const cudaStream_t& operator [] (int i) const { return( s[ i & CDSM_BLK_MS ] ); }
 }; // struct CUDAStrmBlk
 
 #endif // __NVCC__

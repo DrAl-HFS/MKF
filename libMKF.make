@@ -71,7 +71,7 @@ $(TARGET) : $(SRC) $(HDR) $(OBJ) $(MAKEFILE)
 all : clean run
 
 run : $(TARGET)
-	../Diff3D/dt
+	../Diff3D/dt -I100,10 -S1
 
 clean :
 	rm -f $(TARGET) $(OBJ)
