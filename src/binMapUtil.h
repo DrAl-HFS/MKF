@@ -109,6 +109,7 @@ typedef struct
    float dtms[2];
 } KernInfo;
 
+// DEPRECATE / DISPLACE - old test setup
 typedef struct
 {
    int nField, nElem;

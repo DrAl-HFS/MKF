@@ -53,7 +53,7 @@ CMN_DIR := ../Common/src
 INC_DIR := inc
 
 C_SRC := $(shell ls $(SRC_DIR)/*.c)
-CU_SRC := $(SRC_DIR)/binMapCUDA.cu $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/ctUtil.cu
+CU_SRC := $(SRC_DIR)/binMapCUDA.cu $(SRC_DIR)/mkfCUDA.cu $(SRC_DIR)/gridUtil.cu $(SRC_DIR)/ctUtil.cu
 #$(shell ls $(SRC_DIR)/*.cu)
 HDR := $(shell ls $(SRC_DIR)/*.h)
 CPP_SRC := $(shell ls $(SRC_DIR)/*.cpp)
@@ -82,7 +82,8 @@ LIBDEF += -L$(CULBPATH) -lcudart
 INCDEF += -DMKF_CUDA
 INCDEF += -DMKF_ACC_CUDA_INTEROP
 
-%.o : $(SRC_DIR)/%.cu $(HDR_DIR)/%.h
+#$(HDR_DIR)/%.cuh $(HDR_DIR)/%.h
+%.o : $(SRC_DIR)/%.cu
 	$(NVCC) $(NVOPT) $(INCDEF) $< -c
 
 endif

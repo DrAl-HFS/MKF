@@ -9,6 +9,11 @@
 #include "binMapCUDA.cuh"
 
 
+#if 1
+
+#include "gridUtil.cuh"
+
+#else
 /* Misc functions */
 
 int planarity (const FieldDef def[], const FieldStride stride[], int n)
@@ -131,7 +136,7 @@ public:
    dim3 def (void) const { return dim3(GridPlane::grid[0], GridPlane::grid[1], depth); }
    dim3 defColl (void) const { return(GridPlane::grid[0] * GridPlane::grid[1] * depth); }
 }; // class GridSlab
-
+#endif
 
 /* INTERFACE */
 static BMPackWord * gpDevW= NULL;
@@ -146,7 +151,7 @@ BMPackWord *binMapCUDA
    const BinMapF64   * pM
 )
 {
-   GridRegion reg;
+   GridRegion reg(VT_BLKN);
 
    //if (32 != warpSize) { WARN("[binMapCUDA] warpSize=%d\n", warpSize); }
    if (reg.validate(pI))
