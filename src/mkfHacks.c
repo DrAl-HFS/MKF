@@ -64,12 +64,14 @@ static void verifyGroupK (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf i
    for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++) { LOG("%d, ", wK[iG]); }
 } // verifyGroupK
 
+extern void refMeasures (float m[4], const size_t aBPFD[], const float s);
+
 static void logWeightSM (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf inf[CELL8_SYMM_GROUPS])
 {
-   long int d[CELL8_PATTERNS]= {0,};
+   size_t d[CELL8_PATTERNS]= {0,};
    float s[CELL8_GROUP_MAX];
    float m[CELL8_GROUP_MAX];
-   double res[3]={1,1,1};
+   float r[4];
    int j= 0;
 
    for (int iG=0; iG < CELL8_SYMM_GROUPS; iG++)
@@ -80,8 +82,9 @@ static void logWeightSM (const uint8_t patBuf[CELL8_PATTERNS], const GroupInf in
       {
          int id= patBuf[j+i];
          d[id]= 1;
-         s[i]= specsurf(d, res);
-         m[i]= specimc(d, res);
+         refMeasures(r,d,1.0);
+         s[i]= r[2];
+         m[i]= r[1];
          d[id]= 0;
       }
       j+= n;

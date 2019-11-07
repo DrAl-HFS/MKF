@@ -1,4 +1,4 @@
-// mkfAcc.h - dumping ground for junk experiments.
+// mkfHacks.h - dumping ground for junk experiments.
 // https://github.com/DrAl-HFS/MKF.git
 // (c) Project Contributors June-Sept 2019
 

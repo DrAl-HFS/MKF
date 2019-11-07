@@ -188,9 +188,10 @@ ACC_INLINE void addVolBPFD
 /***/
 
 int setupAcc (int id, int flags)
-{  // Only multicore acceleration works presently: GPU produces garbage...
-   int t, r=-1;
+{  // NB: Only multicore acceleration works presently: GPU produces garbage...
+   int r= -1;
 #ifdef OPEN_ACC_API
+   int t= -1;
    if (1 == id) { t= acc_device_nvidia; } else { t= acc_device_host; }
    acc_set_device_type( t );
    r= acc_get_device_type();
