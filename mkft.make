@@ -10,7 +10,7 @@ LIBDEF := -lm
 
 ifdef NVCCPATH
 NVCC := nvcc
-NVOPT := -arch=sm_50 -ccbin=pgc++ 
+NVOPT := -arch=sm_50 -ccbin=pgc++
 #NVOPT += -g -G
 NVOPT += -O3
 endif
@@ -30,6 +30,9 @@ CC := gcc -Wall
 CCPP := g++
 LIBDEF += -lstdc++
 OPT := -march=native
+#gcc7+
+#ACC := -fopenacc
+#-foffload=???
 # problematic...
 # -std=c11 -D__USE_MISC -pedantic
 # defaults

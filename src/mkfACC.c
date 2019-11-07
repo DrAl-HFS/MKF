@@ -161,7 +161,8 @@ ACC_INLINE void addPlaneBPFD
    const int def[3]
 )
 {
-   #pragma acc loop reduction(+: rBPFD )
+   //#pragma acc loop reduction(+: rBPFD )
+   #pragma acc parallel loop
    for (int i= 0; i < (def[1]-1); i++)
    {
       addRowBPFD(rBPFD, pPlane0 + i * rowStride, pPlane1 + i * rowStride, rowStride, def[0]);
@@ -177,7 +178,8 @@ ACC_INLINE void addVolBPFD
    const int def[3]
 )
 {
-   #pragma acc loop reduction(+: rBPFD )
+   //#pragma acc loop reduction(+: rBPFD )
+   #pragma acc parallel loop
    for (int j= 0; j < (def[2]-1); j++)
    {
       addPlaneBPFD(rBPFD, pW + j * planeStride, pW + (j+1) * planeStride, rowStride, def);
@@ -214,10 +216,10 @@ Bool32 mkfAccGetBPFDSimple
    //const int volStride= planeStride * def[2];
    const int nF= prodNI(def,3);
 
+   // DEBUG copyout( pW[:(planeStride * def[2])] )
    #pragma acc data  present_or_create( pW[:(planeStride * def[2]) ] ) \
                      present_or_copyin( pF[:nF], def[:3], pM[:1] )  \
-                     copyout( rBPFD[:MKF_BINS] ) \
-                     copyout( pW[:(planeStride * def[2])] ) // DEBUG
+                     copyout( rBPFD[:MKF_BINS] )
    {  // #pragma acc parallel vector ???
       memset(rBPFD, 0, sizeof(rBPFD[0])*MKF_BINS); // Zero FD bins, ready for accumulation
 

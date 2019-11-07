@@ -12,6 +12,9 @@
 #ifdef __PGI   // HACKY
 #define ACC_INLINE inline
 #endif
+#ifdef _OPENACC // GNU
+#define ACC_INLINE inline
+#endif
 
 #if 1
 typedef double MKFAccScalar;
