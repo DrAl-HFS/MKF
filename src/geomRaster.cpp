@@ -80,7 +80,7 @@ extern "C" size_t rasterise (void *pV, const int def[3], const GeomParam *pGP, c
       if (pG)
       {
          Trav3Inf t(def);
-         if (0 == pRP->flags & RAS_FLAG_WRAL) { pG->safeBoundsI(t.lb, t.ub, 3); LOG("safeBoundsI: l=%d %d %d u=%d %d %d", t.lb[0],t.lb[1],t.lb[2], t.ub[0],t.ub[1],t.ub[2]); }
+         if (0 == (pRP->flags & RAS_FLAG_WRAL)) { pG->safeBoundsI(t.lb, t.ub, 3); LOG("safeBoundsI: l=%d %d %d u=%d %d %d", t.lb[0],t.lb[1],t.lb[2], t.ub[0],t.ub[1],t.ub[2]); }
          switch (pRP->enc)
          {
             case ENC_F32 :

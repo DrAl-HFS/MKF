@@ -272,7 +272,7 @@ size_t mkftu (const Context *pC, const int def[3], const float mScale, const uin
 int main (int argc, char *argv[])
 {
    const int def[3]= {256, 256, 256}; // {64,64,2}; //{96,9,9};
-   const float param[]= { def[0] * 0.75, 1, 0 }; //256-64;
+   const float param[]= { def[0] * 0.75f, 1, 0 }; //256-64;
    Context cux={0};
    const float mScale= 3.0 / sumNI(def,3); // reciprocal mean
    size_t n;
