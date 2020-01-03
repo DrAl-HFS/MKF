@@ -1,6 +1,6 @@
 // mkfAcc.c - tools for calculating Minkowski Functionals on a scalar field (via packed binary map and pattern distribution).
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June-Sept 2019
+// (c) Project Contributors June 2019 - Jan 2020
 
 #include "mkfACC.h"
 
@@ -152,6 +152,7 @@ ACC_INLINE void addRowBPFD
 } // addRowBPFD
 
 // Add plane of cells defined by two bitplanes
+#pragma acc routine
 ACC_INLINE void addPlaneBPFD
 (
    size_t rBPFD[256], // result pattern distribution
@@ -161,8 +162,8 @@ ACC_INLINE void addPlaneBPFD
    const int def[3]
 )
 {
-   //#pragma acc loop reduction(+: rBPFD )
-   #pragma acc parallel loop
+   //pragma acc loop reduction(+: rBPFD )
+   //pragma acc parallel loop
    for (int i= 0; i < (def[1]-1); i++)
    {
       addRowBPFD(rBPFD, pPlane0 + i * rowStride, pPlane1 + i * rowStride, rowStride, def[0]);

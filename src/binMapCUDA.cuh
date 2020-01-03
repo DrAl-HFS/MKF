@@ -1,6 +1,6 @@
 // binMapCUDA.cuh - Templated device code for Packed Binary Map generation from scalar fields
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Jan-Nov 2019
+// (c) Project Contributors Jan 2019 - Jan 2020
 
 #ifndef BIN_MAP_CUDA_CUH
 #define BIN_MAP_CUDA_CUH

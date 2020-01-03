@@ -1,6 +1,6 @@
 // binMapAcc.c - packed binary map generation from scalar field.
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors June 2019
+// (c) Project Contributors June 2019 - Jan 2020
 
 #include "binMapACC.h"
 

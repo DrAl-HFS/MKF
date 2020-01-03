@@ -1,6 +1,6 @@
 // binMapCUDA.h - packed binary map generation from scalar fields
 // https://github.com/DrAl-HFS/MKF.git
-// (c) Project Contributors Jan-Oct 2019
+// (c) Project Contributors Jan 2019 - Jan 2020
 
 #include "binMapCUDA.h"
 #include "utilCUDA.hpp"

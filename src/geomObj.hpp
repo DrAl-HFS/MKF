@@ -68,7 +68,7 @@ public :
       return(d);
    } // boundsI
 
-   bool inF3 (float x, float y, float z) const
+   bool inF3 (float x, float y, float z) const override
    {
       const float s2= sqrMag3D(x-c[0], y-c[1], z-c[2]) ;
       return((r2[0] >= s2) && (r2[1] <= s2));
@@ -92,7 +92,7 @@ public :
       return(d);
    } // boundsI
 
-   bool inF3 (float x, float y, float z) const
+   bool inF3 (float x, float y, float z) const override
    {
       return( (fabs(x-c[0]) <= r[0]) && (fabs(y-c[1]) <= r[1]) && (fabs(z-c[2]) <= r[2]) );
    }
